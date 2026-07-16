@@ -928,6 +928,28 @@
         <label style="margin-top:10px;">Envío automático a SUNAT <span style="color:var(--text-dim); font-weight:normal;">(opcional — solo si esta empresa tiene su SFS conectado al servidor)</span></label>
         <input type="text" id="cfg_bridge_id" placeholder="ej. nutri — déjalo vacío si aún se genera el JSON manualmente">
 
+        <label style="margin-top:14px; display:block; border-top:1px solid var(--line); padding-top:12px;">Ajustar próximo número de correlativo <span style="color:var(--text-dim); font-weight:normal;">(usar solo si ya emitiste comprobantes fuera de FACTASH y necesitas continuar la numeración sin repetir)</span></label>
+        <div class="row2">
+          <div>
+            <label>Próxima Guía Remitente</label>
+            <input type="number" id="cfg_correl_remitente" min="1" placeholder="ej. 752">
+          </div>
+          <div>
+            <label>Próxima Guía Transportista</label>
+            <input type="number" id="cfg_correl_transportista" min="1" placeholder="ej. 1">
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label>Próxima Factura</label>
+            <input type="number" id="cfg_correl_factura" min="1" placeholder="ej. 1">
+          </div>
+          <div>
+            <label>Próxima Boleta</label>
+            <input type="number" id="cfg_correl_boleta" min="1" placeholder="ej. 1">
+          </div>
+        </div>
+
         <button class="btn-primary" onclick="guardarConfigEmpresa()">Guardar configuración</button>
         <div id="cfgEmpresaMsg" style="font-size:12px; margin-top:10px; display:none;"></div>
       </div>
@@ -2877,6 +2899,15 @@ function guardarConfigEmpresa(){
   emp.textoLegal = document.getElementById('cfg_texto_legal').value.trim();
   emp.bridgeEmpresaId = document.getElementById('cfg_bridge_id') ? document.getElementById('cfg_bridge_id').value.trim() : (emp.bridgeEmpresaId || '');
 
+  ['remitente','transportista','factura','boleta'].forEach(tipo=>{
+    const el = document.getElementById(`cfg_correl_${tipo}`);
+    if(el && el.value.trim()){
+      const n = parseInt(el.value, 10);
+      if(!isNaN(n) && n > 0){ emp.correlativos[tipo] = n; }
+      el.value = '';
+    }
+  });
+
   const msg = document.getElementById('cfgEmpresaMsg');
   msg.style.display='block'; msg.style.color='var(--accent-2)';
   msg.textContent = 'Configuración guardada.';
@@ -2927,6 +2958,10 @@ function renderConfigEmpresa(){
   document.getElementById('cfg_web').value = emp.web || '';
   document.getElementById('cfg_texto_legal').value = emp.textoLegal || '';
   if(document.getElementById('cfg_bridge_id')) document.getElementById('cfg_bridge_id').value = emp.bridgeEmpresaId || '';
+  ['remitente','transportista','factura','boleta'].forEach(tipo=>{
+    const el = document.getElementById(`cfg_correl_${tipo}`);
+    if(el){ el.value = ''; el.placeholder = `Actual: ${emp.correlativos[tipo] || 1}`; }
+  });
 
   document.getElementById('listaBancos').innerHTML = (emp.bancos||[]).map(b=>`
     <div class="list-item">
@@ -3197,6 +3232,188 @@ function numeroALetras(num){
   return `${entero(entera)} CON ${String(centavos).padStart(2,'0')}/100 SOLES`;
 }
 
+// Representación impresa de Guía de Remisión — replica el formato oficial que entrega
+// el SFS real (cabecera con datos del emisor/destinatario/transportista, tabla de ítems,
+// QR + hash + link de consulta oficial, cuadro de bultos/peso, firma de conformidad).
+function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
+  const cab = (e.jsonSFS && e.jsonSFS.cabecera) || {};
+  const esTransportista = e.tipo === 'transportista';
+  const [serieG, numG] = (e.serie||'-').split('-');
+
+  const filasGuia = filasItems.map(it => `
+    <tr>
+      <td>${it.codigo!=='-' ? it.codigo : ''}</td>
+      <td style="text-align:right;">${(parseFloat(it.cant)||0).toFixed(2)}</td>
+      <td style="text-align:center;">${it.unidad||'UND'}</td>
+      <td>${it.desc}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="4" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
+
+  // Link oficial de consulta pública SUNAT para verificar la guía (mismo dominio que usa
+  // el propio QR una vez que SUNAT acepta el documento).
+  const urlConsultaPublica = 'https://e-factura.sunat.gob.pe/v1/contribuyente/gre/comprobantes/descargaqr';
+  const hashMostrado = e.sunatQrUrl ? (e.sunatQrUrl.split('hashqr=')[1] || '') : '';
+
+  return `
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${e.serie}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+<style>
+  @page { size: A4; margin: 12mm; }
+  body { font-family: Arial, sans-serif; color:#111; font-size:11px; }
+  .marco { border:1px solid #333; }
+  .fila-header { display:flex; }
+  .logo-box { width:90px; padding:8px; display:flex; align-items:center; justify-content:center; border-right:1px solid #333; }
+  .logo-box img { max-width:100%; max-height:70px; object-fit:contain; }
+  .empresa-box { flex:1; padding:8px 12px; border-right:1px solid #333; }
+  .empresa-box h1 { font-size:13.5px; margin:0 0 4px; }
+  .empresa-box .dir { font-size:10px; color:#333; }
+  .doc-box { width:200px; padding:8px 12px; text-align:center; }
+  .doc-box .ruc { font-size:11px; font-weight:bold; }
+  .doc-box .tipo { font-size:12px; font-weight:bold; margin:5px 0; }
+  .doc-box .serie { font-size:13px; font-weight:bold; letter-spacing:0.5px; }
+  table.datos { width:100%; border-collapse:collapse; border-top:1px solid #333; }
+  table.datos td { padding:5px 8px; font-size:10.5px; vertical-align:top; border-bottom:1px solid #ccc; }
+  table.datos td.label { font-weight:bold; width:120px; white-space:nowrap; }
+  table.datos tr:last-child td { border-bottom:none; }
+  table.items { width:100%; border-collapse:collapse; margin-top:10px; }
+  table.items th { background:#2b2b2b; color:#fff; padding:6px 5px; font-size:10px; text-align:left; }
+  table.items td { padding:5px; font-size:10.5px; border-bottom:1px solid #eee; }
+  .pie { display:flex; margin-top:14px; gap:14px; align-items:flex-start; }
+  .qr-col { width:110px; text-align:center; }
+  #qrcode { margin:0 auto 4px; }
+  .qr-col .resumen { font-size:8.5px; color:#555; word-break:break-all; line-height:1.3; }
+  .consulta-col { flex:1; font-size:9.5px; color:#444; padding-top:4px; }
+  .consulta-col a { color:#1a54c4; word-break:break-all; }
+  .totales-box { border:1px solid #333; padding:6px 10px; font-size:10.5px; min-width:160px; }
+  .totales-box div { display:flex; justify-content:space-between; padding:2px 0; }
+  .firma-col { width:220px; text-align:center; padding-top:34px; font-size:10px; }
+  .firma-col .linea { border-top:1px solid #333; margin-bottom:4px; }
+  .aviso { margin-top:10px; padding:6px 10px; font-size:9.5px; }
+  .aviso.pendiente { background:#fff7e6; border:1px solid #e0a72c; color:#8a5a00; }
+  .aviso.ok { background:#eafaf0; border:1px solid #2e9e5b; color:#1a7a3c; }
+  .footer-legal { margin-top:16px; text-align:center; font-size:9px; color:#777; border-top:1px solid #eee; padding-top:6px; }
+</style></head>
+<body>
+
+  <div class="marco">
+    <div class="fila-header">
+      ${emp.logo ? `<div class="logo-box"><img src="${emp.logo}"></div>` : ''}
+      <div class="empresa-box">
+        <h1>${emp.nombre}</h1>
+        <div class="dir">${emp.direccion || ''}</div>
+      </div>
+      <div class="doc-box">
+        <div class="ruc">R.U.C. ${emp.ruc}</div>
+        <div class="tipo">GUÍA DE REMISIÓN<br>ELECTRÓNICA${esTransportista ? ' — TRANSPORTISTA' : ''}</div>
+        <div class="serie">${e.serie}</div>
+      </div>
+    </div>
+
+    <table class="datos">
+      <tr>
+        <td class="label">Destinatario</td>
+        <td>${e.cliente}</td>
+        <td class="label">Ítem</td>
+        <td style="width:160px;">${filasItems[0] ? filasItems[0].desc : ''}</td>
+      </tr>
+      <tr>
+        <td class="label">RUC/DNI</td>
+        <td>${e.clienteDoc || cab.numDocDestinatario || '-'}</td>
+        <td class="label">Dirección</td>
+        <td>${cab.dirDestinatario || '-'}</td>
+      </tr>
+      <tr>
+        <td class="label">Partida</td>
+        <td colspan="3">${cab.ubiPartida ? `[${cab.ubiPartida}] ` : ''}${cab.dirPartida || '-'}</td>
+      </tr>
+      <tr>
+        <td class="label">Llegada</td>
+        <td colspan="3">${cab.ubiLlegada ? `[${cab.ubiLlegada}] ` : ''}${cab.dirLlegada || '-'}</td>
+      </tr>
+      <tr>
+        <td class="label">Motivo</td>
+        <td>${cab.desMotivoTrasladoDatosEnvio || '-'}</td>
+        <td class="label">Modalidad</td>
+        <td>${cab.modTrasladoDatosEnvio === '01' ? 'Transporte público' : 'Transporte privado'}</td>
+      </tr>
+      <tr>
+        <td class="label">Fecha de emisión</td>
+        <td>${e.fecha}</td>
+        <td class="label">Fecha de traslado</td>
+        <td>${cab.fecInicioTrasladoDatosEnvio || e.fecha}</td>
+      </tr>
+      ${cab.modTrasladoDatosEnvio === '01' ? `
+      <tr>
+        <td class="label">N° Registro MTC</td>
+        <td colspan="3">${cab.numRegistroMTC || '-'}</td>
+      </tr>` : `
+      <tr>
+        <td class="label">Transportista</td>
+        <td>RUC ${cab.numDocTransportista || '-'}</td>
+        <td class="label">Conductor</td>
+        <td>${cab.nomConductorTransPrivado || '-'}</td>
+      </tr>
+      <tr>
+        <td class="label">Placa</td>
+        <td colspan="3">${cab.numPlacaTransPrivado || '-'}</td>
+      </tr>`}
+    </table>
+
+    <div style="padding:0 8px;">
+      <table class="items">
+        <thead>
+          <tr>
+            <th style="width:14%;">Código</th>
+            <th style="width:10%; text-align:right;">Cant.</th>
+            <th style="width:10%; text-align:center;">U.M.</th>
+            <th>Descripción</th>
+          </tr>
+        </thead>
+        <tbody>${filasGuia}</tbody>
+      </table>
+    </div>
+
+    <div style="padding:10px 8px 12px;">
+      <div class="pie">
+        <div class="qr-col">
+          <div id="qrcode"></div>
+          ${e.sunatQrUrl ? `<div class="resumen">Resumen<br>${hashMostrado}</div>` : ''}
+        </div>
+        <div class="consulta-col">
+          Representación impresa de la Guía de Remisión Electrónica. Puede consultar y descargar el documento original ingresando el RUC del emisor (${emp.ruc}), el tipo, serie y número (${e.serie}) en:<br>
+          <a href="https://www.sunat.gob.pe/ol-it-wsconsvalicpe/ValidezItemFactura.htm" target="_blank">https://www.sunat.gob.pe/ol-it-wsconsvalicpe/ValidezItemFactura.htm</a>
+          ${e.sunatQrUrl ? `<br><br>Enlace directo de verificación:<br><a href="${e.sunatQrUrl}" target="_blank">${e.sunatQrUrl}</a>` : ''}
+        </div>
+        <div class="totales-box">
+          <div><span>Total bultos</span><span>${cab.numBultosDatosEnvio || '1'}</span></div>
+          <div><span>Peso total (Kg)</span><span>${cab.psoBrutoTotalBienesDatosEnvio || '0.00'}</span></div>
+        </div>
+        <div class="firma-col">
+          <div class="linea"></div>
+          Conformidad del cliente
+        </div>
+      </div>
+
+      ${!qrDisponible ? `<div class="aviso pendiente">⚠ Pendiente de confirmación SUNAT — este QR es provisional (aún no se cargó el CDR de respuesta oficial).</div>` : ''}
+      ${qrDisponible && e.sunatQrUrl ? `<div class="aviso ok">✓ Documento aceptado por SUNAT — QR oficial verificado.</div>` : ''}
+    </div>
+  </div>
+
+  <div class="footer-legal">
+    ${emp.textoLegal || 'Representación impresa de la Guía de Remisión Electrónica. Generado con FACTASH.'}
+  </div>
+
+  <script>
+    new QRCode(document.getElementById('qrcode'), {
+      text: ${JSON.stringify(contenidoQR)},
+      width: 90, height: 90, correctLevel: QRCode.CorrectLevel.M
+    });
+    window.print();
+  <\/script>
+
+</body></html>`;
+}
+
 function imprimirComprobante(idx, formato){
   const e = emitidos[idx];
   const emp = empresas[e.empresa];
@@ -3297,7 +3514,7 @@ function imprimirComprobante(idx, formato){
   const qrDisponible = !esGuia || !!e.sunatQrUrl;
   const contenidoQR = (esGuia && e.sunatQrUrl) ? e.sunatQrUrl : textoQR;
 
-  const html = `
+  const html = esGuia ? buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible) : `
 <!DOCTYPE html><html><head><meta charset="UTF-8"><title>${e.serie}</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <style>
@@ -3350,7 +3567,7 @@ function imprimirComprobante(idx, formato){
 
   <div class="datos-cliente">
     <div><b>Emisión</b>: ${e.fecha}</div>
-    <div><b>${esGuia ? 'Destinatario' : 'Cliente'}</b>: ${e.cliente}</div>
+    <div><b>Cliente</b>: ${e.cliente}</div>
     ${e.noFiscal ? '<div style="color:#b45309; font-weight:bold;">⚠ Este documento NO es un comprobante de pago válido para SUNAT</div>' : ''}
   </div>
 
@@ -3371,7 +3588,7 @@ function imprimirComprobante(idx, formato){
 
   <div class="footer-totales">
     ${montoLetras ? `<div class="son-letras"><b>SON:</b> ${montoLetras}</div>` : '<div style="flex:1;"></div>'}
-    ${!esGuia && e.monto!==null ? `
+    ${e.monto!==null ? `
     <div class="tabla-impuestos">
       <div><span>Op. Gravada</span><span>S/ ${gravado.toFixed(2)}</span></div>
       <div><span>IGV</span><span>S/ ${igv.toFixed(2)}</span></div>
@@ -3394,8 +3611,6 @@ function imprimirComprobante(idx, formato){
     <div style="font-size:10px; color:#777;">
       RUC: ${emp.ruc} | Tipo: ${badgeLabel(e.tipo)} | Serie: ${e.serie}<br>
       Fecha: ${e.fecha} | Total: S/ ${(e.monto||0).toFixed(2)}
-      ${esGuia && !qrDisponible ? '<br><b style="color:#c0392b;">⚠ Pendiente de CDR SUNAT — QR provisional, no oficial</b>' : ''}
-      ${esGuia && qrDisponible && e.sunatQrUrl ? '<br><b style="color:#1a7a3c;">✓ QR oficial SUNAT (verificado)</b>' : ''}
     </div>
   </div>
 
