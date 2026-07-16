@@ -2239,6 +2239,8 @@ function generarComprobante(){
     sunatEstado: esNoFiscal ? null : 'enviando'
   };
   emitidos.unshift(registro);
+  guardarEmitidoEnServidor(registro);
+  guardarEmpresaEnServidor(empresaActual); // el correlativo de la empresa avanzó
 
   items = [];
   document.getElementById('f_cliente').value='';
@@ -2257,6 +2259,7 @@ function generarComprobante(){
         registro.sunatDescripcion = resultado.descripcion;
         if(resultado.estado === 'error_conexion') descargarJSON(jsonSUNAT, `${emp.ruc}-${tipDocArchivo}-${serie}.json`);
       }
+      actualizarEmitidoEnServidor(registro);
       renderTodo();
     });
   }
@@ -2347,6 +2350,8 @@ function generarGuia(){
     sunatEstado: 'enviando'
   };
   emitidos.unshift(registro);
+  guardarEmitidoEnServidor(registro);
+  guardarEmpresaEnServidor(empresaActual); // el correlativo de la empresa avanzó
 
   itemsGuia = [];
   document.getElementById('g_destinatario').value='';
@@ -2367,6 +2372,7 @@ function generarGuia(){
       registro.sunatDescripcion = resultado.descripcion;
       if(resultado.estado === 'error_conexion') descargarJSON(jsonSFS, `${emp.ruc}-09-${serie}.json`);
     }
+    actualizarEmitidoEnServidor(registro);
     renderTodo();
   });
 }
@@ -2912,6 +2918,8 @@ function guardarConfigEmpresa(){
   msg.style.display='block'; msg.style.color='var(--accent-2)';
   msg.textContent = 'Configuración guardada.';
   document.getElementById('nombreEmpresaHeader').textContent = emp.nombre + (esAdmin ? ' (modo administrador)' : (rolSesion==='caja' ? ' — '+cajaActual.nombre : ''));
+  autoguardarLocal();
+  guardarEmpresaEnServidor(empresaActual);
 }
 
 function agregarBancoEmpresa(){
@@ -3063,6 +3071,8 @@ function cargarCDR(idx, file){
       }
 
       renderTodo();
+      autoguardarLocal();
+      actualizarEmitidoEnServidor(e);
       alert(e.sunatEstado === 'aceptado'
         ? '✓ CDR cargado — SUNAT aceptó el documento. El QR oficial ya quedó vinculado.'
         : `✕ CDR cargado — SUNAT RECHAZÓ el documento.\n\n${descripcion}`);
@@ -3669,6 +3679,110 @@ function actualizarSeriesVisibles(){
     elGuia.textContent = `${emp.series[docActualGuia]}-${String(correlativoG).padStart(8,'0')}`;
   }
 }
+
+// PERSISTENCIA REAL (16 jul 2026): FACTASH ahora guarda la configuración de empresas y los
+// comprobantes/guías emitidos en el backend propio del servidor (factash-api + PostgreSQL),
+// no solo en el navegador. Así los datos son los mismos sin importar desde qué computadora
+// se entre. Se mantiene localStorage como respaldo local instantáneo (por si el backend
+// tarda en responder o hay un corte momentáneo de internet), pero la fuente de verdad real
+// es el servidor.
+const FACTASH_API_URL = 'https://factash-api.vmshgroup.com';
+const STORAGE_KEY_EMPRESAS = 'factash_empresas_v1';
+const STORAGE_KEY_EMITIDOS = 'factash_emitidos_v1';
+
+function autoguardarLocal(){
+  try{
+    localStorage.setItem(STORAGE_KEY_EMPRESAS, JSON.stringify(empresas));
+    localStorage.setItem(STORAGE_KEY_EMITIDOS, JSON.stringify(emitidos));
+  } catch(err){ /* si el navegador bloquea localStorage, no se rompe la app */ }
+}
+
+// Guarda la configuración de UNA empresa en el servidor (se llama tras Guardar configuración,
+// o después de generar un comprobante porque cambia el correlativo).
+async function guardarEmpresaEnServidor(idEmpresa){
+  try{
+    await fetch(`${FACTASH_API_URL}/api/empresas/${encodeURIComponent(idEmpresa)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(empresas[idEmpresa])
+    });
+  } catch(err){ /* si no hay conexión, el dato igual quedó en localStorage como respaldo */ }
+}
+
+// Guarda un comprobante/guía emitido nuevo en el servidor. Devuelve el id que asignó el
+// servidor (útil para luego actualizarlo, ej. al cargar el CDR de SUNAT).
+async function guardarEmitidoEnServidor(registro){
+  try{
+    const resp = await fetch(`${FACTASH_API_URL}/api/emitidos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(registro)
+    });
+    const data = await resp.json();
+    if(data.ok) registro.idServidor = data.id;
+  } catch(err){ /* sin conexión — el registro queda igual en memoria/localStorage */ }
+}
+
+// Actualiza un emitido ya existente en el servidor (ej. tras cargar CDR o cambiar sunatEstado).
+async function actualizarEmitidoEnServidor(registro){
+  if(!registro.idServidor) return; // todavía no se guardó en el servidor, nada que actualizar
+  try{
+    await fetch(`${FACTASH_API_URL}/api/emitidos/${registro.idServidor}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(registro)
+    });
+  } catch(err){ /* sin conexión, se queda como estaba en el servidor por ahora */ }
+}
+
+// Al iniciar la app: primero carga lo que haya en localStorage (instantáneo, sin esperar
+// internet), y luego trae la versión real del servidor y la sobrescribe encima (el servidor
+// manda porque es la fuente de verdad compartida entre dispositivos).
+function cargarLocalGuardado(){
+  try{
+    const savedEmp = localStorage.getItem(STORAGE_KEY_EMPRESAS);
+    if(savedEmp){
+      const datos = JSON.parse(savedEmp);
+      Object.keys(datos).forEach(clave=>{
+        if(empresas[clave]) Object.assign(empresas[clave], datos[clave]);
+      });
+    }
+    const savedEmit = localStorage.getItem(STORAGE_KEY_EMITIDOS);
+    if(savedEmit){
+      const lista = JSON.parse(savedEmit);
+      if(Array.isArray(lista)) emitidos = lista;
+    }
+  } catch(err){ /* si el dato guardado está corrupto, seguimos con los valores por defecto */ }
+}
+
+async function cargarDesdeServidor(){
+  try{
+    const respEmp = await fetch(`${FACTASH_API_URL}/api/empresas`);
+    const dataEmp = await respEmp.json();
+    if(dataEmp.ok){
+      Object.keys(dataEmp.empresas).forEach(clave=>{
+        if(empresas[clave]) Object.assign(empresas[clave], dataEmp.empresas[clave]);
+      });
+    }
+    const respEmit = await fetch(`${FACTASH_API_URL}/api/emitidos`);
+    const dataEmit = await respEmit.json();
+    if(dataEmit.ok && dataEmit.emitidos.length){
+      // El servidor usa idServidor como id propio; mapeamos a nuestro formato interno.
+      emitidos = dataEmit.emitidos.map(e => ({ ...e, idServidor: e.id }));
+    }
+    autoguardarLocal();
+    renderTodo();
+  } catch(err){
+    // Sin internet o servidor caído: seguimos trabajando con lo que ya cargamos de
+    // localStorage, y se sincroniza solo cuando vuelva la conexión (autoguardarLocal
+    // periódico sigue corriendo igual).
+  }
+}
+
+cargarLocalGuardado();
+cargarDesdeServidor();
+setInterval(autoguardarLocal, 5000);
+window.addEventListener('beforeunload', autoguardarLocal);
 
 // init — solo prepara items vacíos, la app se muestra recién tras login
 agregarItem();
