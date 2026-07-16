@@ -565,6 +565,27 @@
 
         <div class="row2">
           <div>
+            <label>Tipo Doc. destinatario</label>
+            <select id="g_dest_tipodoc" onchange="onTipoDocDestChange()">
+              <option value="6">RUC</option>
+              <option value="1">DNI</option>
+              <option value="4">Carné de Extranjería</option>
+              <option value="7">Pasaporte</option>
+              <option value="0">Sin documento</option>
+            </select>
+          </div>
+          <div>
+            <label>N° Documento destinatario</label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="g_dest_doc" placeholder="20600052111" style="flex:1;" oninput="validarCampoDocDest()" onblur="validarCampoDocDest()" onkeydown="if(event.key==='Enter'){event.preventDefault(); consultarRucODni('g_dest_doc','g_dest_tipodoc','g_destinatario','g_dest_direccion','msg_g_dest_doc');}">
+              <button type="button" style="width:42px; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text-dim); cursor:pointer;" onclick="consultarRucODni('g_dest_doc','g_dest_tipodoc','g_destinatario','g_dest_direccion','msg_g_dest_doc')" title="Buscar por RUC/DNI">🔍</button>
+            </div>
+            <div id="msg_g_dest_doc" style="font-size:11px; margin-top:3px; display:none;"></div>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div>
             <label>Destinatario</label>
             <input type="text" id="g_destinatario" placeholder="C.G. LA ESMERALDA DE ANCO">
           </div>
@@ -574,6 +595,9 @@
             <div id="msg_g_fecha" style="font-size:11px; margin-top:3px; display:none;"></div>
           </div>
         </div>
+
+        <label>Dirección del destinatario</label>
+        <input type="text" id="g_dest_direccion" placeholder="Dirección del destinatario">
 
         <div class="row2">
           <div>
@@ -900,6 +924,9 @@
 
         <label style="margin-top:10px;">Texto legal del pie de página</label>
         <input type="text" id="cfg_texto_legal" placeholder="Representación impresa de Factura Electrónica, autorizado por Resolución N° ... SUNAT. Puede ser consultado en: www...">
+
+        <label style="margin-top:10px;">Envío automático a SUNAT <span style="color:var(--text-dim); font-weight:normal;">(opcional — solo si esta empresa tiene su SFS conectado al servidor)</span></label>
+        <input type="text" id="cfg_bridge_id" placeholder="ej. nutri — déjalo vacío si aún se genera el JSON manualmente">
 
         <button class="btn-primary" onclick="guardarConfigEmpresa()">Guardar configuración</button>
         <div id="cfgEmpresaMsg" style="font-size:12px; margin-top:10px; display:none;"></div>
@@ -1909,6 +1936,49 @@ function mostrarMensajeCampo(idMsg, texto, tipo){
 // evitando el bloqueo CORS que impide llamar a apis.net.pe directo desde el navegador.
 const URL_CONSULTA_DOC = 'https://docs-facturador.vmshgroup.com/consulta-doc?numero=';
 
+// Puente automático hacia el SFS real (solo para empresas con SFS conectado al servidor,
+// ver campo "Envío automático a SUNAT" en Configuración). Si la empresa no tiene ese campo
+// lleno, se mantiene el flujo manual de siempre (descargar el JSON).
+const BRIDGE_API_URL = 'https://sfs-bridge.vmshgroup.com';
+
+// Envía el comprobante directo al SFS real y espera el resultado (Aceptado/Rechazado).
+// Devuelve { automatico: true, estado, descripcion } o { automatico: false } si esta
+// empresa aún no tiene el envío automático configurado (se debe descargar el JSON como antes).
+async function enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonComprobante){
+  if(!emp.bridgeEmpresaId) return { automatico: false };
+
+  try{
+    const resp = await fetch(`${BRIDGE_API_URL}/generar-enviar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        empresa: emp.bridgeEmpresaId,
+        num_ruc: emp.ruc,
+        tip_docu: tipDocArchivo,
+        num_docu: serie,
+        comprobante: jsonComprobante
+      })
+    });
+    const data = await resp.json();
+
+    if(!data.ok){
+      return { automatico: true, estado: 'rechazado', descripcion: (data.mensaje || 'Error al procesar en el SFS.') };
+    }
+    const reg = data.registro;
+    // ind_situ: 03 = Enviado y Aceptado, 06 = Con errores (ver bandeja real del SFS)
+    const aceptado = reg && (reg.ind_situ === '03' || reg.ind_situ === '01' && reg.fec_envi);
+    return {
+      automatico: true,
+      estado: aceptado ? 'aceptado' : 'rechazado',
+      descripcion: reg ? reg.des_obse : 'Sin respuesta del SFS.'
+    };
+  } catch(err){
+    // Si el bridge no responde (servidor caído, sin internet, etc.), no se bloquea la emisión —
+    // se avisa y se cae al flujo manual (descargar JSON) para no dejar al usuario sin poder trabajar.
+    return { automatico: true, estado: 'error_conexion', descripcion: 'No se pudo conectar con el SFS automático. Se descargó el JSON para procesarlo manualmente.' };
+  }
+}
+
 async function consultarRucODni(idDoc, idTipoDoc, idNombre, idDireccion, idMsg){
   const numero = document.getElementById(idDoc).value.trim();
 
@@ -1967,6 +2037,28 @@ function validarCampoDoc(){
   }
 
   mostrarMensajeCampo('msg_f_doc', texto, 'error');
+}
+
+function onTipoDocDestChange(){
+  validarCampoDocDest();
+}
+
+function validarCampoDocDest(){
+  const tipoDoc = document.getElementById('g_dest_tipodoc').value;
+  const numDoc = document.getElementById('g_dest_doc').value.trim();
+  let texto = '';
+
+  if(tipoDoc === '6' && numDoc){ // RUC
+    if(!/^(10|15|16|17|20)\d{9}$/.test(numDoc)){
+      texto = 'RUC inválido — debe tener 11 dígitos y empezar con 10, 15, 16, 17 o 20.';
+    }
+  } else if(tipoDoc === '1' && numDoc){ // DNI
+    if(!/^\d{8}$/.test(numDoc)){
+      texto = 'DNI inválido — debe tener exactamente 8 dígitos.';
+    }
+  }
+
+  mostrarMensajeCampo('msg_g_dest_doc', texto, 'error');
 }
 
 function validarCampoFecha(){
@@ -2110,19 +2202,21 @@ function generarComprobante(){
   const { serie, correlativo } = obtenerSerieYCorrelativo(emp, docActualFact);
 
   let jsonSUNAT = null;
+  let tipDocArchivo = null;
   if(!esNoFiscal){
     jsonSUNAT = docActualFact === 'liquidacion' ? buildLiquidacionJSON(emp, serie) : buildFacturaJSON(emp, serie, docActualFact);
-    const tipDocArchivo = (docActualFact==='factura') ? '01' : (docActualFact==='boleta') ? '03' : (docActualFact==='nc') ? '07' : (docActualFact==='liquidacion') ? '04' : '08';
-    descargarJSON(jsonSUNAT, `${emp.ruc}-${tipDocArchivo}-${serie}.json`);
+    tipDocArchivo = (docActualFact==='factura') ? '01' : (docActualFact==='boleta') ? '03' : (docActualFact==='nc') ? '07' : (docActualFact==='liquidacion') ? '04' : '08';
   }
 
-  emitidos.unshift({
+  const registro = {
     empresa: empresaActual, grupo:'facturacion', tipo: docActualFact,
     serie, cliente, monto: total, fecha: document.getElementById('f_fecha').value || new Date().toISOString().slice(0,10),
     detalle: { items: items.map(it=>({producto:it.producto, cant:it.cant, precio:it.precio})) },
     jsonSUNAT, noFiscal: esNoFiscal,
-    tipoDocCliente: document.getElementById('f_tipodoc').value, numDocCliente: document.getElementById('f_doc').value
-  });
+    tipoDocCliente: document.getElementById('f_tipodoc').value, numDocCliente: document.getElementById('f_doc').value,
+    sunatEstado: esNoFiscal ? null : 'enviando'
+  };
+  emitidos.unshift(registro);
 
   items = [];
   document.getElementById('f_cliente').value='';
@@ -2130,6 +2224,20 @@ function generarComprobante(){
   document.getElementById('f_direccion').value='';
   renderTodo();
   cambiarTab('emitidos');
+
+  if(!esNoFiscal){
+    enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonSUNAT).then(resultado=>{
+      if(!resultado.automatico){
+        registro.sunatEstado = null;
+        descargarJSON(jsonSUNAT, `${emp.ruc}-${tipDocArchivo}-${serie}.json`);
+      } else {
+        registro.sunatEstado = resultado.estado === 'aceptado' ? 'aceptado' : (resultado.estado === 'error_conexion' ? 'pendiente' : 'rechazado');
+        registro.sunatDescripcion = resultado.descripcion;
+        if(resultado.estado === 'error_conexion') descargarJSON(jsonSUNAT, `${emp.ruc}-${tipDocArchivo}-${serie}.json`);
+      }
+      renderTodo();
+    });
+  }
 }
 
 // Arma el JSON exacto que espera tu SFS (mismo esquema de campos que tu Hoja2 real)
@@ -2144,9 +2252,10 @@ function buildGuiaJSON(emp, serie){
     horEmision: horaStr,
     tipDocGuia: "09",
     serNumDocGuia: serie,
-    numDocDestinatario: document.getElementById('g_ructrans').value || "",
-    tipDocDestinatario: "6",
+    numDocDestinatario: document.getElementById('g_dest_doc').value || "",
+    tipDocDestinatario: document.getElementById('g_dest_tipodoc').value || "6",
     rznSocialDestinatario: document.getElementById('g_destinatario').value || "",
+    dirDestinatario: document.getElementById('g_dest_direccion').value || "",
     motTrasladoDatosEnvio: document.getElementById('g_motivo').value,
     desMotivoTrasladoDatosEnvio: document.getElementById('g_motivo').selectedOptions[0].text,
     indTransbordoProgDatosEnvio: "false",
@@ -2205,22 +2314,39 @@ function generarGuia(){
 
   const jsonSFS = buildGuiaJSON(emp, serie);
 
-  emitidos.unshift({
+  const registro = {
     empresa: empresaActual, grupo:'guias', tipo: docActualGuia,
-    serie, cliente: destinatario, monto: null,
+    serie, cliente: destinatario,
+    clienteDoc: document.getElementById('g_dest_doc').value || '',
+    monto: null,
     fecha: document.getElementById('g_fecha').value || new Date().toISOString().slice(0,10),
     jsonSFS,
-    detalle: { items: itemsGuia.map(it=>({producto:it.producto, cant:it.cant, unidad:it.unidad})) }
-  });
-
-  descargarJSON(jsonSFS, `${emp.ruc}-09-${serie}.json`);
+    detalle: { items: itemsGuia.map(it=>({producto:it.producto, cant:it.cant, unidad:it.unidad})) },
+    sunatEstado: 'enviando'
+  };
+  emitidos.unshift(registro);
 
   itemsGuia = [];
   document.getElementById('g_destinatario').value='';
+  document.getElementById('g_dest_doc').value='';
+  document.getElementById('g_dest_direccion').value='';
+  document.getElementById('g_dest_tipodoc').value='6';
   document.getElementById('g_partida').value='';
   document.getElementById('g_llegada').value='';
   renderTodo();
   cambiarTab('emitidos');
+
+  enviarAlBridgeSiCorresponde(emp, '09', serie, jsonSFS).then(resultado=>{
+    if(!resultado.automatico){
+      registro.sunatEstado = null;
+      descargarJSON(jsonSFS, `${emp.ruc}-09-${serie}.json`);
+    } else {
+      registro.sunatEstado = resultado.estado === 'aceptado' ? 'aceptado' : (resultado.estado === 'error_conexion' ? 'pendiente' : 'rechazado');
+      registro.sunatDescripcion = resultado.descripcion;
+      if(resultado.estado === 'error_conexion') descargarJSON(jsonSFS, `${emp.ruc}-09-${serie}.json`);
+    }
+    renderTodo();
+  });
 }
 
 // ---------- EMISIÓN MASIVA ----------
@@ -2242,12 +2368,12 @@ const formatosMasivo = {
   },
   remitente: {
     esGuia:true,
-    cabeceraCols: ['Grupo','Destinatario','UbigeoPartida','DirPartida','UbigeoLlegada','DirLlegada','Motivo','DocRef'],
+    cabeceraCols: ['Grupo','Destinatario','RUCDestinatario','DirDestinatario','UbigeoPartida','DirPartida','UbigeoLlegada','DirLlegada','Motivo','DocRef'],
     itemCols: ['Producto','Cantidad','Unidad'],
   },
   transportista: {
     esGuia:true,
-    cabeceraCols: ['Grupo','Destinatario','UbigeoPartida','DirPartida','UbigeoLlegada','DirLlegada','Modalidad(Publico/Privado)','Motivo','DocRef','Categoria','Placa','RUCTransportista','MTC','Conductor','Licencia'],
+    cabeceraCols: ['Grupo','Destinatario','RUCDestinatario','DirDestinatario','UbigeoPartida','DirPartida','UbigeoLlegada','DirLlegada','Modalidad(Publico/Privado)','Motivo','DocRef','Categoria','Placa','RUCTransportista','MTC','Conductor','Licencia'],
     itemCols: ['Producto','Cantidad','Unidad'],
   },
 };
@@ -2416,9 +2542,10 @@ function buildGuiaJSONMasivo(g, serie, esTransportista){
     horEmision: ahora.toTimeString().slice(0,8),
     tipDocGuia: "09",
     serNumDocGuia: serie,
-    numDocDestinatario: "",
-    tipDocDestinatario: "6",
+    numDocDestinatario: cab['RUCDestinatario'] || "",
+    tipDocDestinatario: (cab['RUCDestinatario']||'').length === 8 ? "1" : "6",
     rznSocialDestinatario: cab['Destinatario'] || "",
+    dirDestinatario: cab['DirDestinatario'] || "",
     motTrasladoDatosEnvio: motivoACodigo(cab['Motivo']),
     desMotivoTrasladoDatosEnvio: cab['Motivo'] || "Venta",
     indTransbordoProgDatosEnvio: "false",
@@ -2608,6 +2735,12 @@ function guardarProducto(){
     return;
   }
 
+  const codSunatVal = document.getElementById('prod_codigo_sunat').value.trim();
+  if(codSunatVal && !/^\d{8}$/.test(codSunatVal)){
+    const continuar = confirm('El Código de Producto SUNAT (Catálogo 25) debe tener exactamente 8 dígitos numéricos. Desde el 1 de agosto de 2026, SUNAT (R.S. N.° 000048-2026) rechazará comprobantes con este código mal formado.\n\n¿Guardar de todas formas?');
+    if(!continuar) return;
+  }
+
   const datos = {
     nombre,
     codigo: document.getElementById('prod_codigo').value.trim(),
@@ -2742,6 +2875,7 @@ function guardarConfigEmpresa(){
   emp.email = document.getElementById('cfg_email').value.trim();
   emp.web = document.getElementById('cfg_web').value.trim();
   emp.textoLegal = document.getElementById('cfg_texto_legal').value.trim();
+  emp.bridgeEmpresaId = document.getElementById('cfg_bridge_id') ? document.getElementById('cfg_bridge_id').value.trim() : (emp.bridgeEmpresaId || '');
 
   const msg = document.getElementById('cfgEmpresaMsg');
   msg.style.display='block'; msg.style.color='var(--accent-2)';
@@ -2792,6 +2926,7 @@ function renderConfigEmpresa(){
   document.getElementById('cfg_email').value = emp.email || '';
   document.getElementById('cfg_web').value = emp.web || '';
   document.getElementById('cfg_texto_legal').value = emp.textoLegal || '';
+  if(document.getElementById('cfg_bridge_id')) document.getElementById('cfg_bridge_id').value = emp.bridgeEmpresaId || '';
 
   document.getElementById('listaBancos').innerHTML = (emp.bancos||[]).map(b=>`
     <div class="list-item">
@@ -2860,6 +2995,49 @@ function badgeLabel(tipo){
   return {factura:'Factura',boleta:'Boleta',nc:'N. Crédito',nd:'N. Débito',remitente:'Guía Remitente',transportista:'Guía Transportista',retencion:'Retención',percepcion:'Percepción',liquidacion:'Liq. Compra',ticket:'Ticket',notaventa:'N. Venta',proforma:'Proforma',ordenpago:'Orden Pago'}[tipo];
 }
 
+// Carga el CDR (XML de respuesta real de SUNAT, carpeta RPTA del SFS) y extrae
+// el resultado de aceptación y el hashqr real — necesario sobre todo para Guías,
+// cuyo QR oficial es un link https://e-factura.sunat.gob.pe/.../descargaqr?hashqr=...
+// que SUNAT genera recién al aceptar el documento (no se puede calcular de antemano).
+function cargarCDR(idx, file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(ev.target.result, 'text/xml');
+      if(xml.querySelector('parsererror')) throw new Error('XML inválido');
+
+      const getTxt = (localName) => {
+        const els = xml.getElementsByTagNameNS('*', localName);
+        return els.length ? (els[0].textContent||'').trim() : '';
+      };
+      const codigo = getTxt('ResponseCode');
+      const descripcion = getTxt('Description');
+      const docDescription = getTxt('DocumentDescription');
+
+      const e = emitidos[idx];
+      e.sunatEstado = (codigo === '0') ? 'aceptado' : 'rechazado';
+      e.sunatDescripcion = descripcion;
+
+      // El link completo ya viene armado en DocumentDescription (para Guías/GRE).
+      // Para Factura/Boleta el CDR normalmente no trae este link — en ese caso
+      // se mantiene el QR ya calculado con los datos propios del comprobante.
+      if(docDescription && docDescription.startsWith('http')){
+        e.sunatQrUrl = docDescription;
+      }
+
+      renderTodo();
+      alert(e.sunatEstado === 'aceptado'
+        ? '✓ CDR cargado — SUNAT aceptó el documento. El QR oficial ya quedó vinculado.'
+        : `✕ CDR cargado — SUNAT RECHAZÓ el documento.\n\n${descripcion}`);
+    } catch(err){
+      alert('No se pudo leer el archivo. Verifica que sea el XML de respuesta (CDR) que entrega el SFS en la carpeta RPTA.');
+    }
+  };
+  reader.readAsText(file);
+}
+
 function renderEmitidos(){
   const emp = empresas[empresaActual];
   document.getElementById('nombreEmpresaEmit').textContent = emp.nombre;
@@ -2875,10 +3053,18 @@ function renderEmitidos(){
         </div>
         ${e.monto!==null ? `<span class="monto">S/ ${e.monto.toFixed(2)}</span>` : ''}
       </div>
-      <div class="cliente">${e.cliente} · ${e.fecha}</div>
-      <div style="display:flex; gap:6px; margin-top:8px;">
+      <div class="cliente">${e.cliente} · ${e.fecha} ${
+        e.sunatEstado==='aceptado' ? '<span class="badge fact" style="margin-left:6px;">✓ Aceptado SUNAT</span>' :
+        e.sunatEstado==='rechazado' ? `<span class="badge nc" style="margin-left:6px;" title="${(e.sunatDescripcion||'').replace(/"/g,'')}">✕ Rechazado SUNAT</span>` :
+        e.sunatEstado==='enviando' ? '<span class="badge" style="margin-left:6px; opacity:.6;">⏳ Enviando a SUNAT...</span>' :
+        e.sunatEstado==='pendiente' ? `<span class="badge" style="margin-left:6px; opacity:.7;" title="${(e.sunatDescripcion||'').replace(/"/g,'')}">⚠ Sin conexión — JSON descargado</span>` :
+        (e.grupo==='guias' ? '<span class="badge" style="margin-left:6px; opacity:.6;">⏳ Pendiente CDR</span>' : '')
+      }</div>
+      <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'a4')">📄 PDF A4</button>
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'ticket')">🧾 Ticket</button>
+        ${!emp.bridgeEmpresaId ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="document.getElementById('cdrInput_${idx}').click()">📥 Cargar CDR SUNAT</button>
+        <input type="file" id="cdrInput_${idx}" accept=".xml" style="display:none;" onchange="cargarCDR(${idx}, this.files[0])">` : ''}
         ${e.anulado ? `<span class="badge nc">ANULADO</span>` : `<button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="anularComprobante(${idx})">🗑️ Anular</button>`}
       </div>
     </div>
@@ -3105,6 +3291,12 @@ function imprimirComprobante(idx, formato){
     igv.toFixed(2), total.toFixed(2), e.fecha, tipoDocClienteQR, numDocClienteQR
   ].join('|');
 
+  // Para Guías, el QR oficial es el link que SUNAT entrega en el CDR (hashqr) —
+  // solo existe DESPUÉS de que SUNAT acepta el documento. Si aún no se cargó
+  // ese CDR, se muestra un aviso en vez de un QR inventado.
+  const qrDisponible = !esGuia || !!e.sunatQrUrl;
+  const contenidoQR = (esGuia && e.sunatQrUrl) ? e.sunatQrUrl : textoQR;
+
   const html = `
 <!DOCTYPE html><html><head><meta charset="UTF-8"><title>${e.serie}</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
@@ -3202,6 +3394,8 @@ function imprimirComprobante(idx, formato){
     <div style="font-size:10px; color:#777;">
       RUC: ${emp.ruc} | Tipo: ${badgeLabel(e.tipo)} | Serie: ${e.serie}<br>
       Fecha: ${e.fecha} | Total: S/ ${(e.monto||0).toFixed(2)}
+      ${esGuia && !qrDisponible ? '<br><b style="color:#c0392b;">⚠ Pendiente de CDR SUNAT — QR provisional, no oficial</b>' : ''}
+      ${esGuia && qrDisponible && e.sunatQrUrl ? '<br><b style="color:#1a7a3c;">✓ QR oficial SUNAT (verificado)</b>' : ''}
     </div>
   </div>
 
@@ -3211,7 +3405,7 @@ function imprimirComprobante(idx, formato){
 
   <script>
     new QRCode(document.getElementById('qrcode'), {
-      text: ${JSON.stringify(textoQR)},
+      text: ${JSON.stringify(contenidoQR)},
       width: 80, height: 80, correctLevel: QRCode.CorrectLevel.M
     });
     window.print();
