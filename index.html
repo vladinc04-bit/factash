@@ -1,0 +1,3270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FACTASH</title>
+<style>
+  :root{
+    --bg:#12181f;
+    --panel:#1a222c;
+    --panel-2:#212b37;
+    --line:#2b3947;
+    --text:#e7edf3;
+    --text-dim:#8fa2b3;
+    --accent:#3b82f6;
+    --accent-2:#22c55e;
+    --warn:#f59e0b;
+    --danger:#ef4444;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+    min-height:100vh;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 24px; background:var(--panel); border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:10;
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand .mark{
+    width:30px;height:30px;border-radius:7px;
+    background:linear-gradient(135deg,var(--accent),#8b5cf6);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;
+  }
+  .brand h1{font-size:15px; margin:0; font-weight:600; letter-spacing:.2px;}
+  .brand .sub{font-size:11px; color:var(--text-dim);}
+
+  .empresa-select{display:flex; align-items:center; gap:10px;}
+  select#empresaSel{
+    background:var(--panel-2); color:var(--text); border:1px solid var(--line);
+    border-radius:8px; padding:8px 12px; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .ruc-tag{font-family:var(--mono); font-size:11px; color:var(--text-dim); background:var(--panel-2); padding:4px 8px; border-radius:6px; border:1px solid var(--line);}
+
+  nav.tabs{
+    display:flex; gap:4px; padding:0 24px; background:var(--panel); border-bottom:1px solid var(--line);
+    overflow-x:auto;
+  }
+  nav.tabs button{
+    background:none; border:none; color:var(--text-dim); padding:12px 16px; font-size:13px;
+    cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; font-weight:500;
+  }
+  nav.tabs button.active{color:var(--text); border-bottom-color:var(--accent);}
+  nav.tabs button:hover{color:var(--text);}
+
+  main{padding:24px; max-width:1200px; margin:0 auto;}
+  .grid{display:grid; grid-template-columns:75fr 25fr; gap:20px;}
+  @media (max-width:1000px){.grid{grid-template-columns:1fr;}}
+
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px;}
+  .card h2{font-size:14px; margin:0 0 14px; font-weight:600; display:flex; align-items:center; gap:8px;}
+  .card h2 .n{color:var(--text-dim); font-weight:400; font-size:12px;}
+
+  .doc-picker{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;}
+  .doc-picker-label{font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-dim); font-weight:700; margin:0 0 8px 2px;}
+  .doc-picker button{
+    flex:1; min-width:120px; background:var(--panel-2); border:1px solid var(--line);
+    color:var(--text-dim); padding:10px 8px; border-radius:8px; font-size:12px; cursor:pointer; font-weight:600;
+  }
+  .doc-picker button.active{background:rgba(59,130,246,.15); border-color:var(--accent); color:#bcd4fb;}
+
+  label{display:block; font-size:11px; color:var(--text-dim); margin:10px 0 4px; font-weight:600; text-transform:uppercase; letter-spacing:.4px;}
+  input,select,textarea{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    padding:9px 10px; border-radius:7px; font-size:13px; font-family:inherit;
+  }
+  input:focus,select:focus,textarea:focus{outline:none; border-color:var(--accent);}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;}
+
+  table{width:100%; border-collapse:collapse; margin-top:10px; font-size:12.5px;}
+  th{text-align:left; color:var(--text-dim); font-weight:600; padding:8px 6px; border-bottom:1px solid var(--line); font-size:11px; text-transform:uppercase;}
+  td{padding:8px 6px; border-bottom:1px solid var(--line);}
+  td input{padding:6px 8px; font-size:12.5px;}
+  .item-row td:last-child{text-align:center;}
+  .rm-btn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:15px;}
+  .add-item{margin-top:8px; background:var(--panel-2); border:1px dashed var(--line); color:var(--text-dim); padding:8px; border-radius:7px; width:100%; cursor:pointer; font-size:12px;}
+
+  .totales{margin-top:14px; border-top:1px solid var(--line); padding-top:12px;}
+  .tot-line{display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0; color:var(--text-dim);}
+  .tot-line.final{color:var(--text); font-size:15px; font-weight:700; padding-top:6px;}
+
+  .btn-primary{
+    margin-top:16px; width:100%; background:var(--accent); border:none; color:#fff;
+    padding:12px; border-radius:8px; font-size:13.5px; font-weight:700; cursor:pointer;
+  }
+  .btn-primary:hover{background:#2f6fe0;}
+
+  .correlativo-box{
+    display:flex; align-items:center; justify-content:space-between; background:var(--panel-2);
+    border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-family:var(--mono); font-size:13px;
+  }
+  .correlativo-box .lbl{color:var(--text-dim); font-family:inherit; font-size:11px; text-transform:uppercase;}
+
+  .list-item{
+    border:1px solid var(--line); border-radius:9px; padding:12px; margin-bottom:8px; background:var(--panel-2);
+  }
+  .list-item .top{display:flex; justify-content:space-between; align-items:center;}
+  .list-item .serie{font-family:var(--mono); font-weight:700; font-size:13px;}
+  .list-item .cliente{font-size:12.5px; color:var(--text-dim); margin-top:2px;}
+  .list-item .monto{font-weight:700; font-size:13px;}
+  .badge{font-size:10px; padding:2px 7px; border-radius:20px; font-weight:700; text-transform:uppercase;}
+  .badge.factura{background:rgba(59,130,246,.15); color:#8ab6fb;}
+  .badge.boleta{background:rgba(34,197,94,.15); color:#7fe0a1;}
+  .badge.nc{background:rgba(245,158,11,.15); color:#f7c266;}
+  .badge.nd{background:rgba(239,68,68,.15); color:#f79b9b;}
+  .badge.gremit{background:rgba(139,92,246,.15); color:#c4b0fb;}
+  .badge.gtrans{background:rgba(236,72,153,.15); color:#f5a8cf;}
+
+  .empty-state{text-align:center; padding:40px 10px; color:var(--text-dim); font-size:13px;}
+
+  .placeholder-note{
+    background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.3); color:#f7c266;
+    border-radius:8px; padding:10px 12px; font-size:12px; margin-bottom:16px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div id="loginScreen" style="min-height:100vh; display:flex; align-items:center; justify-content:center;">
+  <div class="card" style="width:100%; max-width:360px;">
+    <div style="text-align:center; margin-bottom:18px;">
+      <div class="mark" style="margin:0 auto 10px; width:40px; height:40px; font-size:16px;">FA</div>
+      <h1 style="font-size:16px; margin:0;">FACTASH</h1>
+      <div class="sub" style="margin-top:4px;">Ingresa con el usuario de tu empresa</div>
+    </div>
+    <label>Usuario</label>
+    <input type="text" id="loginUser" placeholder="usuario" autocomplete="off">
+    <label>Contraseña</label>
+    <input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter') intentarLogin();">
+    <button class="btn-primary" onclick="intentarLogin()">Ingresar</button>
+    <div id="loginError" style="color:var(--danger); font-size:12px; margin-top:10px; display:none;">Usuario o contraseña incorrectos</div>
+    <div style="text-align:center; margin-top:16px;">
+      <a href="#" onclick="abrirAdmin(); return false;" style="color:var(--text-dim); font-size:12px;">Administrar empresas</a>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PANEL ADMIN ===================== -->
+<div id="adminScreen" style="min-height:100vh; display:none; align-items:center; justify-content:center;">
+  <div class="card" style="width:100%; max-width:480px;">
+    <div id="adminLoginBox">
+      <h1 style="font-size:15px; margin:0 0 4px;">Panel de administrador</h1>
+      <div class="sub" style="margin-bottom:10px;">Contraseña de administrador</div>
+      <input type="password" id="adminPass" placeholder="••••••••" onkeydown="if(event.key==='Enter') intentarAdmin();">
+      <button class="btn-primary" onclick="intentarAdmin()">Entrar</button>
+      <div id="adminError" style="color:var(--danger); font-size:12px; margin-top:10px; display:none;">Contraseña incorrecta</div>
+      <div style="text-align:center; margin-top:14px;">
+        <a href="#" onclick="cerrarAdmin(); return false;" style="color:var(--text-dim); font-size:12px;">Volver</a>
+      </div>
+    </div>
+
+    <div id="adminPanelBox" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <h1 style="font-size:15px; margin:0;">Empresas registradas</h1>
+        <a href="#" onclick="cerrarAdmin(); return false;" style="color:var(--text-dim); font-size:12px;">Cerrar</a>
+      </div>
+      <div id="listaEmpresasAdmin" style="margin:12px 0;"></div>
+
+      <h2 style="font-size:13px; margin:18px 0 4px;">Nueva empresa</h2>
+      <label>Razón social</label>
+      <input type="text" id="na_nombre" placeholder="Ej. Comercial XYZ S.A.C.">
+      <label>RUC</label>
+      <input type="text" id="na_ruc" placeholder="20xxxxxxxxx">
+      <div class="row2">
+        <div>
+          <label>Usuario de acceso</label>
+          <input type="text" id="na_usuario" placeholder="usuario">
+        </div>
+        <div>
+          <label>Contraseña</label>
+          <input type="text" id="na_clave" placeholder="clave temporal">
+        </div>
+      </div>
+      <button class="btn-primary" onclick="crearEmpresa()">Crear empresa</button>
+      <div id="adminMsg" style="font-size:12px; margin-top:10px; display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="appScreen" style="display:none;">
+<header>
+  <div class="brand">
+    <div class="mark">FA</div>
+    <div>
+      <h1>FACTASH</h1>
+      <div class="sub" id="nombreEmpresaHeader">Facturas · Guías de Remisión — SUNAT</div>
+    </div>
+  </div>
+  <div class="empresa-select">
+    <span class="ruc-tag" id="rucTag">RUC 20612763306</span>
+    <button class="rm-btn" style="color:var(--text-dim); font-size:12px; border:1px solid var(--line); border-radius:7px; padding:7px 12px;" onclick="cerrarSesion()">Cerrar sesión</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="facturacion" onclick="cambiarTab('facturacion')">📄 Facturación</button>
+  <button class="tab-btn" data-tab="guias" onclick="cambiarTab('guias')">🚚 Guías de Remisión</button>
+  <button class="tab-btn" data-tab="emitidos" onclick="cambiarTab('emitidos')">📋 Emitidos</button>
+  <button class="tab-btn" data-tab="masivo" onclick="cambiarTab('masivo')">⚡ Emisión Masiva</button>
+  <button class="tab-btn" data-tab="productos" onclick="cambiarTab('productos')">📦 Productos</button>
+  <button class="tab-btn" data-tab="config" onclick="cambiarTab('config')">⚙️ Configuración</button>
+</nav>
+
+<main>
+
+  <!-- ===================== TAB FACTURACION ===================== -->
+  <section id="tab-facturacion">
+    <div class="doc-picker-label">Comprobantes de Pago</div>
+    <div class="doc-picker">
+      <button class="doc-btn active" data-doc="factura" onclick="cambiarDoc('facturacion','factura')">Factura</button>
+      <button class="doc-btn" data-doc="boleta" onclick="cambiarDoc('facturacion','boleta')">Boleta</button>
+      <button class="doc-btn" data-doc="nc" onclick="cambiarDoc('facturacion','nc')">Nota de Crédito</button>
+      <button class="doc-btn" data-doc="nd" onclick="cambiarDoc('facturacion','nd')">Nota de Débito</button>
+      <button class="doc-btn" data-doc="retencion" onclick="cambiarDoc('facturacion','retencion')">Retención</button>
+      <button class="doc-btn" data-doc="percepcion" onclick="cambiarDoc('facturacion','percepcion')">Percepción</button>
+      <button class="doc-btn" data-doc="liquidacion" onclick="cambiarDoc('facturacion','liquidacion')">Liquidación de Compra</button>
+    </div>
+
+    <div class="doc-picker-label">Otros Documentos <span class="n" style="text-transform:none; font-weight:400;">(no son comprobantes de pago)</span></div>
+    <div class="doc-picker">
+      <button class="doc-btn" data-doc="ticket" onclick="cambiarDoc('facturacion','ticket')">Ticket</button>
+      <button class="doc-btn" data-doc="notaventa" onclick="cambiarDoc('facturacion','notaventa')">Nota de Venta</button>
+      <button class="doc-btn" data-doc="proforma" onclick="cambiarDoc('facturacion','proforma')">Proforma</button>
+      <button class="doc-btn" data-doc="ordenpago" onclick="cambiarDoc('facturacion','ordenpago')">Orden de Pago</button>
+    </div>
+
+    <div class="placeholder-note" id="notaFact">
+      Índice de trabajo — datos de prueba. Nada se envía a SUNAT ni se guarda todavía.
+    </div>
+
+    <!-- Formulario Retención / Percepción (documento independiente, no usa la tabla de ítems normal) -->
+    <div class="grid" id="bloqueRetPer" style="display:none;">
+      <div class="card">
+        <h2 id="tituloRetPer">Nueva Retención</h2>
+
+        <div class="correlativo-box">
+          <span><span class="lbl">Serie</span></span>
+          <span id="serieRetPer">R001-00000001</span>
+        </div>
+
+        <label id="lbl_rp_contraparte">RUC del proveedor</label>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="rp_ruc" placeholder="20600052111" style="flex:1;">
+          <button type="button" style="width:42px; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text-dim); cursor:pointer;" onclick="consultarRucODni('rp_ruc', null, 'rp_razonsocial', null, 'msg_rp_ruc')" title="Buscar por RUC">🔍</button>
+        </div>
+        <div id="msg_rp_ruc" style="font-size:11px; margin-top:3px; display:none;"></div>
+        <label id="lbl_rp_razonsocial">Razón social del proveedor</label>
+        <input type="text" id="rp_razonsocial" placeholder="Nombre o razón social">
+
+        <div class="row2">
+          <div>
+            <label id="lbl_rp_regimen">Régimen de retención</label>
+            <select id="rp_regimen" onchange="onRegimenRetPerChange()">
+              <option value="01" data-tasa="3">Régimen General (3%)</option>
+              <option value="02" data-tasa="6">Tasa 6% (hasta feb-2014)</option>
+            </select>
+          </div>
+          <div>
+            <label id="lbl_rp_tasa">Tasa (%)</label>
+            <input type="text" id="rp_tasa" value="3" readonly>
+          </div>
+        </div>
+
+        <div class="linea"></div>
+        <h2 style="margin-top:16px;">Documento relacionado</h2>
+        <div class="row2">
+          <div>
+            <label>Tipo de documento relacionado</label>
+            <select id="rp_tipodocrel">
+              <option value="01">Factura</option>
+              <option value="03">Boleta</option>
+              <option value="07">Nota de Crédito</option>
+              <option value="08">Nota de Débito</option>
+            </select>
+          </div>
+          <div>
+            <label>Serie-número del documento relacionado</label>
+            <input type="text" id="rp_serierel" placeholder="F001-00000123">
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label>Fecha de emisión del doc. relacionado</label>
+            <input type="date" id="rp_fechaemisionrel">
+          </div>
+          <div>
+            <label>Importe total del documento relacionado</label>
+            <input type="number" step="0.01" id="rp_importerel" oninput="calcularRetPer()">
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label id="lbl_rp_fechamov">Fecha de pago / cobro</label>
+            <input type="date" id="rp_fechamov">
+          </div>
+          <div>
+            <label id="lbl_rp_nummov">N° de pago / cobro</label>
+            <input type="text" id="rp_nummov" placeholder="1">
+          </div>
+        </div>
+
+        <div class="totales" id="totalesRetPer"></div>
+
+        <button class="btn-primary" onclick="generarRetPer()">Generar comprobante</button>
+      </div>
+
+      <div class="card">
+        <h2>Empresa emisora</h2>
+        <div id="datosEmpresaRetPer"></div>
+      </div>
+    </div>
+
+    <div class="grid" id="bloqueFacturaNormal">
+      <div class="card">
+        <h2 id="tituloDocFact">Nueva Factura</h2>
+
+        <div class="correlativo-box">
+          <span><span class="lbl">Serie</span></span>
+          <span id="serieFact">F001-00000001</span>
+        </div>
+
+        <label id="lbl_f_cliente">Cliente / Razón Social</label>
+        <input type="text" id="f_cliente" placeholder="Buscar o escribir cliente...">
+
+        <div class="row2">
+          <div>
+            <label id="lbl_doctipo_sel">Tipo Doc.</label>
+            <select id="f_tipodoc" onchange="onTipoDocChange()">
+              <option value="6">RUC</option>
+              <option value="1">DNI</option>
+              <option value="4">Carné de Extranjería</option>
+              <option value="7">Pasaporte</option>
+              <option value="0">Sin documento</option>
+            </select>
+          </div>
+          <div>
+            <label id="lbl_doctipo">N° Documento</label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="f_doc" placeholder="20600052111" style="flex:1;" oninput="validarCampoDoc()" onblur="validarCampoDoc()" onkeydown="if(event.key==='Enter'){event.preventDefault(); consultarRucODni('f_doc','f_tipodoc','f_cliente','f_direccion','msg_f_doc');}">
+              <button type="button" style="width:42px; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text-dim); cursor:pointer;" onclick="consultarRucODni('f_doc','f_tipodoc','f_cliente','f_direccion','msg_f_doc')" title="Buscar por RUC/DNI">🔍</button>
+            </div>
+            <div id="msg_f_doc" style="font-size:11px; margin-top:3px; display:none;"></div>
+          </div>
+          <div>
+            <label>Fecha de emisión</label>
+            <input type="date" id="f_fecha" onchange="validarCampoFecha()">
+            <div id="msg_f_fecha" style="font-size:11px; margin-top:3px; display:none;"></div>
+          </div>
+        </div>
+
+        <label>Dirección</label>
+        <input type="text" id="f_direccion" placeholder="Dirección del cliente">
+
+        <div class="row2">
+          <div>
+            <label>Forma de pago</label>
+            <select id="f_formapago" onchange="onFormaPagoChange()">
+              <option value="contado">Contado</option>
+              <option value="credito">Crédito</option>
+            </select>
+          </div>
+          <div>
+            <label>Guía de remisión relacionada (opcional)</label>
+            <input type="text" id="f_guiaref" placeholder="T001-00000001">
+          </div>
+        </div>
+
+        <div id="camposCredito" style="display:none;">
+          <div class="row2">
+            <div>
+              <label>N° de cuotas</label>
+              <input type="number" id="f_ncuotas" min="1" value="1" onchange="renderCuotas()">
+            </div>
+            <div>
+              <label>Monto total a financiar</label>
+              <input type="text" id="f_montofinanciado" readonly>
+            </div>
+          </div>
+          <div id="cuotasBox"></div>
+        </div>
+
+        <div id="camposNCND" style="display:none;">
+          <div class="row2">
+            <div>
+              <label>Comprobante que modifica</label>
+              <input type="text" id="f_docref" placeholder="F001-00000045">
+            </div>
+            <div>
+              <label>Motivo</label>
+              <select id="f_motivo">
+                <option>Anulación de la operación</option>
+                <option>Corrección por error en el RUC</option>
+                <option>Descuento global</option>
+                <option>Descuento por ítem</option>
+                <option>Devolución total</option>
+                <option>Devolución por ítem</option>
+                <option>Otros</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div id="camposLiquidacion" style="display:none;">
+          <div class="row2">
+            <div>
+              <label>Ubigeo domicilio del vendedor (6 dígitos)</label>
+              <input type="text" id="f_liq_ubigeo_dom" placeholder="050101" maxlength="6">
+            </div>
+            <div>
+              <label>Dirección domicilio del vendedor</label>
+              <input type="text" id="f_liq_dir_dom" placeholder="Dirección del vendedor">
+            </div>
+          </div>
+          <div class="row2">
+            <div>
+              <label>Ubigeo del punto de venta/operación (6 dígitos)</label>
+              <input type="text" id="f_liq_ubigeo_pv" placeholder="050101" maxlength="6">
+            </div>
+            <div>
+              <label>Dirección del punto de venta/operación</label>
+              <input type="text" id="f_liq_dir_pv" placeholder="Dirección de la operación">
+            </div>
+          </div>
+        </div>
+
+        <div style="margin:14px 0 10px;">
+          <button type="button" onclick="toggleDatosAdicionales()" style="background:none; border:1px solid var(--line); color:var(--text-dim); border-radius:7px; padding:8px 12px; font-size:12px; cursor:pointer; width:100%; text-align:left;">
+            ⚙️ Datos adicionales SUNAT (percepción, detracción, venta al sector público, retención) <span id="flechaDatosAdic">▾</span>
+          </button>
+        </div>
+        <div id="datosAdicionalesBox" style="display:none;">
+          <div class="row2">
+            <div>
+              <label><input type="checkbox" id="f_aplica_percepcion" onchange="toggleCamposPercepcionDetraccion()" style="width:auto; margin-right:6px;">Esta venta lleva percepción</label>
+            </div>
+            <div>
+              <label><input type="checkbox" id="f_aplica_detraccion" onchange="toggleCamposPercepcionDetraccion()" style="width:auto; margin-right:6px;">Esta venta lleva detracción</label>
+            </div>
+          </div>
+          <div id="camposPercepcionFact" style="display:none;">
+            <div class="row2">
+              <div>
+                <label>Régimen de percepción</label>
+                <select id="f_regimen_percepcion">
+                  <option value="01" data-tasa="2">Venta Interna (2%)</option>
+                  <option value="02" data-tasa="1">Adquisición de Combustible (1%)</option>
+                </select>
+              </div>
+              <div>
+                <label>Monto de la percepción</label>
+                <input type="number" step="0.01" id="f_monto_percepcion" placeholder="0.00">
+              </div>
+            </div>
+          </div>
+          <div id="camposDetraccionFact" style="display:none;">
+            <div class="row2">
+              <div>
+                <label>Código de bien/servicio sujeto a detracción</label>
+                <input type="text" id="f_cod_detraccion" placeholder="Catálogo N° 54">
+              </div>
+              <div>
+                <label>N° cuenta Banco de la Nación</label>
+                <input type="text" id="f_cuenta_detraccion" placeholder="00-000-000000">
+              </div>
+            </div>
+            <div class="row2">
+              <div>
+                <label>Porcentaje de detracción</label>
+                <input type="number" step="0.01" id="f_pct_detraccion" placeholder="4.0">
+              </div>
+              <div>
+                <label>Monto de la detracción</label>
+                <input type="number" step="0.01" id="f_monto_detraccion" placeholder="0.00">
+              </div>
+            </div>
+          </div>
+
+          <label style="margin-top:14px;"><input type="checkbox" id="f_venta_sector_publico" onchange="toggleCamposSectorPublico()" style="width:auto; margin-right:6px;">Venta al sector público (entidad del Estado)</label>
+          <div id="camposSectorPublico" style="display:none;">
+            <div class="row2">
+              <div>
+                <label>N° de expediente</label>
+                <input type="text" id="f_num_expediente" placeholder="-">
+              </div>
+              <div>
+                <label>Código de unidad ejecutora</label>
+                <input type="text" id="f_cod_unidad_ejecutora" placeholder="-">
+              </div>
+            </div>
+            <div class="row2">
+              <div>
+                <label>N° de contrato</label>
+                <input type="text" id="f_num_contrato" placeholder="-">
+              </div>
+              <div>
+                <label>N° de proceso de selección</label>
+                <input type="text" id="f_num_proceso" placeholder="-">
+              </div>
+            </div>
+          </div>
+
+          <label style="margin-top:14px;"><input type="checkbox" id="f_aplica_ret_igv" style="width:auto; margin-right:6px;">Cliente es Agente de Retención (me retiene IGV)</label>
+
+          <label style="margin-top:10px;">Placa de vehículo (venta de combustible, si aplica)</label>
+          <input type="text" id="f_placa_venta" placeholder="ABC-123">
+
+          <label style="margin-top:10px;">Leyenda (se arma automático, editable)</label>
+          <input type="text" id="f_leyenda" placeholder="SON: ...">
+        </div>
+
+        <table>
+          <thead>
+            <tr><th style="width:30%">Producto</th><th>Cant.</th><th>Unid.</th><th>P. Unit.</th><th>Afectación IGV</th><th>Total</th><th></th></tr>
+          </thead>
+          <tbody id="itemsBody"></tbody>
+        </table>
+        <button class="add-item" onclick="agregarItem()">+ Agregar producto</button>
+
+        <div class="totales" id="totalesBox"></div>
+
+        <button class="btn-primary" onclick="generarComprobante()">Generar comprobante</button>
+      </div>
+
+      <div class="card">
+        <h2>Catálogo de productos <span class="n">— <span id="nombreEmpresaProd"></span></span></h2>
+        <div id="catalogoList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB GUIAS ===================== -->
+  <section id="tab-guias" style="display:none;">
+    <div class="doc-picker">
+      <button class="doc-btn active" data-doc="remitente" onclick="cambiarDoc('guias','remitente')">Guía Remitente</button>
+      <button class="doc-btn" data-doc="transportista" onclick="cambiarDoc('guias','transportista')">Guía Transportista</button>
+    </div>
+
+    <div class="placeholder-note">Índice de trabajo — datos de prueba.</div>
+
+    <div class="grid">
+      <div class="card">
+        <h2 id="tituloDocGuia">Nueva Guía de Remisión Remitente</h2>
+
+        <div class="correlativo-box">
+          <span><span class="lbl">Serie</span></span>
+          <span id="serieGuia">T001-00000001</span>
+        </div>
+
+        <div class="row2">
+          <div>
+            <label>Destinatario</label>
+            <input type="text" id="g_destinatario" placeholder="C.G. LA ESMERALDA DE ANCO">
+          </div>
+          <div>
+            <label>Fecha de traslado</label>
+            <input type="date" id="g_fecha" onchange="validarCampoFechaGuia()">
+            <div id="msg_g_fecha" style="font-size:11px; margin-top:3px; display:none;"></div>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div>
+            <label>Ubigeo de partida (6 dígitos)</label>
+            <input type="text" id="g_ubigeo_partida" placeholder="050101" maxlength="6" oninput="validarUbigeo('g_ubigeo_partida')">
+            <div id="msg_g_ubigeo_partida" style="font-size:11px; margin-top:3px; display:none;"></div>
+          </div>
+          <div>
+            <label>Punto de partida</label>
+            <input type="text" id="g_partida" placeholder="Dirección de partida">
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label>Ubigeo de llegada (6 dígitos)</label>
+            <input type="text" id="g_ubigeo_llegada" placeholder="050906" maxlength="6" oninput="validarUbigeo('g_ubigeo_llegada')">
+            <div id="msg_g_ubigeo_llegada" style="font-size:11px; margin-top:3px; display:none;"></div>
+          </div>
+          <div>
+            <label>Punto de llegada</label>
+            <input type="text" id="g_llegada" placeholder="Dirección de llegada">
+          </div>
+        </div>
+
+        <div class="row2">
+          <div>
+            <label>Modalidad de traslado</label>
+            <select id="g_modalidad" onchange="onModalidadChange()">
+              <option value="02">Transporte privado</option>
+              <option value="01">Transporte público</option>
+            </select>
+          </div>
+          <div>
+            <label>Motivo de traslado</label>
+            <select id="g_motivo">
+              <option value="01">Venta</option>
+              <option value="02">Venta sujeta a confirmación del comprador</option>
+              <option value="04">Traslado entre establecimientos de la misma empresa</option>
+              <option value="08">Importación</option>
+              <option value="09">Exportación</option>
+              <option value="13">Otros</option>
+              <option value="14">Venta sujeta a confirmación (itinerante)</option>
+              <option value="18">Traslado emisor itinerante CP</option>
+              <option value="19">Traslado a zona primaria</option>
+              <option value="20">Consignación</option>
+              <option value="99">Donación</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row3">
+          <div>
+            <label>Peso total (Kg)</label>
+            <input type="text" id="g_peso" placeholder="0.00">
+          </div>
+          <div>
+            <label>N° bultos</label>
+            <input type="text" id="g_bultos" placeholder="1">
+          </div>
+          <div>
+            <label>Doc. relacionado (factura/boleta)</label>
+            <input type="text" id="g_docref" placeholder="F001-00000001">
+          </div>
+        </div>
+
+        <div id="camposTransportista" style="display:none;">
+          <div class="row2">
+            <div>
+              <label id="lbl_categoria_veh">Categoría de vehículo</label>
+              <select id="g_categoria">
+                <option value="M1">M1</option>
+                <option value="M2">M2</option>
+                <option value="M3">M3</option>
+                <option value="N1">N1</option>
+                <option value="N2">N2</option>
+                <option value="N3">N3</option>
+              </select>
+            </div>
+            <div>
+              <label>Placa vehículo</label>
+              <input type="text" id="g_placa" placeholder="C5T-760">
+            </div>
+          </div>
+          <div class="row2">
+            <div>
+              <label>RUC transportista</label>
+              <input type="text" id="g_ructrans" placeholder="20600052111">
+            </div>
+            <div id="campoMTC">
+              <label>N° Registro MTC</label>
+              <input type="text" id="g_mtc" placeholder="Obligatorio si es transporte público" oninput="validarCampoMTC()">
+              <div id="msg_g_mtc" style="font-size:11px; margin-top:3px; display:none;"></div>
+            </div>
+          </div>
+          <div class="row2">
+            <div>
+              <label>Conductor</label>
+              <input type="text" id="g_conductor" placeholder="Nombre del conductor">
+            </div>
+            <div>
+              <label>Licencia conductor</label>
+              <input type="text" id="g_licencia" placeholder="S-44276849">
+            </div>
+          </div>
+        </div>
+
+        <table>
+          <thead><tr><th style="width:50%">Producto</th><th>Cant.</th><th>Unid.</th><th></th></tr></thead>
+          <tbody id="itemsGuiaBody"></tbody>
+        </table>
+        <button class="add-item" onclick="agregarItemGuia()">+ Agregar producto</button>
+
+        <button class="btn-primary" onclick="generarGuia()">Generar guía</button>
+      </div>
+
+      <div class="card">
+        <h2>Empresa emisora</h2>
+        <div id="datosEmpresaBox"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB EMITIDOS ===================== -->
+  <section id="tab-emitidos" style="display:none;">
+    <div class="card" style="margin-bottom:16px;">
+      <h2>📋 Resumen Diario de Boletas</h2>
+      <div class="sub" style="color:var(--text-dim); font-size:12px; margin-bottom:10px;">
+        Reporta todas las boletas de un día agrupadas en un solo archivo, en vez de una por una.
+      </div>
+      <div class="row2">
+        <div>
+          <label>Fecha a resumir</label>
+          <input type="date" id="rd_fecha">
+        </div>
+        <div style="display:flex; align-items:flex-end;">
+          <button class="btn-primary" style="margin-top:0;" onclick="generarResumenDiario()">Generar Resumen Diario</button>
+        </div>
+      </div>
+      <div id="resumenDiarioMsg" style="font-size:12px; margin-top:10px; display:none;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Comprobantes y guías emitidos <span class="n">— <span id="nombreEmpresaEmit"></span></span></h2>
+      <div id="emitidosList"></div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB MASIVO ===================== -->
+  <section id="tab-masivo" style="display:none;">
+    <div class="doc-picker">
+      <button class="doc-btn masivo-doc active" data-doc="factura" onclick="cambiarDocMasivo('factura')">Factura</button>
+      <button class="doc-btn masivo-doc" data-doc="boleta" onclick="cambiarDocMasivo('boleta')">Boleta</button>
+      <button class="doc-btn masivo-doc" data-doc="remitente" onclick="cambiarDocMasivo('remitente')">Guía Remitente</button>
+      <button class="doc-btn masivo-doc" data-doc="transportista" onclick="cambiarDocMasivo('transportista')">Guía Transportista</button>
+    </div>
+
+    <div class="placeholder-note">
+      Pega tus datos igual que en tu Excel: una fila por ítem, agrupados por comprobante/guía usando la
+      primera columna como <b>N° de grupo</b> (ej. el mismo código de comité/cliente en varias filas seguidas = un solo comprobante).
+      Columnas separadas por tabulación o "|", en este orden: <b id="formatoCols"></b>
+    </div>
+
+    <div style="display:flex; gap:8px; margin-bottom:16px;">
+      <button class="doc-btn" style="flex:1;" onclick="descargarPlantillaExcel()">⬇️ Descargar plantilla Excel</button>
+      <button class="doc-btn" id="btnSubirExcelWrap" style="flex:1; display:none;" onclick="document.getElementById('masivoExcelFile').click()">⬆️ Subir Excel con datos</button>
+      <input type="file" id="masivoExcelFile" accept=".xlsx,.xls" style="display:none;" onchange="cargarExcelMasivo(this)">
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Pegar datos <span class="n" id="tituloMasivo"></span></h2>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+          <label for="masivoFile" style="flex:1; text-align:center; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; padding:9px; font-size:12px; cursor:pointer; color:var(--text); margin:0; text-transform:none; font-weight:600; letter-spacing:0;">
+            📄 Subir archivo .txt
+          </label>
+          <input type="file" id="masivoFile" accept=".txt,.csv" style="display:none;" onchange="cargarArchivoMasivo(this)">
+          <span id="masivoFileName" style="font-size:11px; color:var(--text-dim);"></span>
+        </div>
+        <textarea id="masivoInput" rows="14" style="font-family:var(--mono); font-size:12px;" placeholder="Pega aquí tus filas, o sube un archivo .txt/Excel arriba..."></textarea>
+        <button class="btn-primary" onclick="procesarMasivo()">Procesar y previsualizar</button>
+      </div>
+
+      <div class="card">
+        <h2>Vista previa <span class="n" id="resumenMasivo"></span></h2>
+        <div id="previewMasivo"><div class="empty-state">Pega datos y presiona "Procesar" para ver cuántos comprobantes/guías se generarán</div></div>
+        <button class="btn-primary" id="btnConfirmarMasivo" style="display:none; background:var(--accent-2);" onclick="confirmarMasivo()">Confirmar y generar todos</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB PRODUCTOS ===================== -->
+  <section id="tab-productos" style="display:none;">
+    <div class="placeholder-note">
+      Catálogo de productos con la estructura que exige SUNAT en cada ítem del comprobante: unidad de medida (Catálogo N° 03),
+      código de producto SUNAT (Catálogo N° 25, opcional), afectación IGV por defecto (Catálogo N° 07) y código de bien sujeto a
+      detracción (Catálogo N° 54, opcional — solo si aplica, ej. combustible).
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2 id="tituloProducto">Nuevo producto</h2>
+        <input type="hidden" id="prod_editando_id">
+
+        <label>Descripción / nombre del producto</label>
+        <input type="text" id="prod_nombre" placeholder="ARROZ FORTIFICADO DE 1000 GR">
+
+        <div class="row2">
+          <div>
+            <label>Código interno (opcional)</label>
+            <input type="text" id="prod_codigo" placeholder="250002">
+          </div>
+          <div>
+            <label>Código de producto SUNAT (Catálogo 25)</label>
+            <input type="text" id="prod_codigo_sunat" placeholder="ej. 50202306">
+          </div>
+        </div>
+        <div style="background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.3); color:#f7c266; border-radius:8px; padding:8px 10px; font-size:11px; margin-bottom:10px;">
+          ⚠️ Desde el <b>1 de agosto de 2026</b>, este código pasa a ser <b>obligatorio</b> (Catálogo N°25, Anexos 25.1/25.2/25.3) para: oro, explosivos, insumos químicos, <b>combustible</b>, maquinarias y equipos, harina/polvo de pescado, minerales, plomo, piedra, arena, dióxido de carbono, PET. Si vendes combustible (Grifo), llénalo siempre.
+        </div>
+
+        <div class="row2">
+          <div>
+            <label>Unidad de medida (Catálogo N° 03)</label>
+            <select id="prod_unidad">
+              <option value="NIU">NIU - Unidad</option>
+              <option value="KGM">KGM - Kilogramo</option>
+              <option value="LTR">LTR - Litro</option>
+              <option value="GLL">GLL - Galón (EE.UU.)</option>
+              <option value="MTR">MTR - Metro</option>
+              <option value="MTK">MTK - Metro cuadrado</option>
+              <option value="MTQ">MTQ - Metro cúbico</option>
+              <option value="ZZ">ZZ - Servicio</option>
+              <option value="BX">BX - Caja</option>
+              <option value="PK">PK - Paquete</option>
+              <option value="BG">BG - Bolsa</option>
+              <option value="DZN">DZN - Docena</option>
+              <option value="C62">C62 - Unidad (alternativa)</option>
+            </select>
+          </div>
+          <div>
+            <label>Precio de venta unitario (con IGV)</label>
+            <input type="number" step="0.01" id="prod_precio" placeholder="4.20">
+          </div>
+        </div>
+
+        <div class="row2">
+          <div>
+            <label>Afectación IGV por defecto (Catálogo N° 07)</label>
+            <select id="prod_afectacion">
+              <option value="10">10 - Gravado - Operación Onerosa</option>
+              <option value="20">20 - Exonerado - Operación Onerosa</option>
+              <option value="30">30 - Inafecto - Operación Onerosa</option>
+              <option value="17">17 - Exportación</option>
+              <option value="40">40 - Exonerado - Transferencia Gratuita</option>
+            </select>
+          </div>
+          <div>
+            <label>Código bien detracción (Catálogo N° 54, opcional)</label>
+            <input type="text" id="prod_cod_detraccion" placeholder="ej. 026 - combustible">
+          </div>
+        </div>
+
+        <label style="margin-top:10px;">
+          <input type="checkbox" id="prod_actividad_turismo" style="width:auto; margin-right:6px;">
+          Es actividad de Restaurante/Hotel/Alojamiento turístico (tasa IGV reducida MYPE, si la empresa calif ica)
+        </label>
+
+        <button class="btn-primary" onclick="guardarProducto()">Guardar producto</button>
+        <button class="add-item" id="btnCancelarEdicionProducto" style="display:none;" onclick="cancelarEdicionProducto()">Cancelar edición</button>
+      </div>
+
+      <div class="card">
+        <h2>Catálogo <span class="n">— <span id="nombreEmpresaProdTab"></span></span></h2>
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <button class="doc-btn" id="btnImportarProdWrap" style="flex:1;" onclick="document.getElementById('prodExcelFile').click()">⬆️ Importar Excel</button>
+          <button class="doc-btn" style="flex:1;" onclick="exportarProductosExcel()">⬇️ Exportar Excel</button>
+          <input type="file" id="prodExcelFile" accept=".xlsx,.xls" style="display:none;" onchange="importarProductosExcel(this)">
+        </div>
+        <div id="prodImportMsg" style="font-size:12px; margin-bottom:10px; display:none;"></div>
+        <div id="catalogoListCompleto"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB CONFIGURACIÓN ===================== -->
+  <section id="tab-config" style="display:none;">
+    <div class="placeholder-note">
+      Estos datos se usan para armar el PDF A4/Ticket de tus comprobantes (logo, contacto, bancos, texto legal) y
+      más adelante alimentarán la plataforma de consulta de comprobantes.
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Datos de la empresa</h2>
+
+        <label>Logo</label>
+        <div style="display:flex; gap:12px; align-items:center; margin-bottom:10px;">
+          <div id="logoPreview" style="width:64px; height:64px; border:1px solid var(--line); border-radius:8px; background:var(--panel-2); display:flex; align-items:center; justify-content:center; overflow:hidden; font-size:10px; color:var(--text-dim); text-align:center;">Sin logo</div>
+          <div>
+            <input type="file" id="cfg_logo_file" accept="image/*" style="display:none;" onchange="subirLogoEmpresa(this)">
+            <button class="doc-btn" onclick="document.getElementById('cfg_logo_file').click()">Subir logo</button>
+            <button class="add-item" onclick="quitarLogoEmpresa()" style="margin-top:6px;">Quitar logo</button>
+          </div>
+        </div>
+
+        <label>Nombre comercial</label>
+        <input type="text" id="cfg_nombre_comercial" placeholder="Nombre comercial">
+
+        <label>Dirección</label>
+        <input type="text" id="cfg_direccion" placeholder="Dirección fiscal">
+
+        <div class="row2">
+          <div>
+            <label>Teléfono</label>
+            <input type="text" id="cfg_telefono" placeholder="01-2338976 / 923827382">
+          </div>
+          <div>
+            <label>Correo</label>
+            <input type="text" id="cfg_email" placeholder="ventas@empresa.com">
+          </div>
+        </div>
+        <label>Sitio web</label>
+        <input type="text" id="cfg_web" placeholder="www.empresa.com">
+
+        <label style="margin-top:10px;">Texto legal del pie de página</label>
+        <input type="text" id="cfg_texto_legal" placeholder="Representación impresa de Factura Electrónica, autorizado por Resolución N° ... SUNAT. Puede ser consultado en: www...">
+
+        <button class="btn-primary" onclick="guardarConfigEmpresa()">Guardar configuración</button>
+        <div id="cfgEmpresaMsg" style="font-size:12px; margin-top:10px; display:none;"></div>
+      </div>
+
+      <div class="card">
+        <h2>Cuentas bancarias <span class="n">(aparecen en el PDF si las activas)</span></h2>
+        <div id="listaBancos" style="margin-bottom:14px;"></div>
+
+        <h2 style="font-size:13px; margin-top:18px;">Agregar cuenta</h2>
+        <div class="row2">
+          <div>
+            <label>Banco</label>
+            <select id="banco_nombre">
+              <option>BCP</option>
+              <option>BBVA</option>
+              <option>Interbank</option>
+              <option>Scotiabank</option>
+              <option>Banco de la Nación</option>
+              <option>Otro</option>
+            </select>
+          </div>
+          <div>
+            <label>Moneda</label>
+            <select id="banco_moneda">
+              <option value="SOLES">Soles</option>
+              <option value="DOLARES">Dólares</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label>N° de cuenta</label>
+            <input type="text" id="banco_cuenta" placeholder="000000000000">
+          </div>
+          <div>
+            <label>CCI</label>
+            <input type="text" id="banco_cci" placeholder="00000000000000000000">
+          </div>
+        </div>
+        <button class="btn-primary" onclick="agregarBancoEmpresa()">Agregar cuenta</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+</div><!-- /appScreen -->
+
+<script>
+// ---------- DATOS DE EMPRESA (mock, en memoria) ----------
+const empresas = {
+  nutri: {
+    nombre: 'Alimentos Nutritivos J&D E.I.R.L.',
+    ruc: '20612763306',
+    usuario: 'nutri',
+    clave: 'cambiar123',
+    direccion: 'Jr. Ejemplo 123, Huamanga, Ayacucho',
+    regimenIGV: 'general',
+    cajas: [],
+    logo: '', telefono: '', email: '', web: '',
+    textoLegal: '',
+    bancos: [],
+    serieAdmin: '5',
+    correlativosPorSerie: {},
+    correlativos: { factura: 1, boleta: 1, nc: 1, nd: 1, remitente: 1, transportista: 1, retencion: 1, percepcion: 1, liquidacion: 1, ticket:1, notaventa:1, proforma:1, ordenpago:1 },
+    series: { factura:'F001', boleta:'B001', nc:'FC01', nd:'FD01', remitente:'T001', transportista:'V001', retencion:'R001', percepcion:'P001', liquidacion:'LC01', ticket:'TK01', notaventa:'NV01', proforma:'PR01', ordenpago:'OP01' },
+    productos: [
+      { id:'p1', nombre:'ARROZ FORTIFICADO', unidad:'KGM', precio: 4.20, codigo:'250002', codigoSunat:'', afectacion:'10', codDetraccion:'' },
+      { id:'p2', nombre:'ACEITE VEGETAL', unidad:'LTR', precio: 8.50, codigo:'250061', codigoSunat:'', afectacion:'10', codDetraccion:'' },
+      { id:'p3', nombre:'AZUCAR RUBIA', unidad:'KGM', precio: 3.80, codigo:'250003', codigoSunat:'', afectacion:'10', codDetraccion:'' },
+    ],
+  },
+  indrapro: {
+    nombre: 'Indra Pro',
+    ruc: '20000000001',
+    usuario: 'indrapro',
+    clave: 'cambiar123',
+    direccion: 'Por definir',
+    regimenIGV: 'general',
+    cajas: [],
+    logo: '', telefono: '', email: '', web: '',
+    textoLegal: '',
+    bancos: [],
+    serieAdmin: '5',
+    correlativosPorSerie: {},
+    correlativos: { factura: 1, boleta: 1, nc: 1, nd: 1, remitente: 1, transportista: 1, retencion: 1, percepcion: 1, liquidacion: 1, ticket:1, notaventa:1, proforma:1, ordenpago:1 },
+    series: { factura:'F001', boleta:'B001', nc:'FC01', nd:'FD01', remitente:'T001', transportista:'V001', retencion:'R001', percepcion:'P001', liquidacion:'LC01', ticket:'TK01', notaventa:'NV01', proforma:'PR01', ordenpago:'OP01' },
+    productos: [
+      { id:'p1', nombre:'PRODUCTO EJEMPLO', unidad:'NIU', precio: 10.00, codigo:'', codigoSunat:'', afectacion:'10', codDetraccion:'' },
+    ],
+  },
+  grifotictac: {
+    nombre: 'YANET SANCHEZ VERA',
+    nombreComercial: 'Grifo Tic Tac',
+    ruc: '10283170140',
+    usuario: 'grifotictac',
+    clave: 'cambiar123',
+    direccion: 'Huamanga, Ayacucho',
+    regimenIGV: 'general',
+    cajas: [],
+    logo: '', telefono: '', email: '', web: '',
+    textoLegal: '',
+    bancos: [],
+    serieAdmin: '5',
+    correlativosPorSerie: {},
+    correlativos: { factura: 1, boleta: 1, nc: 1, nd: 1, remitente: 1, transportista: 1, retencion: 1, percepcion: 1, liquidacion: 1, ticket:1, notaventa:1, proforma:1, ordenpago:1 },
+    series: { factura:'F001', boleta:'B001', nc:'FC01', nd:'FD01', remitente:'T001', transportista:'V001', retencion:'R001', percepcion:'P001', liquidacion:'LC01', ticket:'TK01', notaventa:'NV01', proforma:'PR01', ordenpago:'OP01' },
+    productos: [
+      { id:'p1', nombre:'GASOHOL REGULAR', unidad:'GLL', precio: 17.50, codigo:'', codigoSunat:'15101506', afectacion:'10', codDetraccion:'026' },
+      { id:'p2', nombre:'GASOHOL PREMIUM', unidad:'GLL', precio: 19.90, codigo:'', codigoSunat:'15101506', afectacion:'10', codDetraccion:'026' },
+      { id:'p3', nombre:'DIESEL B5 S-50', unidad:'GLL', precio: 16.80, codigo:'', codigoSunat:'15101505', afectacion:'10', codDetraccion:'026' },
+    ],
+  }
+};
+
+let empresaActual = 'nutri';
+let esAdmin = false; // true solo si Vladi entró a la empresa desde el Panel de administrador
+let rolSesion = 'admin_empresa'; // 'admin_empresa' (ve todo) o 'caja' (solo Factura/Boleta)
+let cajaActual = null; // {id, nombre} de la caja con la que se entró, si aplica
+let docActualFact = 'factura';
+let docActualGuia = 'remitente';
+let items = [];
+let itemsGuia = [];
+let emitidos = []; // {empresa, tipo, serie, cliente, monto, fecha}
+
+const docLabels = {factura:'Factura', boleta:'Boleta', nc:'Nota de Crédito', nd:'Nota de Débito', retencion:'Retención', percepcion:'Percepción', liquidacion:'Liquidación de Compra', ticket:'Ticket', notaventa:'Nota de Venta', proforma:'Proforma', ordenpago:'Orden de Pago'};
+const DOCS_NO_FISCALES = ['ticket','notaventa','proforma','ordenpago'];
+
+const ADMIN_PASS = 'admin123'; // cambiar antes de producción
+
+function abrirAdmin(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('adminScreen').style.display = 'flex';
+  document.getElementById('adminLoginBox').style.display = 'block';
+  document.getElementById('adminPanelBox').style.display = 'none';
+  document.getElementById('adminPass').value = '';
+}
+function cerrarAdmin(){
+  document.getElementById('adminScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+function intentarAdmin(){
+  if(document.getElementById('adminPass').value !== ADMIN_PASS){
+    document.getElementById('adminError').style.display = 'block';
+    return;
+  }
+  document.getElementById('adminError').style.display = 'none';
+  document.getElementById('adminLoginBox').style.display = 'none';
+  document.getElementById('adminPanelBox').style.display = 'block';
+  renderListaEmpresasAdmin();
+}
+function renderListaEmpresasAdmin(){
+  document.getElementById('listaEmpresasAdmin').innerHTML = Object.entries(empresas).map(([id,e])=>`
+    <div class="list-item">
+      <div class="top">
+        <span class="serie">${e.nombre}</span>
+        <button class="rm-btn" style="color:var(--accent); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="entrarComoEmpresa('${id}', true)">Entrar</button>
+      </div>
+      <div class="cliente">${e.usuario} · RUC ${e.ruc}</div>
+      <div style="margin-top:8px;">
+        <label style="font-size:10px;">Régimen IGV</label>
+        <select onchange="cambiarRegimenIGV('${id}', this.value)" style="font-size:12px; padding:6px 8px;">
+          <option value="general" ${e.regimenIGV!=='mype_turismo'?'selected':''}>General (18%)</option>
+          <option value="mype_turismo" ${e.regimenIGV==='mype_turismo'?'selected':''}>MYPE Restaurantes/Hoteles/Alojamiento (tasa reducida escalonada)</option>
+        </select>
+      </div>
+      <div style="margin-top:10px; border-top:1px solid var(--line); padding-top:8px;">
+        <label style="font-size:10px;">Serie del Administrador (Factura/Boleta propias, ej. F005/B005)</label>
+        <div style="display:flex; gap:6px; align-items:center; margin:4px 0 8px;">
+          <input type="text" value="${e.serieAdmin || '5'}" onchange="cambiarSerieAdmin('${id}', this.value)" style="width:70px; padding:6px 8px; font-size:12px;">
+        </div>
+        <label style="font-size:10px;">Cajas (usuarios que solo emiten Factura/Boleta, cada una con su propia serie)</label>
+        <div style="display:flex; gap:6px; align-items:center; margin:4px 0 8px;">
+          <input type="number" min="0" max="20" id="numCajas_${id}" value="${(e.cajas||[]).length}" style="width:70px; padding:6px 8px; font-size:12px;">
+          <button class="rm-btn" style="color:var(--accent); border:1px solid var(--line); border-radius:6px; padding:6px 10px; font-size:11px;" onclick="actualizarNumeroCajas('${id}')">Actualizar N° de cajas</button>
+        </div>
+        ${(e.cajas||[]).map((c,i)=>`
+          <div style="border:1px solid var(--line); border-radius:8px; padding:8px; margin-bottom:6px;">
+            <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
+              <span style="font-size:11px; width:80px;">${c.nombre} (serie ${c.numSerie})</span>
+              <input type="text" value="${c.usuario}" readonly style="font-size:11px; padding:5px 6px; background:var(--bg);">
+              <input type="text" value="${c.clave}" onchange="cambiarClaveCaja('${id}', ${i}, this.value)" style="font-size:11px; padding:5px 6px;" placeholder="contraseña">
+            </div>
+            <div style="font-size:11px;">
+              ${c.deviceId
+                ? `<span style="color:var(--accent-2);">🔒 Equipo autorizado: ${c.deviceId}</span>
+                   <button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-size:10px; margin-left:6px;" onclick="liberarEquipoCaja('${id}', ${i})">Liberar equipo</button>`
+                : `<span style="color:var(--text-dim);">Sin equipo autorizado todavía</span>`
+              }
+              ${c.solicitudPendiente && c.solicitudPendiente !== c.deviceId ? `
+                <div style="margin-top:4px; background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3); border-radius:6px; padding:6px;">
+                  ⏳ Solicitud de equipo nuevo: <b>${c.solicitudPendiente}</b>
+                  <button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-size:10px; margin-left:6px;" onclick="aprobarEquipoCaja('${id}', ${i})">Aprobar este equipo</button>
+                  <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-size:10px; margin-left:4px;" onclick="rechazarEquipoCaja('${id}', ${i})">Rechazar</button>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `).join('') || `<div style="font-size:11px; color:var(--text-dim);">Sin cajas configuradas — pon un número arriba y actualiza.</div>`}
+      </div>
+    </div>
+  `).join('');
+}
+
+function cambiarSerieAdmin(id, valor){
+  const v = parseInt(valor);
+  if(!v || v<1) return;
+  empresas[id].serieAdmin = String(v);
+  if(id === empresaActual) renderTodo();
+}
+
+function aprobarEquipoCaja(id, idx){
+  const caja = empresas[id].cajas[idx];
+  caja.deviceId = caja.solicitudPendiente;
+  caja.solicitudPendiente = null;
+  renderListaEmpresasAdmin();
+}
+
+function rechazarEquipoCaja(id, idx){
+  empresas[id].cajas[idx].solicitudPendiente = null;
+  renderListaEmpresasAdmin();
+}
+
+function liberarEquipoCaja(id, idx){
+  if(!confirm('¿Liberar el equipo autorizado de esta caja? El equipo actual perderá acceso hasta que apruebes uno nuevo (el mismo u otro).')) return;
+  const caja = empresas[id].cajas[idx];
+  caja.deviceId = null;
+  caja.solicitudPendiente = null;
+  renderListaEmpresasAdmin();
+}
+
+function actualizarNumeroCajas(id){
+  const emp = empresas[id];
+  const n = parseInt(document.getElementById('numCajas_'+id).value) || 0;
+  const cajasActuales = emp.cajas || [];
+  const nuevasCajas = [];
+  for(let i=1; i<=n; i++){
+    const existente = cajasActuales[i-1];
+    nuevasCajas.push(existente || {
+      id: 'caja'+i,
+      nombre: 'Caja '+i,
+      usuario: emp.usuario + '_caja' + i,
+      clave: 'caja' + i + '123',
+      numSerie: i,
+      deviceId: null,        // token del equipo aprobado por el administrador (null = ningún equipo autorizado aún)
+      solicitudPendiente: null // token del equipo que está pidiendo acceso, a la espera de aprobación
+    });
+  }
+  emp.cajas = nuevasCajas;
+  renderListaEmpresasAdmin();
+}
+
+function cambiarClaveCaja(id, idx, valor){
+  if(!valor.trim()) return;
+  empresas[id].cajas[idx].clave = valor.trim();
+}
+
+function cambiarRegimenIGV(id, valor){
+  empresas[id].regimenIGV = valor;
+  if(id === empresaActual) renderTodo();
+}
+
+function crearEmpresa(){
+  const nombre = document.getElementById('na_nombre').value.trim();
+  const ruc = document.getElementById('na_ruc').value.trim();
+  const usuario = document.getElementById('na_usuario').value.trim().toLowerCase();
+  const clave = document.getElementById('na_clave').value;
+  const msg = document.getElementById('adminMsg');
+
+  if(!nombre || !usuario || !clave){
+    msg.style.display='block'; msg.style.color='var(--danger)';
+    msg.textContent = 'Completa razón social, usuario y contraseña.';
+    return;
+  }
+  if(empresas[usuario] || Object.values(empresas).some(e=>e.usuario===usuario)){
+    msg.style.display='block'; msg.style.color='var(--danger)';
+    msg.textContent = 'Ese usuario ya existe, elige otro.';
+    return;
+  }
+
+  const id = usuario;
+  empresas[id] = {
+    nombre, ruc: ruc || '(pendiente)', usuario, clave, regimenIGV: 'general',
+    cajas: [],
+    logo: '', telefono: '', email: '', web: '',
+    textoLegal: '',
+    bancos: [],
+    serieAdmin: '5',
+    correlativosPorSerie: {},
+    correlativos: { factura:1, boleta:1, nc:1, nd:1, remitente:1, transportista:1, retencion:1, percepcion:1, liquidacion:1, ticket:1, notaventa:1, proforma:1, ordenpago:1 },
+    series: { factura:'F001', boleta:'B001', nc:'FC01', nd:'FD01', remitente:'T001', transportista:'V001', retencion:'R001', percepcion:'P001', liquidacion:'LC01', ticket:'TK01', notaventa:'NV01', proforma:'PR01', ordenpago:'OP01' },
+    productos: []
+  };
+
+  document.getElementById('na_nombre').value='';
+  document.getElementById('na_ruc').value='';
+  document.getElementById('na_usuario').value='';
+  document.getElementById('na_clave').value='';
+  msg.style.display='block'; msg.style.color='var(--accent-2)';
+  msg.textContent = `Empresa "${nombre}" creada. Ya puede ingresar con usuario "${usuario}".`;
+  renderListaEmpresasAdmin();
+}
+
+// Genera (o reutiliza) un token único para este navegador+caja, guardado en localStorage.
+// Es lo más parecido a "esta PC" que un navegador permite sin instalar nada aparte.
+function obtenerTokenDeEsteEquipo(usuarioCaja){
+  const clave = 'factash_device_' + usuarioCaja;
+  let token = localStorage.getItem(clave);
+  if(!token){
+    token = 'EQ-' + Math.random().toString(36).slice(2,6).toUpperCase() + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
+    localStorage.setItem(clave, token);
+  }
+  return token;
+}
+
+function intentarLogin(){
+  const user = document.getElementById('loginUser').value.trim().toLowerCase();
+  const pass = document.getElementById('loginPass').value;
+
+  // 1. ¿Coincide con el usuario/clave de administrador de alguna empresa?
+  const matchEmpresa = Object.entries(empresas).find(([id,e]) => e.usuario===user && e.clave===pass);
+  if(matchEmpresa){
+    document.getElementById('loginError').style.display = 'none';
+    entrarComoEmpresa(matchEmpresa[0], false, 'admin_empresa', null);
+    return;
+  }
+
+  // 2. ¿Coincide con el usuario/clave de alguna Caja dentro de alguna empresa?
+  for(const [id, e] of Object.entries(empresas)){
+    const caja = (e.cajas||[]).find(c => c.usuario===user && c.clave===pass);
+    if(caja){
+      const tokenEquipo = obtenerTokenDeEsteEquipo(caja.usuario);
+
+      if(!caja.deviceId){
+        // Ningún equipo aprobado todavía para esta caja: queda pendiente de que el administrador lo apruebe.
+        caja.solicitudPendiente = tokenEquipo;
+        document.getElementById('loginError').style.display = 'block';
+        document.getElementById('loginError').textContent =
+          `Este equipo aún no está autorizado para "${caja.nombre}". Pide al administrador que lo apruebe. Código de equipo: ${tokenEquipo}`;
+        return;
+      }
+
+      if(caja.deviceId !== tokenEquipo){
+        // Hay un equipo ya aprobado, y no es este.
+        caja.solicitudPendiente = tokenEquipo; // deja registrada la solicitud por si el admin quiere autorizar el cambio
+        document.getElementById('loginError').style.display = 'block';
+        document.getElementById('loginError').textContent =
+          `"${caja.nombre}" ya está autorizada en otro equipo. Este equipo no tiene acceso — pide al administrador que lo autorice si es necesario cambiarlo.`;
+        return;
+      }
+
+      // Equipo correcto: entra normal.
+      document.getElementById('loginError').style.display = 'none';
+      entrarComoEmpresa(id, false, 'caja', caja);
+      return;
+    }
+  }
+
+  document.getElementById('loginError').style.display = 'block';
+  document.getElementById('loginError').textContent = 'Usuario o contraseña incorrectos';
+}
+
+function entrarComoEmpresa(id, comoAdmin, rol, caja){
+  empresaActual = id;
+  esAdmin = !!comoAdmin;
+  rolSesion = rol || 'admin_empresa';
+  cajaActual = caja || null;
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('adminScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+  document.getElementById('rucTag').textContent = 'RUC ' + empresas[id].ruc;
+  let sufijo = '';
+  if(esAdmin) sufijo = ' (modo administrador)';
+  else if(rolSesion === 'caja') sufijo = ` — ${cajaActual.nombre}`;
+  document.getElementById('nombreEmpresaHeader').textContent = empresas[id].nombre + sufijo;
+  aplicarRestriccionesCaja();
+  renderTodo();
+}
+
+function aplicarRestriccionesCaja(){
+  const esCaja = rolSesion === 'caja';
+  // Solo se ven las pestañas de Facturación y Emitidos; Guías, Masivo y Productos quedan ocultas para Caja
+  document.querySelectorAll('nav.tabs button').forEach(b=>{
+    const tab = b.dataset.tab;
+    b.style.display = (esCaja && !['facturacion','emitidos'].includes(tab)) ? 'none' : '';
+  });
+  // Dentro de Facturación, Caja solo puede emitir Factura y Boleta
+  document.querySelectorAll('#tab-facturacion .doc-btn').forEach(b=>{
+    const doc = b.dataset.doc;
+    b.style.display = (esCaja && !['factura','boleta'].includes(doc)) ? 'none' : '';
+  });
+  if(esCaja){
+    document.querySelectorAll('#tab-facturacion .doc-picker-label').forEach(l=>{
+      if(l.textContent.includes('Otros Documentos')) l.style.display = 'none';
+    });
+    cambiarDoc('facturacion','factura');
+  } else {
+    document.querySelectorAll('#tab-facturacion .doc-picker-label').forEach(l=>{ l.style.display = ''; });
+  }
+}
+
+function cerrarSesion(){
+  esAdmin = false;
+  rolSesion = 'admin_empresa';
+  cajaActual = null;
+  document.querySelectorAll('nav.tabs button').forEach(b=>{ b.style.display = ''; });
+  document.querySelectorAll('#tab-facturacion .doc-btn').forEach(b=>{ b.style.display = ''; });
+  document.querySelectorAll('#tab-facturacion .doc-picker-label').forEach(l=>{ l.style.display = ''; });
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginUser').focus();
+}
+
+function cambiarTab(tab){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`nav.tabs button[data-tab="${tab}"]`).classList.add('active');
+  ['facturacion','guias','emitidos','masivo','productos','config'].forEach(t=>{
+    document.getElementById('tab-'+t).style.display = (t===tab)?'block':'none';
+  });
+  if(tab==='masivo'){
+    document.getElementById('btnSubirExcelWrap').style.display = esAdmin ? 'block' : 'none';
+  }
+  renderTodo();
+}
+
+function cambiarDoc(grupo, doc){
+  const picker = grupo==='facturacion' ? '#tab-facturacion .doc-picker' : '#tab-guias .doc-picker';
+  document.querySelectorAll(picker+' .doc-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`${picker} .doc-btn[data-doc="${doc}"]`).classList.add('active');
+
+  if(grupo==='facturacion'){
+    docActualFact = doc;
+    const esRetPer = (doc==='retencion' || doc==='percepcion');
+    document.getElementById('bloqueRetPer').style.display = esRetPer ? 'grid' : 'none';
+    document.getElementById('bloqueFacturaNormal').style.display = esRetPer ? 'none' : 'grid';
+    if(esRetPer){
+      configurarFormRetPer(doc);
+    } else {
+      document.getElementById('tituloDocFact').textContent = 'Nueva ' + docLabels[doc];
+      document.getElementById('camposNCND').style.display = (doc==='nc'||doc==='nd') ? 'block':'none';
+      document.getElementById('camposLiquidacion').style.display = (doc==='liquidacion') ? 'block':'none';
+      document.getElementById('lbl_f_cliente').textContent = (doc==='liquidacion') ? 'Vendedor (persona natural sin RUC)' : 'Cliente / Razón Social';
+      document.getElementById('f_tipodoc').value = (doc==='boleta'||doc==='liquidacion') ? '1' : '6';
+      const esNoFiscal = DOCS_NO_FISCALES.includes(doc);
+      const btnDatosAdic = document.querySelector('button[onclick="toggleDatosAdicionales()"]');
+      if(btnDatosAdic) btnDatosAdic.parentElement.style.display = esNoFiscal ? 'none' : 'block';
+      document.getElementById('notaFact').textContent = esNoFiscal
+        ? `⚠️ ${docLabels[doc]} — este documento NO ES un comprobante de pago válido para SUNAT, es solo para uso interno/comercial.`
+        : 'Índice de trabajo — datos de prueba. Nada se envía a SUNAT ni se guarda todavía.';
+      onTipoDocChange();
+    }
+  } else {
+    docActualGuia = doc;
+    document.getElementById('tituloDocGuia').textContent = 'Nueva Guía de Remisión ' + (doc==='remitente'?'Remitente':'Transportista');
+    document.getElementById('camposTransportista').style.display = (doc==='transportista') ? 'block':'none';
+    if(doc==='transportista') onModalidadChange();
+  }
+  renderTodo();
+}
+
+function onModalidadChange(){
+  const publico = document.getElementById('g_modalidad').value === '01';
+  document.getElementById('campoMTC').style.display = publico ? 'block' : 'none';
+  if(document.getElementById('msg_g_mtc')) validarCampoMTC();
+}
+
+function agregarItem(){
+  items.push({producto:'', cant:1, unidad:'UND', precio:0, afectacion:'10'});
+  renderItems();
+}
+function quitarItem(i){ items.splice(i,1); renderItems(); }
+
+// Catálogo 07 SUNAT (simplificado a los códigos de uso frecuente)
+// ---------- TASA DE IGV (según régimen de la empresa y año de emisión) ----------
+// Régimen General: 18% fijo.
+// Régimen MYPE Restaurantes/Hoteles/Alojamiento turístico (Ley 32219 + Ley 32387): tasa reducida escalonada.
+// OJO: NO aplica a servicios de catering/concesionarios de alimentos (excluidos desde 2025), ni a otros rubros.
+const CRONOGRAMA_IGV_MYPE_TURISMO = {
+  2025: 0.10,   // 8% IGV + 2% IPM
+  2026: 0.105,  // 8% IGV + 2.5% IPM
+  2027: 0.14,   // 12% IGV + 2% IPM
+  // desde 2028 el beneficio vence (salvo prórroga por nueva ley) y vuelve al régimen general 18%
+};
+
+function tasaIGVEmpresa(emp, fechaStr, esActividadTurismo){
+  if(!emp || emp.regimenIGV !== 'mype_turismo' || !esActividadTurismo) return 0.18;
+  const anio = fechaStr ? new Date(fechaStr+'T00:00:00').getFullYear() : new Date().getFullYear();
+  return CRONOGRAMA_IGV_MYPE_TURISMO[anio] !== undefined ? CRONOGRAMA_IGV_MYPE_TURISMO[anio] : 0.18;
+}
+
+const AFECTACIONES_IGV = {
+  '10':'Gravado - Operación Onerosa',
+  '20':'Exonerado - Operación Onerosa',
+  '30':'Inafecto - Operación Onerosa',
+  '17':'Exportación',
+  '40':'Exonerado - Transferencia Gratuita',
+};
+
+function renderItems(){
+  const emp = empresas[empresaActual];
+  const body = document.getElementById('itemsBody');
+  body.innerHTML = '';
+  items.forEach((it,i)=>{
+    const tr = document.createElement('tr');
+    tr.className='item-row';
+    tr.innerHTML = `
+      <td>
+        <select onchange="setItemProducto(${i}, this)">
+          <option value="">-- elegir --</option>
+          ${emp.productos.map(p=>`<option ${p.nombre===it.producto?'selected':''}>${p.nombre}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" min="0" step="0.01" value="${it.cant}" oninput="editarCantidadItem(${i}, this.value)"></td>
+      <td><input type="text" value="${it.unidad}" oninput="items[${i}].unidad=this.value;"></td>
+      <td><input type="number" min="0" step="0.01" value="${it.precio}" oninput="editarPrecioItem(${i}, this.value)"></td>
+      <td>
+        <select onchange="items[${i}].afectacion=this.value; renderTotales();">
+          ${Object.entries(AFECTACIONES_IGV).map(([code,label])=>`<option value="${code}" ${it.afectacion===code?'selected':''}>${label}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" min="0" step="0.01" class="total-item-input" value="${(it.cant*it.precio).toFixed(2)}" style="text-align:right; font-family:var(--mono);" oninput="editarTotalItem(${i}, this.value)"></td>
+      <td><button class="rm-btn" onclick="quitarItem(${i})">✕</button></td>
+    `;
+    body.appendChild(tr);
+  });
+  renderTotales();
+}
+
+// Cálculo flexible: si editas Cantidad o Precio, el Total se recalcula como siempre (Cant × Precio),
+// actualizando solo el campo Total sin redibujar la fila (para no perder el foco mientras escribes).
+// Si editas el Total directamente, la Cantidad se recalcula sola (Total ÷ Precio) — útil cuando ya
+// sabes cuánto vas a cobrar en total y necesitas que el sistema saque cuántas unidades corresponden.
+function editarCantidadItem(i, val){
+  items[i].cant = parseFloat(val) || 0;
+  actualizarTotalFilaItem(i);
+  renderTotales();
+}
+function editarPrecioItem(i, val){
+  items[i].precio = parseFloat(val) || 0;
+  actualizarTotalFilaItem(i);
+  renderTotales();
+}
+function actualizarTotalFilaItem(i){
+  const filas = document.querySelectorAll('#itemsBody tr.item-row');
+  const totalInput = filas[i] ? filas[i].querySelector('.total-item-input') : null;
+  if(totalInput) totalInput.value = (items[i].cant * items[i].precio).toFixed(2);
+}
+function editarTotalItem(i, val){
+  const total = parseFloat(val) || 0;
+  const precio = items[i].precio;
+  if(precio > 0){
+    items[i].cant = +(total / precio).toFixed(4);
+    const filas = document.querySelectorAll('#itemsBody tr.item-row');
+    const cantInput = filas[i] ? filas[i].querySelectorAll('input')[0] : null;
+    if(cantInput) cantInput.value = items[i].cant;
+  }
+  renderTotales();
+}
+
+function setItemProducto(i, sel){
+  const emp = empresas[empresaActual];
+  const p = emp.productos.find(p=>p.nombre===sel.value);
+  items[i].producto = sel.value;
+  if(p){ items[i].precio = p.precio; items[i].unidad = p.unidad; items[i].afectacion = p.afectacion || '10'; items[i].actividadTurismo = !!p.actividadTurismo; }
+  renderItems();
+}
+
+function renderTotales(){
+  const emp = empresas[empresaActual];
+  const fechaEl = document.getElementById('f_fecha');
+  const fecha = fechaEl ? fechaEl.value : null;
+
+  let gravado=0, exonerado=0, inafecto=0, exportacion=0, igv=0;
+  let hayTurismo=false, hayGeneral=false;
+  items.forEach(it=>{
+    const monto = it.cant*it.precio;
+    if(it.afectacion==='10'){
+      const tasaItem = tasaIGVEmpresa(emp, fecha, it.actividadTurismo);
+      const valorVenta = monto / (1+tasaItem);
+      gravado += valorVenta;
+      igv += valorVenta*tasaItem;
+      if(it.actividadTurismo) hayTurismo=true; else hayGeneral=true;
+    }
+    else if(it.afectacion==='20'||it.afectacion==='40') exonerado += monto;
+    else if(it.afectacion==='30') inafecto += monto;
+    else if(it.afectacion==='17') exportacion += monto;
+  });
+  const total = gravado+exonerado+inafecto+exportacion+igv;
+  const etiquetaTasa = hayTurismo && hayGeneral ? 'mixto' : hayTurismo ? `${(tasaIGVEmpresa(emp, fecha, true)*100).toFixed(1).replace('.0','')}%` : '18%';
+
+  document.getElementById('totalesBox').innerHTML = `
+    ${gravado>0?`<div class="tot-line"><span>Op. Gravada</span><span>S/ ${gravado.toFixed(2)}</span></div>`:''}
+    ${exonerado>0?`<div class="tot-line"><span>Op. Exonerada</span><span>S/ ${exonerado.toFixed(2)}</span></div>`:''}
+    ${inafecto>0?`<div class="tot-line"><span>Op. Inafecta</span><span>S/ ${inafecto.toFixed(2)}</span></div>`:''}
+    ${exportacion>0?`<div class="tot-line"><span>Op. Exportación</span><span>S/ ${exportacion.toFixed(2)}</span></div>`:''}
+    <div class="tot-line"><span>IGV (${etiquetaTasa})</span><span>S/ ${igv.toFixed(2)}</span></div>
+    <div class="tot-line final"><span>Total</span><span>S/ ${total.toFixed(2)}</span></div>
+  `;
+  const financEl = document.getElementById('f_montofinanciado');
+  if(financEl) financEl.value = total.toFixed(2);
+  if(document.getElementById('f_formapago') && document.getElementById('f_formapago').value==='credito') renderCuotas();
+  if(document.getElementById('msg_f_doc')) validarCampoDoc();
+}
+
+function onTipoDocChange(){
+  const map = {'6':'RUC','1':'DNI','4':'N° Carné Ext.','7':'N° Pasaporte','0':'N° Documento'};
+  document.getElementById('lbl_doctipo').textContent = map[document.getElementById('f_tipodoc').value];
+}
+
+function onFormaPagoChange(){
+  const esCredito = document.getElementById('f_formapago').value === 'credito';
+  document.getElementById('camposCredito').style.display = esCredito ? 'block' : 'none';
+  if(esCredito) renderCuotas();
+}
+
+function renderCuotas(){
+  const n = parseInt(document.getElementById('f_ncuotas').value) || 1;
+  const total = parseFloat(document.getElementById('f_montofinanciado').value) || 0;
+  const montoCuota = n>0 ? (total/n).toFixed(2) : '0.00';
+  let html = '<table><thead><tr><th>Cuota</th><th>Fecha vcmto.</th><th>Monto</th></tr></thead><tbody>';
+  for(let i=1;i<=n;i++){
+    html += `<tr><td>${i}</td><td><input type="date" id="cuota_fecha_${i}"></td><td>S/ ${montoCuota}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('cuotasBox').innerHTML = html;
+}
+
+function agregarItemGuia(){
+  itemsGuia.push({producto:'', cant:1, unidad:'UND'});
+  renderItemsGuia();
+}
+function quitarItemGuia(i){ itemsGuia.splice(i,1); renderItemsGuia(); }
+function renderItemsGuia(){
+  const emp = empresas[empresaActual];
+  const body = document.getElementById('itemsGuiaBody');
+  body.innerHTML = '';
+  itemsGuia.forEach((it,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <select onchange="itemsGuia[${i}].producto=this.value;">
+          <option value="">-- elegir --</option>
+          ${emp.productos.map(p=>`<option ${p.nombre===it.producto?'selected':''}>${p.nombre}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" min="0" step="0.01" value="${it.cant}" oninput="itemsGuia[${i}].cant=parseFloat(this.value)||0;"></td>
+      <td><input type="text" value="${it.unidad}" oninput="itemsGuia[${i}].unidad=this.value;"></td>
+      <td><button class="rm-btn" onclick="quitarItemGuia(${i})">✕</button></td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+// Motivo de Nota de Crédito/Débito (Catálogo N° 10 SUNAT, simplificado a los de uso frecuente)
+const MOTIVO_NOTA_A_CODIGO = {
+  'anulación de la operación':'01', 'anulacion de la operacion':'01',
+  'corrección por error en el ruc':'02', 'correccion por error en el ruc':'02',
+  'descuento global':'03', 'descuento por ítem':'04', 'descuento por item':'04',
+  'devolución total':'05', 'devolucion total':'05',
+  'devolución por ítem':'06', 'devolucion por item':'06',
+  'otros':'13'
+};
+
+// Arma el JSON oficial SUNAT (Anexo I) para Factura/Boleta/NC/ND — mismos nombres de atributo que el manual del programador
+function toggleDatosAdicionales(){
+  const box = document.getElementById('datosAdicionalesBox');
+  const abierto = box.style.display !== 'none';
+  box.style.display = abierto ? 'none' : 'block';
+  document.getElementById('flechaDatosAdic').textContent = abierto ? '▾' : '▴';
+}
+
+function toggleCamposPercepcionDetraccion(){
+  document.getElementById('camposPercepcionFact').style.display = document.getElementById('f_aplica_percepcion').checked ? 'block' : 'none';
+  document.getElementById('camposDetraccionFact').style.display = document.getElementById('f_aplica_detraccion').checked ? 'block' : 'none';
+}
+
+function toggleCamposSectorPublico(){
+  document.getElementById('camposSectorPublico').style.display = document.getElementById('f_venta_sector_publico').checked ? 'block' : 'none';
+}
+
+// Si la fecha de emisión elegida es un día anterior a hoy, usa 23:59:59 (el máximo margen posible dentro
+// de ese día) en vez de la hora actual — así se evita el rechazo por corte de hora dentro del plazo de 3 días.
+function horaParaFecha(fechaInputVal){
+  if(!fechaInputVal) return new Date().toTimeString().slice(0,8);
+  const hoyStr = new Date().toISOString().slice(0,10);
+  return fechaInputVal < hoyStr ? '23:59:59' : new Date().toTimeString().slice(0,8);
+}
+
+function buildFacturaJSON(emp, serie, docTipo){
+  const ahora = new Date();
+  const tipoDocSel = document.getElementById('f_tipodoc').value;
+  const esNota = (docTipo === 'nc' || docTipo === 'nd');
+  const fechaEmisionVal = document.getElementById('f_fecha').value;
+
+  const detalle = items.filter(it=>it.producto).map(it=>{
+    const esGravado = it.afectacion === '10';
+    const tasa = tasaIGVEmpresa(emp, fechaEmisionVal, it.actividadTurismo);
+    const valorUnitario = esGravado ? (it.precio/(1+tasa)) : it.precio;
+    const valorVentaItem = it.cant * valorUnitario;
+    const igvItem = esGravado ? valorVentaItem*tasa : 0;
+    const prodCat = emp.productos.find(p=>p.nombre===it.producto);
+    return {
+      codUnidadMedida: it.unidad || "NIU",
+      ctdUnidadItem: it.cant.toFixed(2),
+      codProducto: (prodCat && prodCat.codigo) || "-",
+      codProductoSUNAT: (prodCat && prodCat.codigoSunat) || "-",
+      desItem: it.producto,
+      mtoValorUnitario: valorUnitario.toFixed(2),
+      sumTotTributosItem: igvItem.toFixed(2),
+      codTriIGV: esGravado ? 1000 : (it.afectacion==='20'?9997:it.afectacion==='30'?9998:it.afectacion==='17'?9995:9996),
+      mtoIgvItem: igvItem.toFixed(2),
+      mtoBaseIgvItem: valorVentaItem.toFixed(2),
+      nomTributoIgvItem: "IGV",
+      codTipTributoIgvItem: "VAT",
+      tipAfeIGV: it.afectacion,
+      porIgvItem: (tasa*100).toFixed(2),
+      mtoPrecioVentaUnitario: it.precio.toFixed(2),
+      mtoValorVentaItem: valorVentaItem.toFixed(2)
+    };
+  });
+
+  const sumTotValVenta = detalle.reduce((s,d)=>s+parseFloat(d.mtoValorVentaItem),0);
+  const sumTotTributos = detalle.reduce((s,d)=>s+parseFloat(d.sumTotTributosItem),0);
+  const sumImpVenta = sumTotValVenta + sumTotTributos;
+
+  const cabecera = {
+    tipOperacion: "0101",
+    fecEmision: document.getElementById('f_fecha').value || ahora.toISOString().slice(0,10),
+    horEmision: horaParaFecha(document.getElementById('f_fecha').value),
+    fecVencimiento: "-",
+    codLocalEmisor: "-",
+    tipDocUsuario: tipoDocSel,
+    numDocUsuario: document.getElementById('f_doc').value || "-",
+    rznSocialUsuario: document.getElementById('f_cliente').value || "-",
+    tipMoneda: "PEN",
+    sumTotTributos: sumTotTributos.toFixed(2),
+    sumTotValVenta: sumTotValVenta.toFixed(2),
+    sumPrecioVenta: sumImpVenta.toFixed(2),
+    sumDescTotal: "0.00",
+    sumOtrosCargos: "0.00",
+    sumTotalAnticipos: "0.00",
+    sumImpVenta: sumImpVenta.toFixed(2),
+    ublVersionId: "2.1",
+    customizationId: "2.0"
+  };
+
+  if(esNota){
+    const motivoTexto = document.getElementById('f_motivo').value;
+    cabecera.codMotivo = MOTIVO_NOTA_A_CODIGO[motivoTexto.toLowerCase()] || "13";
+    cabecera.desMotivo = motivoTexto;
+    cabecera.tipDocAfectado = tipoDocSel === '1' ? "03" : "01"; // 01=Factura, 03=Boleta
+    cabecera.numDocAfectado = document.getElementById('f_docref').value || "";
+  }
+
+  // Datos adicionales SUNAT (opcionales, solo si se marcaron/llenaron)
+  const leyenda = document.getElementById('f_leyenda').value;
+  if(leyenda) cabecera.leyenda = leyenda;
+
+  const guiaRef = document.getElementById('f_guiaref').value;
+  if(guiaRef) cabecera.guiaRelacionada = guiaRef;
+
+  if(document.getElementById('f_aplica_percepcion').checked){
+    const regSel = document.getElementById('f_regimen_percepcion');
+    cabecera.percepcion = {
+      codRegimenPercepcion: regSel.value,
+      tasaPercepcion: regSel.selectedOptions[0].dataset.tasa,
+      montoPercepcion: parseFloat(document.getElementById('f_monto_percepcion').value || 0).toFixed(2),
+      montoTotalIncluidoPercepcion: (sumImpVenta + (parseFloat(document.getElementById('f_monto_percepcion').value)||0)).toFixed(2)
+    };
+  }
+
+  if(document.getElementById('f_aplica_detraccion').checked){
+    cabecera.detraccion = {
+      codBienDetraccion: document.getElementById('f_cod_detraccion').value || "",
+      ctaBancoNacionDetraccion: document.getElementById('f_cuenta_detraccion').value || "",
+      porDetraccion: document.getElementById('f_pct_detraccion').value || "",
+      montoDetraccion: parseFloat(document.getElementById('f_monto_detraccion').value || 0).toFixed(2)
+    };
+  }
+
+  if(document.getElementById('f_venta_sector_publico').checked){
+    cabecera.ventaSectorPublico = {
+      numExpediente: document.getElementById('f_num_expediente').value || "-",
+      codUnidadEjecutora: document.getElementById('f_cod_unidad_ejecutora').value || "-",
+      numContrato: document.getElementById('f_num_contrato').value || "-",
+      numProcesoSeleccion: document.getElementById('f_num_proceso').value || "-"
+    };
+  }
+
+  if(document.getElementById('f_aplica_ret_igv').checked){
+    cabecera.indClienteAgenteRetencion = true;
+  }
+
+  const placaVenta = document.getElementById('f_placa_venta').value;
+  if(placaVenta) cabecera.placaVehiculoVenta = placaVenta;
+
+  return { cabecera, detalle };
+}
+
+// ---------- RETENCIÓN / PERCEPCIÓN ----------
+// Nota: el manual oficial SUNAT para estos 2 documentos solo publica el TAG XML (UBL),
+// no un nombre de atributo JSON como en Factura/Guía. Los nombres de campo usados abajo
+// son una adaptación razonable siguiendo el mismo patrón de nombres que el resto de FACTASH
+// (ublVersionId, fecEmision, etc.) — CONFIRMAR con tu SFS antes de usarlo en producción real.
+
+const REGIMEN_RETENCION_TASA = {'01':3, '02':6};
+const REGIMEN_PERCEPCION = {
+  '01': {label:'Percepción Venta Interna (2%)', tasa:2},
+  '02': {label:'Percepción Adquisición de Combustible (1%)', tasa:1},
+  '03': {label:'Percepción Agente de Venta (0.5%)', tasa:0.5},
+};
+
+function configurarFormRetPer(doc){
+  const esRetencion = doc === 'retencion';
+  document.getElementById('tituloRetPer').textContent = esRetencion ? 'Nueva Retención' : 'Nueva Percepción';
+  document.getElementById('lbl_rp_contraparte').textContent = esRetencion ? 'RUC del proveedor' : 'RUC del cliente';
+  document.getElementById('lbl_rp_razonsocial').textContent = esRetencion ? 'Razón social del proveedor' : 'Razón social del cliente';
+  document.getElementById('lbl_rp_regimen').textContent = esRetencion ? 'Régimen de retención' : 'Régimen de percepción';
+  document.getElementById('lbl_rp_fechamov').textContent = esRetencion ? 'Fecha de pago' : 'Fecha de cobro';
+  document.getElementById('lbl_rp_nummov').textContent = esRetencion ? 'N° de pago' : 'N° de cobro';
+
+  const sel = document.getElementById('rp_regimen');
+  if(esRetencion){
+    sel.innerHTML = `<option value="01" data-tasa="3">Régimen General (3%)</option><option value="02" data-tasa="6">Tasa 6% (hasta feb-2014)</option>`;
+  } else {
+    sel.innerHTML = Object.entries(REGIMEN_PERCEPCION).map(([cod,r])=>`<option value="${cod}" data-tasa="${r.tasa}">${r.label}</option>`).join('');
+  }
+  onRegimenRetPerChange();
+
+  const emp = empresas[empresaActual];
+  const correlativo = emp.correlativos[doc];
+  document.getElementById('serieRetPer').textContent = `${emp.series[doc]}-${String(correlativo).padStart(8,'0')}`;
+
+  document.getElementById('datosEmpresaRetPer').innerHTML = `
+    <label>Razón Social</label><input value="${emp.nombre}" readonly>
+    <label>RUC</label><input value="${emp.ruc}" readonly>
+  `;
+}
+
+function onRegimenRetPerChange(){
+  const sel = document.getElementById('rp_regimen');
+  const tasa = sel.selectedOptions[0].dataset.tasa;
+  document.getElementById('rp_tasa').value = tasa;
+  calcularRetPer();
+}
+
+function calcularRetPer(){
+  const esRetencion = docActualFact === 'retencion';
+  const importeRel = parseFloat(document.getElementById('rp_importerel').value) || 0;
+  const tasa = parseFloat(document.getElementById('rp_tasa').value) || 0;
+  const montoRetPer = importeRel * (tasa/100);
+  const neto = esRetencion ? (importeRel - montoRetPer) : (importeRel + montoRetPer);
+
+  document.getElementById('totalesRetPer').innerHTML = `
+    <div class="tot-line"><span>Importe del documento relacionado</span><span>S/ ${importeRel.toFixed(2)}</span></div>
+    <div class="tot-line"><span>${esRetencion?'Importe retenido':'Importe percibido'} (${tasa}%)</span><span>S/ ${montoRetPer.toFixed(2)}</span></div>
+    <div class="tot-line final"><span>${esRetencion?'Importe neto a pagar':'Importe total a cobrar'}</span><span>S/ ${neto.toFixed(2)}</span></div>
+  `;
+  return {importeRel, montoRetPer, neto};
+}
+
+function buildRetPerJSON(emp, serie, doc){
+  const esRetencion = doc === 'retencion';
+  const ahora = new Date();
+  const {importeRel, montoRetPer, neto} = calcularRetPer();
+  const tasa = parseFloat(document.getElementById('rp_tasa').value) || 0;
+
+  const base = {
+    ublVersionId: "2.0",
+    customizationId: "1.0",
+    id: serie,
+    fecEmision: ahora.toISOString().slice(0,10),
+    horEmision: ahora.toTimeString().slice(0,8),
+    numDocEmisor: emp.ruc,
+    tipDocEmisor: "6",
+    rznSocialEmisor: emp.nombre,
+    numDocContraparte: document.getElementById('rp_ruc').value || "",
+    tipDocContraparte: "6",
+    rznSocialContraparte: document.getElementById('rp_razonsocial').value || "",
+    observaciones: "-",
+    documentoRelacionado: {
+      tipDocRelacionado: document.getElementById('rp_tipodocrel').value,
+      numDocRelacionado: document.getElementById('rp_serierel').value || "",
+      fecEmisionRelacionado: document.getElementById('rp_fechaemisionrel').value || "",
+      importeTotalRelacionado: importeRel.toFixed(2),
+      monedaRelacionado: "PEN",
+      fechaMovimiento: document.getElementById('rp_fechamov').value || "",
+      numeroMovimiento: document.getElementById('rp_nummov').value || "1"
+    }
+  };
+
+  if(esRetencion){
+    base.codRegimenRetencion = document.getElementById('rp_regimen').value;
+    base.tasaRetencion = tasa.toFixed(2);
+    base.importeTotalRetenido = montoRetPer.toFixed(2);
+    base.monedaRetenido = "PEN";
+    base.importeTotalPagado = neto.toFixed(2);
+    base.monedaPagado = "PEN";
+    base.documentoRelacionado.importeRetenido = montoRetPer.toFixed(2);
+    base.documentoRelacionado.importeNetoPagado = neto.toFixed(2);
+  } else {
+    base.codRegimenPercepcion = document.getElementById('rp_regimen').value;
+    base.porcentajePercepcion = tasa.toFixed(2);
+    base.importeTotalPercibido = montoRetPer.toFixed(2);
+    base.monedaPercibido = "PEN";
+    base.importeTotalCobrado = neto.toFixed(2);
+    base.monedaCobrado = "PEN";
+    base.documentoRelacionado.importePercibido = montoRetPer.toFixed(2);
+    base.documentoRelacionado.importeTotalCobrado = neto.toFixed(2);
+  }
+
+  return base;
+}
+
+function generarRetPer(){
+  const emp = empresas[empresaActual];
+  const doc = docActualFact; // 'retencion' o 'percepcion'
+  const contraparte = document.getElementById('rp_razonsocial').value || '(sin nombre)';
+  const correlativo = emp.correlativos[doc]++;
+  const serie = `${emp.series[doc]}-${String(correlativo).padStart(8,'0')}`;
+  const {montoRetPer} = calcularRetPer();
+
+  const json = buildRetPerJSON(emp, serie, doc);
+  const tipDocArchivo = doc === 'retencion' ? '20' : '40';
+
+  emitidos.unshift({
+    empresa: empresaActual, grupo:'facturacion', tipo: doc,
+    serie, cliente: contraparte, monto: montoRetPer,
+    fecha: new Date().toISOString().slice(0,10),
+    jsonSUNAT: json
+  });
+
+  descargarJSON(json, `${emp.ruc}-${tipDocArchivo}-${serie}.json`);
+
+  document.getElementById('rp_ruc').value = '';
+  document.getElementById('rp_razonsocial').value = '';
+  document.getElementById('rp_serierel').value = '';
+  document.getElementById('rp_importerel').value = '';
+  renderTodo();
+  cambiarTab('emitidos');
+}
+
+// Reglas de negocio que el propio SFS valida al recibir el JSON — se revisan ANTES de generar,
+// para que el archivo nunca llegue mal estructurado y quede "Rechazado por SUNAT" o ni se envíe.
+function validarReglasSFS(docTipo, total){
+  const errores = [];
+  const fechaInput = document.getElementById('f_fecha').value;
+  const fechaEmision = fechaInput ? new Date(fechaInput+'T00:00:00') : new Date();
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const fechaEmisionSinHora = new Date(fechaEmision); fechaEmisionSinHora.setHours(0,0,0,0);
+  const diffDias = Math.round((hoy - fechaEmisionSinHora) / 86400000);
+
+  if(diffDias > 3){
+    errores.push(`La fecha de emisión (${fechaInput}) tiene ${diffDias} días de atraso — SUNAT rechaza pasado el 3er día calendario desde el siguiente a la emisión (Res. 000003-2023/SUNAT, igual para Facturador SUNAT y sistema propio). Corrige la fecha o emite con fecha de hoy.`);
+  }
+  if(diffDias < 0){
+    errores.push(`La fecha de emisión (${fechaInput}) está en el futuro — corrígela.`);
+  }
+
+  if(docTipo === 'boleta' && total > 700){
+    const tipoDoc = document.getElementById('f_tipodoc').value;
+    const numDoc = document.getElementById('f_doc').value;
+    if(tipoDoc !== '1' || !numDoc || numDoc.length !== 8){
+      errores.push(`Boletas mayores a S/700 requieren obligatoriamente el DNI (8 dígitos) del cliente. Monto actual: S/${total.toFixed(2)}.`);
+    }
+  }
+
+  return errores;
+}
+
+// Aviso no bloqueante: desde 01/08/2026 el código SUNAT es obligatorio para ciertos rubros (combustible, oro, etc.)
+// Devuelve true si se puede continuar (el usuario confirmó o no aplica), false si canceló.
+function confirmarCodigosSunatSiAplica(fechaInput){
+  const fecha = fechaInput ? new Date(fechaInput+'T00:00:00') : new Date();
+  const fechaLimite = new Date('2026-08-01T00:00:00');
+  if(fecha < fechaLimite) return true;
+
+  const emp = empresas[empresaActual];
+  const itemsSinCodigo = items.filter(it=>{
+    const prod = emp.productos.find(p=>p.nombre===it.producto);
+    return it.producto && (!prod || !prod.codigoSunat);
+  });
+  if(itemsSinCodigo.length === 0) return true;
+
+  return confirm(
+    `⚠️ Desde el 01/08/2026, SUNAT exige código de producto (Catálogo N°25) para ciertos rubros (combustible, oro, explosivos, insumos químicos, minerales, etc.).\n\n` +
+    `Estos ítems no tienen código SUNAT en su catálogo:\n` + itemsSinCodigo.map(it=>'• '+it.producto).join('\n') +
+    `\n\nSi alguno es combustible u otro bien de esa lista, SUNAT puede rechazar el comprobante.\n\n¿Generar de todas formas?`
+  );
+}
+
+// ---------- VALIDACIÓN EN VIVO POR CASILLERO ----------
+// Muestra el mensaje justo debajo del campo, en rojo (error) o ámbar (advertencia), mientras se llena el formulario.
+function mostrarMensajeCampo(idMsg, texto, tipo){
+  const el = document.getElementById(idMsg);
+  if(!texto){ el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.style.color = tipo === 'error' ? 'var(--danger)' : 'var(--warn)';
+  el.textContent = (tipo === 'error' ? '⚠️ ' : 'ℹ️ ') + texto;
+}
+
+// ---------- CONSULTA RUC/DNI ----------
+// Usa el mismo backend que ya funciona en CONTASH: una función de Netlify que sí corre 24/7
+// (no depende de que Vladi prenda ningún servidor) y hace la consulta desde el servidor,
+// evitando el bloqueo CORS que impide llamar a apis.net.pe directo desde el navegador.
+const URL_CONSULTA_DOC = 'https://docs-facturador.vmshgroup.com/consulta-doc?numero=';
+
+async function consultarRucODni(idDoc, idTipoDoc, idNombre, idDireccion, idMsg){
+  const numero = document.getElementById(idDoc).value.trim();
+
+  if(!numero){ return; }
+  if(numero.length !== 11 && numero.length !== 8){
+    const msgEl0 = document.getElementById(idMsg);
+    if(msgEl0){ msgEl0.style.display='block'; msgEl0.style.color='var(--danger)'; msgEl0.textContent='Número de documento con longitud inválida para buscar (RUC=11, DNI=8).'; }
+    return;
+  }
+
+  const msgEl = document.getElementById(idMsg);
+  if(msgEl){ msgEl.style.display='block'; msgEl.style.color='var(--text-dim)'; msgEl.textContent='Buscando...'; }
+
+  try{
+    const resp = await fetch(URL_CONSULTA_DOC + numero);
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'No encontrado');
+
+    // La función de Netlify tiene un bug: para DNI a veces deja "nombre" vacío pero sí trae
+    // el dato completo dentro de "raw.full_name" — usamos ese como respaldo.
+    const nombreEncontrado = data.nombre || (data.raw && data.raw.full_name) || '';
+    document.getElementById(idNombre).value = nombreEncontrado;
+    if(idDireccion && document.getElementById(idDireccion)) document.getElementById(idDireccion).value = data.direccion || '';
+
+    if(msgEl){
+      msgEl.style.color = nombreEncontrado ? 'var(--accent-2)' : 'var(--danger)';
+      msgEl.textContent = nombreEncontrado ? '✓ Encontrado' : '✕ No encontrado, escribe manual';
+      if(nombreEncontrado) setTimeout(()=>{ msgEl.style.display='none'; }, 2000);
+    }
+  } catch(err){
+    if(msgEl){ msgEl.style.color='var(--danger)'; msgEl.textContent='✕ No se pudo consultar, escribe manual.'; }
+  }
+}
+
+function validarCampoDoc(){
+  const tipoDoc = document.getElementById('f_tipodoc').value;
+  const numDoc = document.getElementById('f_doc').value.trim();
+  let texto = '';
+
+  if(tipoDoc === '6' && numDoc){ // RUC
+    if(!/^(10|15|16|17|20)\d{9}$/.test(numDoc)){
+      texto = 'RUC inválido — debe tener 11 dígitos y empezar con 10, 15, 16, 17 o 20.';
+    }
+  } else if(tipoDoc === '1' && numDoc){ // DNI
+    if(!/^\d{8}$/.test(numDoc)){
+      texto = 'DNI inválido — debe tener exactamente 8 dígitos.';
+    }
+  }
+
+  // Regla SFS: boleta >S/700 exige DNI válido
+  if(!texto && docActualFact === 'boleta'){
+    const totalActual = items.reduce((s,it)=>s+it.cant*it.precio,0);
+    if(totalActual > 700 && (tipoDoc !== '1' || !/^\d{8}$/.test(numDoc))){
+      texto = `Esta boleta es de S/${totalActual.toFixed(2)} (>S/700) — SUNAT exige DNI válido del cliente.`;
+    }
+  }
+
+  mostrarMensajeCampo('msg_f_doc', texto, 'error');
+}
+
+function validarCampoFecha(){
+  const val = document.getElementById('f_fecha').value;
+  const {texto, tipo} = calcularMensajeFecha(val);
+  mostrarMensajeCampo('msg_f_fecha', texto, tipo);
+}
+
+function validarCampoFechaGuia(){
+  const val = document.getElementById('g_fecha').value;
+  const {texto, tipo} = calcularMensajeFecha(val);
+  mostrarMensajeCampo('msg_g_fecha', texto, tipo);
+}
+
+function calcularMensajeFecha(val){
+  if(!val) return {texto:'', tipo:'error'};
+  const fecha = new Date(val+'T00:00:00'); fecha.setHours(0,0,0,0);
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const diffDias = Math.round((hoy - fecha) / 86400000);
+  if(diffDias > 3) return {texto:`Tiene ${diffDias} días de atraso — SUNAT rechaza pasado el 3er día calendario (código 2108/1079, Res. 000003-2023/SUNAT). Usa una fecha más reciente.`, tipo:'error'};
+  if(diffDias === 3) return {texto:'Justo en el límite (3 días de atraso). El plazo vence al final de hoy — genera y envía cuanto antes para no arriesgarte por diferencia de horas con el reloj de SUNAT.', tipo:'aviso'};
+  if(diffDias < 0) return {texto:'La fecha está en el futuro — corrígela.', tipo:'error'};
+  return {texto:'', tipo:'error'};
+}
+
+function validarUbigeo(idCampo){
+  const val = document.getElementById(idCampo).value.trim();
+  const idMsg = 'msg_' + idCampo;
+  let texto = '';
+  if(val && !/^\d{6}$/.test(val)){
+    texto = 'El ubigeo debe tener exactamente 6 dígitos numéricos.';
+  }
+  mostrarMensajeCampo(idMsg, texto, 'error');
+}
+
+function validarCampoMTC(){
+  const esPublico = document.getElementById('g_modalidad').value === '01';
+  const val = document.getElementById('g_mtc').value.trim();
+  let texto = '';
+  if(esPublico && !val){
+    texto = 'Obligatorio: en transporte público, SUNAT exige el N° de Registro MTC del transportista.';
+  }
+  mostrarMensajeCampo('msg_g_mtc', texto, esPublico && !val ? 'error' : 'aviso');
+}
+
+// Liquidación de Compra — Catálogo N° 01: tipo de documento "04". Se usa cuando se compra a un
+// vendedor persona natural sin RUC (ej. pequeños productores/agricultores que le venden a Nutri).
+function buildLiquidacionJSON(emp, serie){
+  const ahora = new Date();
+  const tipoDocSel = document.getElementById('f_tipodoc').value;
+  const fechaEmisionVal = document.getElementById('f_fecha').value;
+
+  const detalle = items.filter(it=>it.producto).map(it=>{
+    const esGravado = it.afectacion === '10';
+    const tasa = tasaIGVEmpresa(emp, fechaEmisionVal, it.actividadTurismo);
+    const valorUnitario = esGravado ? (it.precio/(1+tasa)) : it.precio;
+    const valorVentaItem = it.cant * valorUnitario;
+    const igvItem = esGravado ? valorVentaItem*tasa : 0;
+    const prodCat = emp.productos.find(p=>p.nombre===it.producto);
+    return {
+      codUnidadMedida: it.unidad || "NIU",
+      ctdUnidadItem: it.cant.toFixed(2),
+      codProducto: (prodCat && prodCat.codigo) || "-",
+      desItem: it.producto,
+      mtoValorUnitario: valorUnitario.toFixed(2),
+      mtoIgvItem: igvItem.toFixed(2),
+      tipAfeIGV: it.afectacion,
+      porIgvItem: (tasa*100).toFixed(2),
+      mtoPrecioVentaUnitario: it.precio.toFixed(2),
+      mtoValorVentaItem: valorVentaItem.toFixed(2)
+    };
+  });
+
+  const sumTotValVenta = detalle.reduce((s,d)=>s+parseFloat(d.mtoValorVentaItem),0);
+  const sumTotTributos = detalle.reduce((s,d)=>s+parseFloat(d.mtoIgvItem),0);
+  const sumImpVenta = sumTotValVenta + sumTotTributos;
+
+  const cabecera = {
+    tipDocumento: "04",
+    fecEmision: document.getElementById('f_fecha').value || ahora.toISOString().slice(0,10),
+    horEmision: horaParaFecha(document.getElementById('f_fecha').value),
+    tipDocVendedor: tipoDocSel,
+    numDocVendedor: document.getElementById('f_doc').value || "-",
+    rznSocialVendedor: document.getElementById('f_cliente').value || "-",
+    ubigeoDomicilioVendedor: document.getElementById('f_liq_ubigeo_dom').value || "",
+    dirDomicilioVendedor: document.getElementById('f_liq_dir_dom').value || "",
+    ubigeoPuntoVenta: document.getElementById('f_liq_ubigeo_pv').value || "",
+    dirPuntoVenta: document.getElementById('f_liq_dir_pv').value || "",
+    tipMoneda: "PEN",
+    sumTotTributos: sumTotTributos.toFixed(2),
+    sumTotValVenta: sumTotValVenta.toFixed(2),
+    sumImpVenta: sumImpVenta.toFixed(2),
+    ublVersionId: "2.1",
+    customizationId: "2.0"
+  };
+
+  return { cabecera, detalle };
+}
+
+// Factura/Boleta: cada Caja tiene su propia serie numerada (Caja 1→serie F001/B001, Caja 2→F002/B002...);
+// el Administrador de la empresa emite con la serie 5 (F005/B005). El resto de documentos usa la serie
+// única de la empresa (emp.series / emp.correlativos), como antes.
+function obtenerSerieYCorrelativo(emp, docTipo){
+  if(docTipo !== 'factura' && docTipo !== 'boleta'){
+    const correlativo = emp.correlativos[docTipo]++;
+    const serie = `${emp.series[docTipo]}-${String(correlativo).padStart(8,'0')}`;
+    return { serie, correlativo };
+  }
+
+  const numSerie = (rolSesion === 'caja' && cajaActual) ? cajaActual.numSerie : (parseInt(emp.serieAdmin) || 5);
+  const prefijo = docTipo === 'factura' ? 'F' : 'B';
+  const codigoSerie = prefijo + String(numSerie).padStart(3,'0');
+
+  if(!emp.correlativosPorSerie[docTipo]) emp.correlativosPorSerie[docTipo] = {};
+  if(!emp.correlativosPorSerie[docTipo][numSerie]) emp.correlativosPorSerie[docTipo][numSerie] = 1;
+  const correlativo = emp.correlativosPorSerie[docTipo][numSerie]++;
+  const serie = `${codigoSerie}-${String(correlativo).padStart(8,'0')}`;
+  return { serie, correlativo };
+}
+
+function generarComprobante(){
+  const emp = empresas[empresaActual];
+  const cliente = document.getElementById('f_cliente').value || '(sin nombre)';
+  const sub = items.reduce((s,it)=>s+it.cant*it.precio,0);
+  const total = sub; // el precio unitario ya incluye IGV, no se vuelve a aplicar la tasa aquí
+  const esNoFiscal = DOCS_NO_FISCALES.includes(docActualFact);
+
+  if(!esNoFiscal){
+    const errores = validarReglasSFS(docActualFact, total);
+    if(errores.length){
+      alert('No se puede generar el comprobante:\n\n' + errores.map(e=>'• '+e).join('\n'));
+      return;
+    }
+    if(!confirmarCodigosSunatSiAplica(document.getElementById('f_fecha').value)){
+      return;
+    }
+  }
+
+  // Factura y Boleta usan serie propia por Caja (Caja 1 = serie 1, Caja 2 = serie 2...);
+  // el resto de documentos (NC, ND, Guías, Retención, etc.) sigue con la serie única de la empresa.
+  const { serie, correlativo } = obtenerSerieYCorrelativo(emp, docActualFact);
+
+  let jsonSUNAT = null;
+  if(!esNoFiscal){
+    jsonSUNAT = docActualFact === 'liquidacion' ? buildLiquidacionJSON(emp, serie) : buildFacturaJSON(emp, serie, docActualFact);
+    const tipDocArchivo = (docActualFact==='factura') ? '01' : (docActualFact==='boleta') ? '03' : (docActualFact==='nc') ? '07' : (docActualFact==='liquidacion') ? '04' : '08';
+    descargarJSON(jsonSUNAT, `${emp.ruc}-${tipDocArchivo}-${serie}.json`);
+  }
+
+  emitidos.unshift({
+    empresa: empresaActual, grupo:'facturacion', tipo: docActualFact,
+    serie, cliente, monto: total, fecha: document.getElementById('f_fecha').value || new Date().toISOString().slice(0,10),
+    detalle: { items: items.map(it=>({producto:it.producto, cant:it.cant, precio:it.precio})) },
+    jsonSUNAT, noFiscal: esNoFiscal,
+    tipoDocCliente: document.getElementById('f_tipodoc').value, numDocCliente: document.getElementById('f_doc').value
+  });
+
+  items = [];
+  document.getElementById('f_cliente').value='';
+  document.getElementById('f_doc').value='';
+  document.getElementById('f_direccion').value='';
+  renderTodo();
+  cambiarTab('emitidos');
+}
+
+// Arma el JSON exacto que espera tu SFS (mismo esquema de campos que tu Hoja2 real)
+function buildGuiaJSON(emp, serie){
+  const modalidadCod = document.getElementById('g_modalidad').value; // 01 público / 02 privado
+  const esPublico = modalidadCod === '01';
+  const ahora = new Date();
+  const horaStr = horaParaFecha(document.getElementById('g_fecha').value);
+
+  const cabecera = {
+    fecEmision: document.getElementById('g_fecha').value || ahora.toISOString().slice(0,10),
+    horEmision: horaStr,
+    tipDocGuia: "09",
+    serNumDocGuia: serie,
+    numDocDestinatario: document.getElementById('g_ructrans').value || "",
+    tipDocDestinatario: "6",
+    rznSocialDestinatario: document.getElementById('g_destinatario').value || "",
+    motTrasladoDatosEnvio: document.getElementById('g_motivo').value,
+    desMotivoTrasladoDatosEnvio: document.getElementById('g_motivo').selectedOptions[0].text,
+    indTransbordoProgDatosEnvio: "false",
+    psoBrutoTotalBienesDatosEnvio: parseFloat(document.getElementById('g_peso').value||0).toFixed(3),
+    uniMedidaPesoBrutoDatosEnvio: "KGM",
+    numBultosDatosEnvio: document.getElementById('g_bultos').value || "1",
+    modTrasladoDatosEnvio: modalidadCod,
+    fecInicioTrasladoDatosEnvio: document.getElementById('g_fecha').value || ahora.toISOString().slice(0,10),
+    fecEntregaBienesTransportista: document.getElementById('g_fecha').value || ahora.toISOString().slice(0,10),
+    numDocTransportista: document.getElementById('g_ructrans') ? document.getElementById('g_ructrans').value : "",
+    tipDocTransportista: "6",
+    nomTransportista: esPublico ? "" : "",
+    numPlacaTransPrivado: document.getElementById('g_placa') ? document.getElementById('g_placa').value : "",
+    numDocIdeConductorTransPrivado: "",
+    tipDocIdeConductorTransPrivado: "1",
+    nomConductorTransPrivado: document.getElementById('g_conductor') ? document.getElementById('g_conductor').value : "",
+    ubiLlegada: document.getElementById('g_ubigeo_llegada').value || "",
+    dirLlegada: document.getElementById('g_llegada').value || "",
+    ubiPartida: document.getElementById('g_ubigeo_partida').value || "",
+    dirPartida: document.getElementById('g_partida').value || "",
+    obsGuia: "",
+    ublVersionId: "2.1",
+    customizationId: "2.0"
+  };
+  if(esPublico){
+    cabecera.numRegistroMTC = document.getElementById('g_mtc') ? document.getElementById('g_mtc').value : "";
+  }
+
+  const detalle = itemsGuia.filter(it=>it.producto).map(it=>({
+    uniMedidaItem: it.unidad || "NIU",
+    canItem: (parseFloat(it.cant)||0).toFixed(2),
+    desItem: it.producto,
+    codItem: ""
+  }));
+
+  return { cabecera, detalle };
+}
+
+function descargarJSON(objeto, nombreArchivo){
+  const blob = new Blob([JSON.stringify(objeto, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombreArchivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function generarGuia(){
+  const emp = empresas[empresaActual];
+  const destinatario = document.getElementById('g_destinatario').value || '(sin destinatario)';
+  const correlativo = emp.correlativos[docActualGuia]++;
+  const serie = `${emp.series[docActualGuia]}-${String(correlativo).padStart(8,'0')}`;
+
+  const jsonSFS = buildGuiaJSON(emp, serie);
+
+  emitidos.unshift({
+    empresa: empresaActual, grupo:'guias', tipo: docActualGuia,
+    serie, cliente: destinatario, monto: null,
+    fecha: document.getElementById('g_fecha').value || new Date().toISOString().slice(0,10),
+    jsonSFS,
+    detalle: { items: itemsGuia.map(it=>({producto:it.producto, cant:it.cant, unidad:it.unidad})) }
+  });
+
+  descargarJSON(jsonSFS, `${emp.ruc}-09-${serie}.json`);
+
+  itemsGuia = [];
+  document.getElementById('g_destinatario').value='';
+  document.getElementById('g_partida').value='';
+  document.getElementById('g_llegada').value='';
+  renderTodo();
+  cambiarTab('emitidos');
+}
+
+// ---------- EMISIÓN MASIVA ----------
+let docActualMasivo = 'factura';
+let filasMasivoProcesadas = [];
+
+// cabeceraCols = datos que se repiten en cada fila del grupo (se toman de la primera fila)
+// itemCols = datos que sí cambian por producto (una fila = un producto)
+const formatosMasivo = {
+  factura: {
+    esGuia:false,
+    cabeceraCols: ['Grupo','Cliente','TipoDoc(RUC/DNI/CE/PAS/SD)','NumDoc','Direccion','FormaPago(Contado/Credito)','NumCuotas','GuiaRef'],
+    itemCols: ['Producto','Cantidad','PrecioUnit','Afectacion(Gravado/Exonerado/Inafecto/Exportacion)'],
+  },
+  boleta: {
+    esGuia:false,
+    cabeceraCols: ['Grupo','Cliente','TipoDoc(RUC/DNI/CE/PAS/SD)','NumDoc','Direccion','FormaPago(Contado/Credito)','NumCuotas','GuiaRef'],
+    itemCols: ['Producto','Cantidad','PrecioUnit','Afectacion(Gravado/Exonerado/Inafecto/Exportacion)'],
+  },
+  remitente: {
+    esGuia:true,
+    cabeceraCols: ['Grupo','Destinatario','UbigeoPartida','DirPartida','UbigeoLlegada','DirLlegada','Motivo','DocRef'],
+    itemCols: ['Producto','Cantidad','Unidad'],
+  },
+  transportista: {
+    esGuia:true,
+    cabeceraCols: ['Grupo','Destinatario','UbigeoPartida','DirPartida','UbigeoLlegada','DirLlegada','Modalidad(Publico/Privado)','Motivo','DocRef','Categoria','Placa','RUCTransportista','MTC','Conductor','Licencia'],
+    itemCols: ['Producto','Cantidad','Unidad'],
+  },
+};
+
+const AFECTACION_WORD_TO_CODE = {gravado:'10', exonerado:'20', inafecto:'30', exportacion:'17', donacion:'40'};
+const TIPODOC_WORD_TO_CODE = {ruc:'6', dni:'1', ce:'4', pas:'7', sd:'0'};
+
+function descargarPlantillaExcel(){
+  const f = formatosMasivo[docActualMasivo];
+  const headers = [...f.cabeceraCols, ...f.itemCols];
+  const ws = XLSX.utils.aoa_to_sheet([headers]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Datos');
+  XLSX.writeFile(wb, `plantilla_${docActualMasivo}.xlsx`);
+}
+
+function cargarExcelMasivo(input){
+  if(!esAdmin){
+    alert('Solo el administrador puede subir archivos Excel con datos.');
+    input.value = '';
+    return;
+  }
+  const file = input.files[0];
+  if(!file) return;
+  document.getElementById('masivoFileName').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+    // se asume la primera fila es la cabecera (nombres de columna) y se descarta
+    const cuerpo = filas.slice(1).filter(f=>f.some(c=>String(c).trim()!==''));
+    const texto = cuerpo.map(fila=>fila.map(c=>String(c).trim()).join('|')).join('\n');
+    document.getElementById('masivoInput').value = texto;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function cargarArchivoMasivo(input){
+  const file = input.files[0];
+  if(!file) return;
+  document.getElementById('masivoFileName').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    document.getElementById('masivoInput').value = e.target.result;
+  };
+  reader.onerror = ()=>{
+    document.getElementById('masivoFileName').textContent = 'Error al leer el archivo';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function cambiarDocMasivo(doc){
+  docActualMasivo = doc;
+  document.querySelectorAll('.masivo-doc').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.masivo-doc[data-doc="${doc}"]`).classList.add('active');
+  actualizarFormatoMasivo();
+  document.getElementById('previewMasivo').innerHTML = '<div class="empty-state">Pega datos y presiona "Procesar" para ver cuántos comprobantes/guías se generarán</div>';
+  document.getElementById('btnConfirmarMasivo').style.display = 'none';
+  document.getElementById('resumenMasivo').textContent = '';
+}
+
+function actualizarFormatoMasivo(){
+  const f = formatosMasivo[docActualMasivo];
+  const todas = [...f.cabeceraCols, ...f.itemCols];
+  document.getElementById('formatoCols').innerHTML = todas.map((c,i)=>
+    i < f.cabeceraCols.length ? c : `<b>${c}</b>`
+  ).join('  |  ') + `<br><span style="color:var(--text-dim);">(en negrita: columnas que van una por producto; el resto se repite igual en cada fila del mismo Grupo)</span>`;
+  document.getElementById('tituloMasivo').textContent = '— ' + (docLabels[docActualMasivo] || {remitente:'Guía Remitente',transportista:'Guía Transportista'}[docActualMasivo]);
+}
+
+function parseLinea(linea){
+  return linea.split(/\t|\|/).map(c=>c.trim());
+}
+
+function procesarMasivo(){
+  const raw = document.getElementById('masivoInput').value.trim();
+  const preview = document.getElementById('previewMasivo');
+  const resumen = document.getElementById('resumenMasivo');
+  const btn = document.getElementById('btnConfirmarMasivo');
+  const f = formatosMasivo[docActualMasivo];
+  const totalCols = f.cabeceraCols.length + f.itemCols.length;
+
+  if(!raw){
+    preview.innerHTML = '<div class="empty-state">No hay datos pegados</div>';
+    btn.style.display = 'none';
+    return;
+  }
+
+  const lineas = raw.split('\n').map(l=>l.trim()).filter(l=>l.length);
+  const grupos = {}; // grupo -> {cabecera:{...}, items:[]}
+  let errores = 0;
+
+  lineas.forEach(l=>{
+    const c = parseLinea(l);
+    if(c.length < totalCols){ errores++; return; }
+
+    const grupo = c[0];
+    if(!grupos[grupo]){
+      const cab = {};
+      f.cabeceraCols.forEach((nombreCol,i)=>{ cab[nombreCol] = c[i]; });
+      grupos[grupo] = { grupo, cabecera: cab, items: [] };
+    }
+
+    const item = {};
+    f.itemCols.forEach((nombreCol,i)=>{ item[nombreCol] = c[f.cabeceraCols.length + i]; });
+    grupos[grupo].items.push(item);
+  });
+
+  filasMasivoProcesadas = Object.values(grupos);
+
+  if(filasMasivoProcesadas.length === 0){
+    preview.innerHTML = '<div class="empty-state">No se pudo agrupar ninguna fila. Revisa que tengas todas las columnas requeridas.</div>';
+    btn.style.display = 'none';
+    return;
+  }
+
+  resumen.textContent = `— se generarán ${filasMasivoProcesadas.length} ${f.esGuia?'guía(s)':'comprobante(s)'}${errores?` (${errores} fila(s) ignorada(s), faltan columnas)`:''}`;
+
+  preview.innerHTML = filasMasivoProcesadas.map(g=>{
+    const totalItems = g.items.length;
+    let totalMonto = null;
+    if(!f.esGuia){
+      totalMonto = g.items.reduce((s,it)=>{
+        const cant = parseFloat(it['Cantidad'])||0;
+        const precio = parseFloat(it['PrecioUnit'])||0;
+        const afect = (it['Afectacion(Gravado/Exonerado/Inafecto/Exportacion)']||'gravado').toLowerCase();
+        const igv = afect==='gravado' ? tasaIGVEmpresa(empresas[empresaActual], new Date().toISOString().slice(0,10)) : 0;
+        return s + cant*precio; // el precio ya incluye IGV
+      },0);
+    }
+    const nombreCab = g.cabecera['Cliente'] || g.cabecera['Destinatario'] || '';
+    const extra = f.esGuia ? (g.cabecera['DirLlegada']||'') : (g.cabecera['FormaPago(Contado/Credito)']||'');
+    return `
+      <div class="list-item">
+        <div class="top">
+          <span class="serie">${g.grupo}</span>
+          ${totalMonto!==null ? `<span class="monto">S/ ${totalMonto.toFixed(2)}</span>` : `<span class="badge ${badgeClass(docActualMasivo)}">${totalItems} ítem(s)</span>`}
+        </div>
+        <div class="cliente">${nombreCab} · ${extra} — ${totalItems} producto(s)</div>
+      </div>
+    `;
+  }).join('');
+
+  btn.style.display = 'block';
+}
+
+const MOTIVO_TEXTO_A_CODIGO = {
+  'venta':'01', 'venta sujeta a confirmacion del comprador':'02', 'traslado entre establecimientos de la misma empresa':'04',
+  'importacion':'08', 'exportacion':'09', 'otros':'13', 'traslado emisor itinerante cp':'18',
+  'traslado a zona primaria':'19', 'consignacion':'20', 'donacion':'99'
+};
+function motivoACodigo(texto){
+  const key = (texto||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  return MOTIVO_TEXTO_A_CODIGO[key] || '01';
+}
+
+function buildGuiaJSONMasivo(g, serie, esTransportista){
+  const cab = g.cabecera;
+  const modalidadTexto = (cab['Modalidad(Publico/Privado)']||'Privado').toLowerCase();
+  const esPublico = modalidadTexto.startsWith('publ');
+  const ahora = new Date();
+
+  const cabecera = {
+    fecEmision: ahora.toISOString().slice(0,10),
+    horEmision: ahora.toTimeString().slice(0,8),
+    tipDocGuia: "09",
+    serNumDocGuia: serie,
+    numDocDestinatario: "",
+    tipDocDestinatario: "6",
+    rznSocialDestinatario: cab['Destinatario'] || "",
+    motTrasladoDatosEnvio: motivoACodigo(cab['Motivo']),
+    desMotivoTrasladoDatosEnvio: cab['Motivo'] || "Venta",
+    indTransbordoProgDatosEnvio: "false",
+    psoBrutoTotalBienesDatosEnvio: "0.000",
+    uniMedidaPesoBrutoDatosEnvio: "KGM",
+    numBultosDatosEnvio: "1",
+    modTrasladoDatosEnvio: esPublico ? "01" : "02",
+    fecInicioTrasladoDatosEnvio: ahora.toISOString().slice(0,10),
+    fecEntregaBienesTransportista: ahora.toISOString().slice(0,10),
+    numDocTransportista: esTransportista ? (cab['RUCTransportista']||"") : "",
+    tipDocTransportista: "6",
+    nomTransportista: "",
+    numPlacaTransPrivado: esTransportista ? (cab['Placa']||"") : "",
+    numDocIdeConductorTransPrivado: "",
+    tipDocIdeConductorTransPrivado: "1",
+    nomConductorTransPrivado: esTransportista ? (cab['Conductor']||"") : "",
+    ubiLlegada: cab['UbigeoLlegada'] || "",
+    dirLlegada: cab['DirLlegada'] || "",
+    ubiPartida: cab['UbigeoPartida'] || "",
+    dirPartida: cab['DirPartida'] || "",
+    obsGuia: "",
+    ublVersionId: "2.1",
+    customizationId: "2.0"
+  };
+  if(esPublico && esTransportista) cabecera.numRegistroMTC = cab['MTC'] || "";
+
+  const detalle = g.items.map(it=>({
+    uniMedidaItem: it['Unidad'] || "NIU",
+    canItem: (parseFloat(it['Cantidad'])||0).toFixed(2),
+    desItem: it['Producto'] || "",
+    codItem: ""
+  }));
+
+  return { cabecera, detalle };
+}
+
+function buildFacturaJSONMasivo(g, serie, docTipo){
+  const ahora = new Date();
+  const cab = g.cabecera;
+  const tipDocMap = {ruc:'6', dni:'1', ce:'4', pas:'7', sd:'0'};
+  const tipDocUsuario = tipDocMap[(cab['TipoDoc(RUC/DNI/CE/PAS/SD)']||'RUC').toLowerCase()] || '6';
+  const tasa = tasaIGVEmpresa(empresas[empresaActual], ahora.toISOString().slice(0,10));
+
+  const detalle = g.items.map(it=>{
+    const afectTexto = (it['Afectacion(Gravado/Exonerado/Inafecto/Exportacion)']||'Gravado').toLowerCase();
+    const afeCode = AFECTACION_WORD_TO_CODE[afectTexto] || '10';
+    const esGravado = afeCode === '10';
+    const cant = parseFloat(it['Cantidad'])||0;
+    const precio = parseFloat(it['PrecioUnit'])||0;
+    const valorUnitario = esGravado ? (precio/(1+tasa)) : precio;
+    const valorVentaItem = cant*valorUnitario;
+    const igvItem = esGravado ? valorVentaItem*tasa : 0;
+    return {
+      codUnidadMedida: "NIU",
+      ctdUnidadItem: cant.toFixed(2),
+      codProducto: "-",
+      codProductoSUNAT: "-",
+      desItem: it['Producto']||"",
+      mtoValorUnitario: valorUnitario.toFixed(2),
+      sumTotTributosItem: igvItem.toFixed(2),
+      codTriIGV: esGravado ? 1000 : (afeCode==='20'?9997:afeCode==='30'?9998:afeCode==='17'?9995:9996),
+      mtoIgvItem: igvItem.toFixed(2),
+      mtoBaseIgvItem: valorVentaItem.toFixed(2),
+      nomTributoIgvItem: "IGV",
+      codTipTributoIgvItem: "VAT",
+      tipAfeIGV: afeCode,
+      porIgvItem: (tasa*100).toFixed(2),
+      mtoPrecioVentaUnitario: precio.toFixed(2),
+      mtoValorVentaItem: valorVentaItem.toFixed(2)
+    };
+  });
+
+  const sumTotValVenta = detalle.reduce((s,d)=>s+parseFloat(d.mtoValorVentaItem),0);
+  const sumTotTributos = detalle.reduce((s,d)=>s+parseFloat(d.sumTotTributosItem),0);
+  const sumImpVenta = sumTotValVenta + sumTotTributos;
+
+  const cabecera = {
+    tipOperacion: "0101",
+    fecEmision: ahora.toISOString().slice(0,10),
+    horEmision: ahora.toTimeString().slice(0,8),
+    fecVencimiento: "-",
+    codLocalEmisor: "-",
+    tipDocUsuario,
+    numDocUsuario: cab['NumDoc'] || "-",
+    rznSocialUsuario: cab['Cliente'] || "-",
+    tipMoneda: "PEN",
+    sumTotTributos: sumTotTributos.toFixed(2),
+    sumTotValVenta: sumTotValVenta.toFixed(2),
+    sumPrecioVenta: sumImpVenta.toFixed(2),
+    sumDescTotal: "0.00",
+    sumOtrosCargos: "0.00",
+    sumTotalAnticipos: "0.00",
+    sumImpVenta: sumImpVenta.toFixed(2),
+    ublVersionId: "2.1",
+    customizationId: "2.0"
+  };
+
+  return { cabecera, detalle };
+}
+
+function confirmarMasivo(){
+  const emp = empresas[empresaActual];
+  const f = formatosMasivo[docActualMasivo];
+  const loteJSON = [];
+
+  // Regla SFS: boletas >S/700 requieren DNI (8 dígitos) del cliente
+  if(docActualMasivo === 'boleta'){
+    const gruposInvalidos = [];
+    filasMasivoProcesadas.forEach(g=>{
+      const montoGrupo = g.items.reduce((s,it)=>{
+        const cant = parseFloat(it['Cantidad'])||0;
+        const precio = parseFloat(it['PrecioUnit'])||0;
+        const afect = (it['Afectacion(Gravado/Exonerado/Inafecto/Exportacion)']||'gravado').toLowerCase();
+        const igv = afect==='gravado' ? tasaIGVEmpresa(empresas[empresaActual], new Date().toISOString().slice(0,10)) : 0;
+        return s + cant*precio; // el precio ya incluye IGV
+      },0);
+      const tipoDocGrupo = (g.cabecera['TipoDoc(RUC/DNI/CE/PAS/SD)']||'').toLowerCase();
+      const numDocGrupo = g.cabecera['NumDoc']||'';
+      if(montoGrupo > 700 && (tipoDocGrupo !== 'dni' || numDocGrupo.length !== 8)){
+        gruposInvalidos.push(`${g.grupo} (S/${montoGrupo.toFixed(2)})`);
+      }
+    });
+    if(gruposInvalidos.length){
+      alert('No se puede generar el lote — estas boletas superan S/700 y necesitan DNI (8 dígitos) del cliente:\n\n' + gruposInvalidos.join('\n'));
+      return;
+    }
+  }
+
+  filasMasivoProcesadas.forEach(g=>{
+    const correlativo = emp.correlativos[docActualMasivo]++;
+    const serie = `${emp.series[docActualMasivo]}-${String(correlativo).padStart(8,'0')}`;
+    let monto = null;
+    if(!f.esGuia){
+      monto = g.items.reduce((s,it)=>{
+        const cant = parseFloat(it['Cantidad'])||0;
+        const precio = parseFloat(it['PrecioUnit'])||0;
+        const afect = (it['Afectacion(Gravado/Exonerado/Inafecto/Exportacion)']||'gravado').toLowerCase();
+        const igv = afect==='gravado' ? tasaIGVEmpresa(empresas[empresaActual], new Date().toISOString().slice(0,10)) : 0;
+        return s + cant*precio; // el precio ya incluye IGV
+      },0);
+      const jsonFactura = buildFacturaJSONMasivo(g, serie, docActualMasivo);
+      const tipDocArchivo = (docActualMasivo==='factura') ? '01' : '03';
+      loteJSON.push({ archivo: `${emp.ruc}-${tipDocArchivo}-${serie}.json`, ...jsonFactura });
+    } else {
+      const jsonGuia = buildGuiaJSONMasivo(g, serie, docActualMasivo==='transportista');
+      loteJSON.push({ archivo: `${emp.ruc}-09-${serie}.json`, ...jsonGuia });
+    }
+    const nombreCab = g.cabecera['Cliente'] || g.cabecera['Destinatario'] || '(sin nombre)';
+
+    emitidos.unshift({
+      empresa: empresaActual,
+      grupo: f.esGuia ? 'guias' : 'facturacion',
+      tipo: docActualMasivo,
+      serie,
+      cliente: `${nombreCab} (${g.grupo})`,
+      monto,
+      fecha: new Date().toISOString().slice(0,10),
+      detalle: g // queda guardado el detalle completo (cabecera + items) por si se necesita luego
+    });
+  });
+
+  if(loteJSON.length){
+    const prefijo = f.esGuia ? 'lote_guias' : 'lote_comprobantes';
+    descargarJSON(loteJSON, `${prefijo}_${emp.usuario}_${new Date().toISOString().slice(0,10)}.json`);
+  }
+
+  const total = filasMasivoProcesadas.length;
+  filasMasivoProcesadas = [];
+  document.getElementById('masivoInput').value = '';
+  document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">✅ ${total} documento(s) generado(s) correctamente</div>`;
+  document.getElementById('btnConfirmarMasivo').style.display = 'none';
+  document.getElementById('resumenMasivo').textContent = '';
+  renderTodo();
+}
+
+// ---------- CATÁLOGO DE PRODUCTOS (estructura SUNAT) ----------
+const AFECTACION_LABEL = {'10':'Gravado','20':'Exonerado','30':'Inafecto','17':'Exportación','40':'Exon. Gratuita'};
+
+function guardarProducto(){
+  const emp = empresas[empresaActual];
+  const idEditando = document.getElementById('prod_editando_id').value;
+  const nombre = document.getElementById('prod_nombre').value.trim();
+  const precio = parseFloat(document.getElementById('prod_precio').value);
+
+  if(!nombre || isNaN(precio) || precio < 0){
+    alert('Completa al menos la descripción y un precio válido.');
+    return;
+  }
+
+  const datos = {
+    nombre,
+    codigo: document.getElementById('prod_codigo').value.trim(),
+    codigoSunat: document.getElementById('prod_codigo_sunat').value.trim(),
+    unidad: document.getElementById('prod_unidad').value,
+    precio,
+    afectacion: document.getElementById('prod_afectacion').value,
+    codDetraccion: document.getElementById('prod_cod_detraccion').value.trim(),
+    actividadTurismo: document.getElementById('prod_actividad_turismo').checked,
+  };
+
+  if(idEditando){
+    const p = emp.productos.find(p=>p.id===idEditando);
+    if(p) Object.assign(p, datos);
+  } else {
+    datos.id = 'p' + Date.now();
+    emp.productos.push(datos);
+  }
+
+  cancelarEdicionProducto();
+  renderTodo();
+}
+
+function editarProducto(id){
+  const emp = empresas[empresaActual];
+  const p = emp.productos.find(p=>p.id===id);
+  if(!p) return;
+  document.getElementById('prod_editando_id').value = id;
+  document.getElementById('prod_nombre').value = p.nombre;
+  document.getElementById('prod_codigo').value = p.codigo || '';
+  document.getElementById('prod_codigo_sunat').value = p.codigoSunat || '';
+  document.getElementById('prod_unidad').value = p.unidad;
+  document.getElementById('prod_precio').value = p.precio;
+  document.getElementById('prod_afectacion').value = p.afectacion || '10';
+  document.getElementById('prod_cod_detraccion').value = p.codDetraccion || '';
+  document.getElementById('prod_actividad_turismo').checked = !!p.actividadTurismo;
+  document.getElementById('tituloProducto').textContent = 'Editar producto';
+  document.getElementById('btnCancelarEdicionProducto').style.display = 'block';
+}
+
+function cancelarEdicionProducto(){
+  document.getElementById('prod_editando_id').value = '';
+  document.getElementById('prod_nombre').value = '';
+  document.getElementById('prod_codigo').value = '';
+  document.getElementById('prod_codigo_sunat').value = '';
+  document.getElementById('prod_precio').value = '';
+  document.getElementById('prod_cod_detraccion').value = '';
+  document.getElementById('prod_unidad').value = 'NIU';
+  document.getElementById('prod_afectacion').value = '10';
+  document.getElementById('prod_actividad_turismo').checked = false;
+  document.getElementById('tituloProducto').textContent = 'Nuevo producto';
+  document.getElementById('btnCancelarEdicionProducto').style.display = 'none';
+}
+
+function eliminarProducto(id){
+  const emp = empresas[empresaActual];
+  if(!confirm('¿Eliminar este producto del catálogo?')) return;
+  emp.productos = emp.productos.filter(p=>p.id!==id);
+  renderTodo();
+}
+
+const COLUMNAS_PRODUCTO_EXCEL = ['Descripcion','CodigoInterno','CodigoSunat','UnidadMedida','Precio','AfectacionIGV(10/20/30/17/40)','CodigoDetraccion','ActividadTurismo(SI/NO)'];
+
+function exportarProductosExcel(){
+  const emp = empresas[empresaActual];
+  const filas = [COLUMNAS_PRODUCTO_EXCEL, ...emp.productos.map(p=>[
+    p.nombre, p.codigo||'', p.codigoSunat||'', p.unidad, p.precio, p.afectacion||'10', p.codDetraccion||'', p.actividadTurismo?'SI':'NO'
+  ])];
+  const ws = XLSX.utils.aoa_to_sheet(filas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+  XLSX.writeFile(wb, `productos_${emp.usuario}.xlsx`);
+}
+
+function importarProductosExcel(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+    const cuerpo = filas.slice(1).filter(f=>f.some(c=>String(c).trim()!==''));
+    const emp = empresas[empresaActual];
+    let agregados = 0, actualizados = 0;
+
+    cuerpo.forEach(fila=>{
+      const [nombre, codigo, codigoSunat, unidad, precio, afectacion, codDetraccion, actTurismo] = fila.map(c=>String(c).trim());
+      if(!nombre) return;
+      const datos = {
+        nombre, codigo: codigo||'', codigoSunat: codigoSunat||'',
+        unidad: unidad || 'NIU', precio: parseFloat(precio)||0,
+        afectacion: afectacion || '10', codDetraccion: codDetraccion||'',
+        actividadTurismo: (actTurismo||'').toUpperCase()==='SI'
+      };
+      const existente = emp.productos.find(p=>p.nombre.toLowerCase()===nombre.toLowerCase());
+      if(existente){ Object.assign(existente, datos); actualizados++; }
+      else { datos.id = 'p'+Date.now()+Math.random().toString(36).slice(2,6); emp.productos.push(datos); agregados++; }
+    });
+
+    const msg = document.getElementById('prodImportMsg');
+    msg.style.display='block'; msg.style.color='var(--accent-2)';
+    msg.textContent = `Importación completa: ${agregados} producto(s) nuevo(s), ${actualizados} actualizado(s).`;
+    input.value = '';
+    renderTodo();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ---------- CONFIGURACIÓN DE EMPRESA (logo, contacto, bancos, texto legal) ----------
+function subirLogoEmpresa(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    empresas[empresaActual].logo = e.target.result; // base64
+    renderConfigEmpresa();
+  };
+  reader.readAsDataURL(file);
+}
+
+function quitarLogoEmpresa(){
+  empresas[empresaActual].logo = '';
+  renderConfigEmpresa();
+}
+
+function guardarConfigEmpresa(){
+  const emp = empresas[empresaActual];
+  emp.nombreComercial = document.getElementById('cfg_nombre_comercial').value.trim() || emp.nombreComercial || emp.nombre;
+  emp.direccion = document.getElementById('cfg_direccion').value.trim();
+  emp.telefono = document.getElementById('cfg_telefono').value.trim();
+  emp.email = document.getElementById('cfg_email').value.trim();
+  emp.web = document.getElementById('cfg_web').value.trim();
+  emp.textoLegal = document.getElementById('cfg_texto_legal').value.trim();
+
+  const msg = document.getElementById('cfgEmpresaMsg');
+  msg.style.display='block'; msg.style.color='var(--accent-2)';
+  msg.textContent = 'Configuración guardada.';
+  document.getElementById('nombreEmpresaHeader').textContent = emp.nombre + (esAdmin ? ' (modo administrador)' : (rolSesion==='caja' ? ' — '+cajaActual.nombre : ''));
+}
+
+function agregarBancoEmpresa(){
+  const emp = empresas[empresaActual];
+  const cuenta = document.getElementById('banco_cuenta').value.trim();
+  if(!cuenta){ alert('Pon el número de cuenta.'); return; }
+  emp.bancos.push({
+    id: 'b'+Date.now(),
+    banco: document.getElementById('banco_nombre').value,
+    moneda: document.getElementById('banco_moneda').value,
+    cuenta,
+    cci: document.getElementById('banco_cci').value.trim(),
+    activo: true
+  });
+  document.getElementById('banco_cuenta').value = '';
+  document.getElementById('banco_cci').value = '';
+  renderConfigEmpresa();
+}
+
+function toggleBancoActivo(id){
+  const emp = empresas[empresaActual];
+  const b = emp.bancos.find(b=>b.id===id);
+  if(b) b.activo = !b.activo;
+  renderConfigEmpresa();
+}
+
+function eliminarBancoEmpresa(id){
+  const emp = empresas[empresaActual];
+  emp.bancos = emp.bancos.filter(b=>b.id!==id);
+  renderConfigEmpresa();
+}
+
+function renderConfigEmpresa(){
+  const emp = empresas[empresaActual];
+  if(!emp) return;
+
+  document.getElementById('logoPreview').innerHTML = emp.logo
+    ? `<img src="${emp.logo}" style="max-width:100%; max-height:100%;">`
+    : 'Sin logo';
+  document.getElementById('cfg_nombre_comercial').value = emp.nombreComercial || emp.nombre || '';
+  document.getElementById('cfg_direccion').value = emp.direccion || '';
+  document.getElementById('cfg_telefono').value = emp.telefono || '';
+  document.getElementById('cfg_email').value = emp.email || '';
+  document.getElementById('cfg_web').value = emp.web || '';
+  document.getElementById('cfg_texto_legal').value = emp.textoLegal || '';
+
+  document.getElementById('listaBancos').innerHTML = (emp.bancos||[]).map(b=>`
+    <div class="list-item">
+      <div class="top">
+        <span class="serie">${b.banco} — ${b.moneda}</span>
+        <label style="font-size:11px; display:flex; align-items:center; gap:4px;">
+          <input type="checkbox" ${b.activo?'checked':''} onchange="toggleBancoActivo('${b.id}')"> Activo
+        </label>
+      </div>
+      <div class="cliente">Cuenta: ${b.cuenta}${b.cci?' · CCI: '+b.cci:''}</div>
+      <button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-size:10px; margin-top:6px;" onclick="eliminarBancoEmpresa('${b.id}')">🗑️ Eliminar</button>
+    </div>
+  `).join('') || `<div class="empty-state">Sin cuentas bancarias registradas</div>`;
+}
+
+function renderCatalogoCompleto(){
+  const emp = empresas[empresaActual];
+  document.getElementById('nombreEmpresaProdTab').textContent = emp.nombre;
+  document.getElementById('catalogoListCompleto').innerHTML = emp.productos.map(p=>`
+    <div class="list-item">
+      <div class="top">
+        <span class="serie">${p.nombre}</span>
+        <span class="monto">S/ ${p.precio.toFixed(2)}</span>
+      </div>
+      <div class="cliente">
+        ${p.unidad} · ${AFECTACION_LABEL[p.afectacion]||'Gravado'}
+        ${p.codigo ? ' · Cód. int: '+p.codigo : ''}
+        ${p.codigoSunat ? ' · Cód. SUNAT: '+p.codigoSunat : ''}
+        ${p.codDetraccion ? ' · Detracción: '+p.codDetraccion : ''}
+        ${p.actividadTurismo ? ' · <span style="color:var(--accent-2);">🍽️ Actividad turismo (tasa reducida)</span>' : ''}
+      </div>
+      <div style="display:flex; gap:6px; margin-top:8px;">
+        <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="editarProducto('${p.id}')">✏️ Editar</button>
+        <button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="eliminarProducto('${p.id}')">🗑️ Eliminar</button>
+      </div>
+    </div>
+  `).join('') || `<div class="empty-state">Sin productos registrados — agrega el primero con el formulario</div>`;
+}
+
+function renderCatalogo(){
+  const emp = empresas[empresaActual];
+  document.getElementById('catalogoList').innerHTML = emp.productos.map(p=>`
+    <div class="list-item">
+      <div class="top">
+        <span class="serie">${p.nombre}</span>
+        <span class="monto">S/ ${p.precio.toFixed(2)}</span>
+      </div>
+      <div class="cliente">${p.unidad}</div>
+    </div>
+  `).join('') || `<div class="empty-state">Sin productos registrados</div>`;
+}
+
+function renderDatosEmpresa(){
+  const emp = empresas[empresaActual];
+  document.getElementById('datosEmpresaBox').innerHTML = `
+    <label>Razón Social</label><input value="${emp.nombre}" readonly>
+    <label>RUC</label><input value="${emp.ruc}" readonly>
+    <label>Dirección</label><input value="${emp.direccion}" readonly>
+  `;
+}
+
+function badgeClass(tipo){
+  return {factura:'factura',boleta:'boleta',nc:'nc',nd:'nd',remitente:'gremit',transportista:'gtrans',retencion:'nc',percepcion:'nd',liquidacion:'gremit',ticket:'gtrans',notaventa:'gtrans',proforma:'gtrans',ordenpago:'gtrans'}[tipo];
+}
+function badgeLabel(tipo){
+  return {factura:'Factura',boleta:'Boleta',nc:'N. Crédito',nd:'N. Débito',remitente:'Guía Remitente',transportista:'Guía Transportista',retencion:'Retención',percepcion:'Percepción',liquidacion:'Liq. Compra',ticket:'Ticket',notaventa:'N. Venta',proforma:'Proforma',ordenpago:'Orden Pago'}[tipo];
+}
+
+function renderEmitidos(){
+  const emp = empresas[empresaActual];
+  document.getElementById('nombreEmpresaEmit').textContent = emp.nombre;
+  const lista = emitidos.filter(e=>e.empresa===empresaActual);
+  document.getElementById('emitidosList').innerHTML = lista.length ? lista.map(e=>{
+    const idx = emitidos.indexOf(e);
+    return `
+    <div class="list-item">
+      <div class="top">
+        <div>
+          <span class="badge ${badgeClass(e.tipo)}">${badgeLabel(e.tipo)}</span>
+          <span class="serie" style="margin-left:8px;">${e.serie}</span>
+        </div>
+        ${e.monto!==null ? `<span class="monto">S/ ${e.monto.toFixed(2)}</span>` : ''}
+      </div>
+      <div class="cliente">${e.cliente} · ${e.fecha}</div>
+      <div style="display:flex; gap:6px; margin-top:8px;">
+        <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'a4')">📄 PDF A4</button>
+        <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'ticket')">🧾 Ticket</button>
+        ${e.anulado ? `<span class="badge nc">ANULADO</span>` : `<button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="anularComprobante(${idx})">🗑️ Anular</button>`}
+      </div>
+    </div>
+  `;
+  }).join('') : `<div class="empty-state">Aún no hay comprobantes emitidos para esta empresa</div>`;
+}
+
+// Catálogo N°1 SUNAT (tipo de documento) — para Comunicación de Baja
+const TIPO_DOC_CATALOGO1 = { factura:'01', boleta:'03', nc:'07', nd:'08', remitente:'09', transportista:'31' };
+
+// Resumen Diario de Boletas (Anexo II SUNAT) — agrupa todas las boletas de una fecha en un solo archivo
+function generarResumenDiario(){
+  const fecha = document.getElementById('rd_fecha').value;
+  const msg = document.getElementById('resumenDiarioMsg');
+  if(!fecha){
+    msg.style.display='block'; msg.style.color='var(--danger)';
+    msg.textContent = 'Elige la fecha a resumir.';
+    return;
+  }
+
+  const emp = empresas[empresaActual];
+  const boletas = emitidos.filter(e => e.empresa===empresaActual && e.tipo==='boleta' && e.fecha===fecha && !e.anulado);
+
+  if(boletas.length === 0){
+    msg.style.display='block'; msg.style.color='var(--danger)';
+    msg.textContent = `No hay boletas emitidas el ${fecha} para resumir.`;
+    return;
+  }
+
+  const ahora = new Date();
+  const correlativoResumen = (emp.correlativos.resumenDiario = (emp.correlativos.resumenDiario||0) + 1);
+  const idResumen = `RC${String(correlativoResumen).padStart(2,'0')}-${String(correlativoResumen).padStart(8,'0')}`;
+
+  const detalleBoletas = boletas.map((b, i) => {
+    const totalGravado = b.monto ? (b.monto/1.18) : 0;
+    const igv = b.monto ? (b.monto - totalGravado) : 0;
+    return {
+      idLineaRd: i+1,
+      fecEmision: b.fecha,
+      tipDocResumen: "03", // boleta
+      idDocResumen: b.serie,
+      tipDocUsuario: "1",
+      numDocUsuario: "-",
+      tipMoneda: "PEN",
+      totValGrabado: totalGravado.toFixed(2),
+      totValExoneado: "0.00",
+      totValInafecto: "0.00",
+      totValExportado: "0.00",
+      totValGratuito: "0.00",
+      totOtroCargo: "0.00",
+      totImpCpe: (b.monto||0).toFixed(2),
+      tipEstado: "1" // 1=adicionar
+    };
+  });
+
+  const resumen = {
+    fecGeneracion: fecha,
+    fecResumen: ahora.toISOString().slice(0,10),
+    idResumen: idResumen,
+    numDocEmisor: emp.ruc,
+    detalle: detalleBoletas
+  };
+
+  descargarJSON(resumen, `${emp.ruc}-RC-${fecha.replace(/-/g,'')}-${String(correlativoResumen).padStart(3,'0')}.json`);
+
+  msg.style.display='block'; msg.style.color='var(--accent-2)';
+  msg.textContent = `Resumen generado con ${boletas.length} boleta(s) del ${fecha}.`;
+}
+
+function anularComprobante(idx){
+  const e = emitidos[idx];
+  const motivo = prompt('Motivo de la anulación (ej. Error en el RUC del cliente, Error en el monto, etc.):');
+  if(motivo === null) return; // canceló
+  if(!motivo.trim()){
+    alert('Debes indicar un motivo para anular.');
+    return;
+  }
+
+  const emp = empresas[e.empresa];
+  const ahora = new Date();
+
+  const comunicacionBaja = {
+    resumenBajas: {
+      fecGeneracion: e.fecha,
+      fecComunicacion: ahora.toISOString().slice(0,10),
+      tipDocBaja: TIPO_DOC_CATALOGO1[e.tipo] || '01',
+      numDocBaja: e.serie,
+      desMotivoBaja: motivo.trim()
+    }
+  };
+
+  e.anulado = true;
+  e.motivoAnulacion = motivo.trim();
+
+  descargarJSON(comunicacionBaja, `${emp.ruc}-RA-${ahora.toISOString().slice(0,10).replace(/-/g,'')}-${e.serie.replace('/','')}.json`);
+
+  renderTodo();
+}
+
+function numeroALetras(num){
+  // Conversión simple de número a letras para "SON: ... SOLES" — cubre los montos habituales de facturación.
+  const UNI = ['','UNO','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE','DIEZ','ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISEIS','DIECISIETE','DIECIOCHO','DIECINUEVE','VEINTE'];
+  const DEC = ['','','VEINTI','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];
+  const CEN = ['','CIENTO','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS','SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS'];
+  function tresDigitos(n){
+    if(n===0) return '';
+    if(n===100) return 'CIEN';
+    let s='';
+    const c=Math.floor(n/100), d=Math.floor((n%100)/10), u=n%10;
+    if(c>0) s+=CEN[c]+' ';
+    const resto=n%100;
+    if(resto<=20) s+=UNI[resto];
+    else if(d===2) s+='VEINTI'+UNI[u];
+    else { s+=DEC[d]; if(u>0) s+=' Y '+UNI[u]; }
+    return s.trim();
+  }
+  function entero(n){
+    if(n===0) return 'CERO';
+    let s='';
+    const millones=Math.floor(n/1000000);
+    const miles=Math.floor((n%1000000)/1000);
+    const cientos=n%1000;
+    if(millones>0) s+=(millones===1?'UN MILLON ':tresDigitos(millones)+' MILLONES ');
+    if(miles>0) s+=(miles===1?'MIL ':tresDigitos(miles)+' MIL ');
+    if(cientos>0) s+=tresDigitos(cientos);
+    return s.trim();
+  }
+  const entera = Math.floor(num);
+  const centavos = Math.round((num-entera)*100);
+  return `${entero(entera)} CON ${String(centavos).padStart(2,'0')}/100 SOLES`;
+}
+
+function imprimirComprobante(idx, formato){
+  const e = emitidos[idx];
+  const emp = empresas[e.empresa];
+  const esGuia = e.grupo === 'guias';
+
+  // ítems: vienen de "detalle" (masivo o individual) o quedan vacíos si no se guardó snapshot
+  let filasItems = [];
+  if(e.detalle && e.detalle.items){
+    filasItems = e.detalle.items.map(it => {
+      const nombreProd = it['Producto']||it.producto||'';
+      const prodCat = emp.productos.find(p=>p.nombre===nombreProd);
+      return {
+        codigo: (prodCat && prodCat.codigo) || '-',
+        desc: nombreProd,
+        cant: it['Cantidad']||it.cant||0,
+        unidad: it['Unidad']||it.unidad||(prodCat&&prodCat.unidad)||'',
+        precio: parseFloat(it['PrecioUnit']||it.precio||0)
+      };
+    });
+  }
+
+  const anchoTicket = formato === 'ticket';
+
+  if(anchoTicket){
+    // ---------- TICKET 80mm (simplificado) ----------
+    const filasTicket = filasItems.map(it => `
+      <tr><td>${it.desc}</td><td style="text-align:right;">${it.cant}</td><td style="text-align:right;">${esGuia?it.unidad:it.precio.toFixed(2)}</td></tr>
+    `).join('') || `<tr><td colspan="3" style="text-align:center; color:#999;">(ítems no disponibles)</td></tr>`;
+
+    const html = `
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${e.serie}</title>
+<style>
+  @page { size: 80mm auto; margin: 4mm; }
+  body { font-family: Arial, sans-serif; color:#111; width:72mm; font-size:11px; }
+  h1 { font-size:13px; margin:0 0 4px; text-align:center; }
+  .sub { color:#555; font-size:10px; margin-bottom:6px; text-align:center; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; }
+  th, td { padding:3px 2px; text-align:left; font-size:10px; }
+  th { border-bottom:1px solid #999; }
+  .total { text-align:right; font-weight:bold; margin-top:8px; font-size:12px; }
+  .linea { border-top:1px dashed #999; margin:6px 0; }
+  .center { text-align:center; }
+</style></head>
+<body onload="window.print()">
+  <h1>${emp.nombreComercial || emp.nombre}</h1>
+  <div class="sub">RUC ${emp.ruc}${emp.direccion ? ' - '+emp.direccion : ''}</div>
+  <div class="linea"></div>
+  <div class="center"><b>${badgeLabel(e.tipo)}</b><br>${e.serie}</div>
+  <div class="sub">Fecha: ${e.fecha}</div>
+  <div class="sub">${esGuia ? 'Destinatario' : 'Cliente'}: ${e.cliente}</div>
+  <div class="linea"></div>
+  <table>
+    <thead><tr><th>Descripción</th><th style="text-align:right;">Cant.</th><th style="text-align:right;">${esGuia?'Unid.':'P.Unit'}</th></tr></thead>
+    <tbody>${filasTicket}</tbody>
+  </table>
+  <div class="linea"></div>
+  ${e.monto!==null ? `<div class="total">TOTAL: S/ ${e.monto.toFixed(2)}</div>` : ''}
+  <div class="sub" style="margin-top:8px;">¡Gracias por su compra!</div>
+</body></html>`;
+    const ventana = window.open('', '_blank', 'width=400,height=700');
+    ventana.document.write(html);
+    ventana.document.close();
+    return;
+  }
+
+  // ---------- A4 (formato profesional completo) ----------
+  const filasA4 = filasItems.map(it => `
+    <tr>
+      <td>${it.cant}</td>
+      <td>${it.unidad}</td>
+      <td>${it.codigo}</td>
+      <td>${it.desc}</td>
+      <td style="text-align:right;">${esGuia ? '-' : it.precio.toFixed(2)}</td>
+      <td style="text-align:right;">${esGuia ? '-' : it.precio.toFixed(2)}</td>
+      <td style="text-align:right;">${esGuia ? '-' : (it.cant*it.precio).toFixed(2)}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="7" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
+
+  const total = e.monto || 0;
+  const gravado = total / 1.18;
+  const igv = total - gravado;
+  const montoLetras = e.monto!==null ? numeroALetras(total) : '';
+
+  // Catálogo N°1 SUNAT (tipo de documento) para el código QR
+  const CATALOGO1_QR = { factura:'01', boleta:'03', nc:'07', nd:'08', remitente:'09', transportista:'31', liquidacion:'04', retencion:'20', percepcion:'40' };
+  const [serieQR, numeroQR] = (e.serie||'-').split('-');
+  const tipoDocClienteQR = e.tipoDocCliente || '6';
+  const numDocClienteQR = e.numDocCliente || '-';
+  // Formato oficial SUNAT: RUC|TipoDoc|Serie|Correlativo|IGV|Total|Fecha|TipoDocCliente|NumDocCliente
+  const textoQR = [
+    emp.ruc, CATALOGO1_QR[e.tipo]||'01', serieQR||'-', numeroQR||'-',
+    igv.toFixed(2), total.toFixed(2), e.fecha, tipoDocClienteQR, numDocClienteQR
+  ].join('|');
+
+  const html = `
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${e.serie}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+<style>
+  @page { size: A4; margin: 15mm; }
+  body { font-family: Arial, sans-serif; color:#111; font-size:12px; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #333; padding-bottom:10px; margin-bottom:14px; }
+  .empresa h1 { font-size:16px; margin:0 0 4px; }
+  .empresa .datos { font-size:11px; color:#333; line-height:1.5; }
+  .caja-comprobante { border:1.5px solid #333; border-radius:4px; padding:10px 16px; text-align:center; min-width:220px; }
+  .caja-comprobante .ruc { font-weight:bold; font-size:12px; }
+  .caja-comprobante .tipo { font-weight:bold; font-size:13px; margin:4px 0; }
+  .caja-comprobante .serie { font-size:14px; font-weight:bold; letter-spacing:1px; }
+  .datos-cliente { border:1px solid #ccc; border-radius:4px; padding:10px 14px; margin-bottom:14px; font-size:11.5px; }
+  .datos-cliente div { margin-bottom:3px; }
+  .datos-cliente b { display:inline-block; width:90px; }
+  table.items { width:100%; border-collapse:collapse; margin-bottom:14px; }
+  table.items th { background:#2b2b2b; color:#fff; padding:6px 5px; font-size:10.5px; text-align:left; }
+  table.items td { padding:5px; font-size:11px; border-bottom:1px solid #eee; }
+  .footer-totales { display:flex; justify-content:space-between; align-items:flex-start; margin-top:10px; }
+  .son-letras { border:1px solid #ccc; border-radius:4px; padding:8px 12px; font-size:11px; flex:1; margin-right:16px; }
+  .tabla-impuestos { font-size:11.5px; min-width:220px; }
+  .tabla-impuestos div { display:flex; justify-content:space-between; padding:2px 0; }
+  .tabla-impuestos .final { border-top:1.5px solid #333; margin-top:4px; padding-top:5px; font-weight:bold; font-size:13px; }
+  .qr-box { display:flex; gap:16px; align-items:center; margin-top:18px; }
+  #qrcode { width:80px; height:80px; }
+  .footer-legal { margin-top:20px; text-align:center; font-size:9.5px; color:#777; border-top:1px solid #eee; padding-top:8px; }
+</style></head>
+<body>
+
+  <div class="header">
+    <div class="empresa" style="display:flex; gap:12px; align-items:flex-start;">
+      ${emp.logo ? `<img src="${emp.logo}" style="width:64px; height:64px; object-fit:contain;">` : ''}
+      <div>
+        <h1>${emp.nombreComercial || emp.nombre}</h1>
+        <div class="datos">
+          ${emp.direccion || ''}<br>
+          ${emp.nombre !== (emp.nombreComercial||emp.nombre) ? 'Razón Social: '+emp.nombre+'<br>' : ''}
+          ${emp.telefono ? 'Telf: '+emp.telefono+'<br>' : ''}
+          ${emp.email ? 'Email: '+emp.email+'<br>' : ''}
+          ${emp.web ? 'Web: '+emp.web : ''}
+        </div>
+      </div>
+    </div>
+    <div class="caja-comprobante">
+      <div class="ruc">R.U.C. N° ${emp.ruc}</div>
+      <div class="tipo">${badgeLabel(e.tipo).toUpperCase()}${e.noFiscal ? '' : ' ELECTRÓNICA'}</div>
+      <div class="serie">${e.serie}</div>
+    </div>
+  </div>
+
+  <div class="datos-cliente">
+    <div><b>Emisión</b>: ${e.fecha}</div>
+    <div><b>${esGuia ? 'Destinatario' : 'Cliente'}</b>: ${e.cliente}</div>
+    ${e.noFiscal ? '<div style="color:#b45309; font-weight:bold;">⚠ Este documento NO es un comprobante de pago válido para SUNAT</div>' : ''}
+  </div>
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:8%;">Cant.</th>
+        <th style="width:10%;">Unidad</th>
+        <th style="width:12%;">Código</th>
+        <th>Descripción</th>
+        <th style="width:11%; text-align:right;">Valor Unit.</th>
+        <th style="width:11%; text-align:right;">Precio Unit.</th>
+        <th style="width:11%; text-align:right;">Total</th>
+      </tr>
+    </thead>
+    <tbody>${filasA4}</tbody>
+  </table>
+
+  <div class="footer-totales">
+    ${montoLetras ? `<div class="son-letras"><b>SON:</b> ${montoLetras}</div>` : '<div style="flex:1;"></div>'}
+    ${!esGuia && e.monto!==null ? `
+    <div class="tabla-impuestos">
+      <div><span>Op. Gravada</span><span>S/ ${gravado.toFixed(2)}</span></div>
+      <div><span>IGV</span><span>S/ ${igv.toFixed(2)}</span></div>
+      <div class="final"><span>Importe Total</span><span>S/ ${total.toFixed(2)}</span></div>
+    </div>` : ''}
+  </div>
+
+  ${(emp.bancos||[]).filter(b=>b.activo).length ? `
+  <table style="width:100%; border-collapse:collapse; margin-top:8px; font-size:10px;">
+    ${(emp.bancos||[]).filter(b=>b.activo).map(b=>`
+      <tr>
+        <td style="padding:3px 6px; font-weight:bold; width:110px;">${b.banco}</td>
+        <td style="padding:3px 6px;">(${b.moneda}) ${b.cuenta}${b.cci?' — CCI: '+b.cci:''}</td>
+      </tr>
+    `).join('')}
+  </table>` : ''}
+
+  <div class="qr-box">
+    <div id="qrcode"></div>
+    <div style="font-size:10px; color:#777;">
+      RUC: ${emp.ruc} | Tipo: ${badgeLabel(e.tipo)} | Serie: ${e.serie}<br>
+      Fecha: ${e.fecha} | Total: S/ ${(e.monto||0).toFixed(2)}
+    </div>
+  </div>
+
+  <div class="footer-legal">
+    ${emp.textoLegal || `Representación impresa de ${badgeLabel(e.tipo)}${e.noFiscal?'':' Electrónica'}. Generado con FACTASH.`}
+  </div>
+
+  <script>
+    new QRCode(document.getElementById('qrcode'), {
+      text: ${JSON.stringify(textoQR)},
+      width: 80, height: 80, correctLevel: QRCode.CorrectLevel.M
+    });
+    window.print();
+  <\/script>
+
+</body></html>`;
+
+  const ventana = window.open('', '_blank', 'width=850,height=1100');
+  ventana.document.write(html);
+  ventana.document.close();
+}
+
+function renderTodo(){
+  renderItems();
+  renderItemsGuia();
+  renderCatalogo();
+  renderCatalogoCompleto();
+  renderDatosEmpresa();
+  renderEmitidos();
+  actualizarFormatoMasivo();
+  actualizarSeriesVisibles();
+  renderConfigEmpresa();
+}
+
+// Corrige el bug donde el recuadro de serie mostraba siempre "F001-00000001" fijo,
+// sin importar qué tipo de documento o empresa estuviera seleccionado.
+function actualizarSeriesVisibles(){
+  const emp = empresas[empresaActual];
+  if(!emp) return;
+  const elFact = document.getElementById('serieFact');
+  if(elFact){
+    if(docActualFact === 'factura' || docActualFact === 'boleta'){
+      const numSerie = (rolSesion === 'caja' && cajaActual) ? cajaActual.numSerie : (parseInt(emp.serieAdmin) || 5);
+      const prefijo = docActualFact === 'factura' ? 'F' : 'B';
+      const codigoSerie = prefijo + String(numSerie).padStart(3,'0');
+      const correlativo = (emp.correlativosPorSerie[docActualFact] && emp.correlativosPorSerie[docActualFact][numSerie]) || 1;
+      elFact.textContent = `${codigoSerie}-${String(correlativo).padStart(8,'0')}`;
+    } else if(emp.series[docActualFact] !== undefined){
+      const correlativo = emp.correlativos[docActualFact] || 1;
+      elFact.textContent = `${emp.series[docActualFact]}-${String(correlativo).padStart(8,'0')}`;
+    }
+  }
+  const elGuia = document.getElementById('serieGuia');
+  if(elGuia && emp.series[docActualGuia] !== undefined){
+    const correlativoG = emp.correlativos[docActualGuia] || 1;
+    elGuia.textContent = `${emp.series[docActualGuia]}-${String(correlativoG).padStart(8,'0')}`;
+  }
+}
+
+// init — solo prepara items vacíos, la app se muestra recién tras login
+agregarItem();
+agregarItemGuia();
+</script>
+
+</body>
+</html>
