@@ -3721,6 +3721,22 @@ function generarComprobante(){
 }
 
 // Arma el JSON exacto que espera tu SFS (mismo esquema de campos que tu Hoja2 real)
+// Calcula el RUC "tipo 10" (persona natural) a partir de un DNI de 8 dígitos, usando el algoritmo
+// oficial de dígito verificador de SUNAT. Confirmado exacto contra tu guía real T001-00000751:
+// DNI 44276849 → RUC 10442768493.
+function calcularRUCDesdeDNI(dni){
+  if(!dni || dni.length !== 8 || !/^\d{8}$/.test(dni)) return "";
+  const base = "10" + dni; // 10 dígitos
+  const factores = [5,4,3,2,7,6,5,4,3,2];
+  let suma = 0;
+  for(let i=0;i<10;i++) suma += parseInt(base[i],10) * factores[i];
+  const resto = suma % 11;
+  let digito = 11 - resto;
+  if(digito === 10) digito = 0;
+  else if(digito === 11) digito = 1;
+  return base + digito;
+}
+
 function onCambioPagadorEsDestinatario(){
   document.getElementById('boxPagadorDistinto').style.display = document.getElementById('chk_pagador_es_destinatario').checked ? 'none' : 'block';
 }
@@ -3749,9 +3765,19 @@ function buildGuiaJSON(emp, serie){
     modTrasladoDatosEnvio: modalidadCod,
     fecInicioTrasladoDatosEnvio: document.getElementById('g_fecha_traslado').value || document.getElementById('g_fecha').value || ahora.toISOString().slice(0,10),
     fecEntregaBienesTransportista: document.getElementById('g_fecha_entrega').value || document.getElementById('g_fecha').value || ahora.toISOString().slice(0,10),
-    numDocTransportista: docActualGuia==='remitente' ? (transportistaGuia.length ? transportistaGuia[0].ruc : "") : (document.getElementById('g_ructrans') ? document.getElementById('g_ructrans').value : ""),
+    numDocTransportista: docActualGuia==='remitente'
+      ? (esPublico
+          ? (transportistaGuia.length ? transportistaGuia[0].ruc : "")
+          // Privado: confirmado con tu guía real T001-00000751 — el "transportista" es el propio
+          // conductor (usa su propio vehículo), y va con el RUC calculado a partir de su DNI.
+          : (conductoresGuia.length && conductoresGuia[0].tipoDoc === '1' ? calcularRUCDesdeDNI(conductoresGuia[0].numDoc) : ""))
+      : (document.getElementById('g_ructrans') ? document.getElementById('g_ructrans').value : ""),
     tipDocTransportista: "6",
-    nomTransportista: docActualGuia==='remitente' ? (transportistaGuia.length ? transportistaGuia[0].razonSocial : "") : "",
+    nomTransportista: docActualGuia==='remitente'
+      ? (esPublico
+          ? (transportistaGuia.length ? transportistaGuia[0].razonSocial : "")
+          : (conductoresGuia.length ? conductoresGuia[0].nombres : ""))
+      : "",
     numPlacaTransPrivado: (document.getElementById('chk_m1l') && document.getElementById('chk_m1l').checked) ? document.getElementById('g_placa_m1l').value : (vehiculosGuia.length ? vehiculosGuia[0].placa : ""),
     numDocIdeConductorTransPrivado: conductoresGuia.length ? conductoresGuia[0].numDoc : "",
     tipDocIdeConductorTransPrivado: conductoresGuia.length ? conductoresGuia[0].tipoDoc : "1",
@@ -4862,6 +4888,7 @@ function renderEmitidos(){
         ${['retencion','percepcion'].includes(e.tipo) && e.jsonSUNAT ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="descargarRetPerTXT(emitidos[${idx}].jsonSUNAT, emp.ruc, '${e.tipo==='retencion'?'20':'40'}', emitidos[${idx}].serie, ${e.tipo==='retencion'})">🗂️ Descargar archivos TXT (${e.tipo==='retencion'?'.RET/.DRE':'.PER/.DPE'})</button>` : ''}
         ${!emp.bridgeEmpresaId ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="document.getElementById('cdrInput_${idx}').click()">📥 Cargar CDR SUNAT</button>
         <input type="file" id="cdrInput_${idx}" accept=".xml" style="display:none;" onchange="cargarCDR(${idx}, this.files[0])">` : ''}
+        ${!e.anulado && (e.sunatEstado==='rechazado'||e.sunatEstado==='pendiente') ? `<button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="reintentarEnvio(${idx})">🔁 Reintentar (mismo N°)</button>` : ''}
         ${e.anulado ? `<span class="badge nc">ANULADO</span>` : `<button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="anularComprobante(${idx})">🗑️ Anular</button>`}
       </div>
     </div>
@@ -4870,7 +4897,34 @@ function renderEmitidos(){
 }
 
 // Catálogo N°1 SUNAT (tipo de documento) — para Comunicación de Baja
-const TIPO_DOC_CATALOGO1 = { factura:'01', boleta:'03', nc:'07', nd:'08', remitente:'09', transportista:'31' };
+const TIPO_DOC_CATALOGO1 = { factura:'01', boleta:'03', nc:'07', nd:'08', remitente:'09', transportista:'31', liquidacion:'04', retencion:'20', percepcion:'40' };
+
+// Reintenta el ENVÍO de un comprobante/guía RECHAZADO usando el mismo número de serie ya asignado
+// (no genera uno nuevo) — porque un documento rechazado por SUNAT nunca llegó a ser válido, así
+// que ese número no está "quemado" y sí se puede corregir/reenviar con el mismo número. Solo debe
+// usarse cuando ya corregiste el problema real (revisa el motivo de rechazo antes de reintentar).
+async function reintentarEnvio(idx){
+  const e = emitidos[idx];
+  const emp = empresas[e.empresa];
+  const jsonDoc = e.jsonSFS || e.jsonSUNAT;
+  if(!jsonDoc){ alert('Este registro no tiene el JSON guardado — genera uno nuevo en vez de reintentar.'); return; }
+  const tipDocArchivo = TIPO_DOC_CATALOGO1[e.tipo];
+  if(!tipDocArchivo){ alert('Tipo de documento no soportado para reintento automático.'); return; }
+
+  e.sunatEstado = 'enviando';
+  renderTodo();
+
+  const resultado = await enviarAlBridgeSiCorresponde(emp, tipDocArchivo, e.serie, jsonDoc);
+  if(!resultado.automatico){
+    e.sunatEstado = null;
+    descargarJSON(jsonDoc, `${emp.ruc}-${tipDocArchivo}-${e.serie}.json`);
+  } else {
+    e.sunatEstado = resultado.estado === 'aceptado' ? 'aceptado' : (resultado.estado === 'error_conexion' ? 'pendiente' : 'rechazado');
+    e.sunatDescripcion = resultado.descripcion;
+  }
+  actualizarEmitidoEnServidor(e);
+  renderTodo();
+}
 
 // Resumen Diario de Boletas (Anexo II SUNAT) — agrupa todas las boletas de una fecha en un solo archivo
 function generarResumenDiario(){
