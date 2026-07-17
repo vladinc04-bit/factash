@@ -127,6 +127,25 @@
     background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.3); color:#f7c266;
     border-radius:8px; padding:10px 12px; font-size:12px; margin-bottom:16px;
   }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center;
+    justify-content:center; z-index:9999; padding:16px;
+  }
+  .modal-box{
+    background:var(--card-bg,#1c2333); border-radius:10px; width:100%; max-width:480px;
+    padding:16px; max-height:90vh; overflow-y:auto;
+  }
+  .modal-head{
+    display:flex; justify-content:space-between; align-items:center; font-weight:700;
+    font-size:15px; margin-bottom:14px;
+  }
+  .item-row{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:8px 0; border-bottom:1px solid rgba(255,255,255,.08); font-size:12px;
+  }
+  .item-row .tag{font-size:10px; text-transform:uppercase; color:var(--text-dim); min-width:60px;}
+  .item-row .x-remove{cursor:pointer; color:#f79b9b; font-weight:700;}
 </style>
 </head>
 <body>
@@ -258,11 +277,14 @@
         <label id="lbl_rp_contraparte">RUC del proveedor</label>
         <div style="display:flex; gap:6px;">
           <input type="text" id="rp_ruc" placeholder="20600052111" style="flex:1;">
-          <button type="button" style="width:42px; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text-dim); cursor:pointer;" onclick="consultarRucODni('rp_ruc', null, 'rp_razonsocial', null, 'msg_rp_ruc')" title="Buscar por RUC">🔍</button>
+          <button type="button" style="width:42px; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text-dim); cursor:pointer;" onclick="consultarRucODni('rp_ruc', null, 'rp_razonsocial', 'rp_direccion', 'msg_rp_ruc', 'rp_ubigeo')" title="Buscar por RUC">🔍</button>
         </div>
         <div id="msg_rp_ruc" style="font-size:11px; margin-top:3px; display:none;"></div>
         <label id="lbl_rp_razonsocial">Razón social del proveedor</label>
         <input type="text" id="rp_razonsocial" placeholder="Nombre o razón social">
+        <label>Dirección del receptor</label>
+        <input type="text" id="rp_direccion" placeholder="Dirección completa">
+        <input type="hidden" id="rp_ubigeo" value="">
 
         <div class="row2">
           <div>
@@ -473,7 +495,9 @@
             <div class="row2">
               <div>
                 <label>Código de bien/servicio sujeto a detracción</label>
-                <input type="text" id="f_cod_detraccion" placeholder="Catálogo N° 54">
+                <select id="f_cod_detraccion" onchange="onCambioCodDetraccion()">
+                  <option value="">Seleccione</option>
+                </select>
               </div>
               <div>
                 <label>N° cuenta Banco de la Nación</label>
@@ -483,7 +507,7 @@
             <div class="row2">
               <div>
                 <label>Porcentaje de detracción</label>
-                <input type="number" step="0.01" id="f_pct_detraccion" placeholder="4.0">
+                <input type="number" step="0.01" id="f_pct_detraccion" placeholder="4.0" oninput="calcularMontoDetraccion()">
               </div>
               <div>
                 <label>Monto de la detracción</label>
@@ -565,6 +589,31 @@
 
         <div class="row2">
           <div>
+            <label>Fecha de emisión</label>
+            <input type="date" id="g_fecha" onchange="validarCampoFechaGuia()">
+            <div id="msg_g_fecha" style="font-size:11px; margin-top:3px; display:none;"></div>
+          </div>
+          <div>
+            <label>Motivo de traslado</label>
+            <select id="g_motivo" onchange="onCambioMotivoGuia()">
+              <option value="01">Venta</option>
+              <option value="02">Compra</option>
+              <option value="04">Traslado entre establecimientos de la misma empresa</option>
+              <option value="08">Importación</option>
+              <option value="09">Exportación</option>
+              <option value="13">Otros</option>
+              <option value="14">Venta sujeta a confirmación del comprador</option>
+              <option value="18">Traslado emisor itinerante CP</option>
+              <option value="19">Traslado a zona primaria</option>
+              <option value="03">Venta con entrega a terceros (sin confirmar oficialmente)</option>
+              <option value="20">Consignación (sin confirmar oficialmente)</option>
+              <option value="99">Donación (sin confirmar oficialmente)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div>
             <label>Tipo Doc. destinatario</label>
             <select id="g_dest_tipodoc" onchange="onTipoDocDestChange()">
               <option value="6">RUC</option>
@@ -577,8 +626,8 @@
           <div>
             <label>N° Documento destinatario</label>
             <div style="display:flex; gap:6px;">
-              <input type="text" id="g_dest_doc" placeholder="20600052111" style="flex:1;" oninput="validarCampoDocDest()" onblur="validarCampoDocDest()" onkeydown="if(event.key==='Enter'){event.preventDefault(); consultarRucODni('g_dest_doc','g_dest_tipodoc','g_destinatario','g_dest_direccion','msg_g_dest_doc');}">
-              <button type="button" style="width:42px; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text-dim); cursor:pointer;" onclick="consultarRucODni('g_dest_doc','g_dest_tipodoc','g_destinatario','g_dest_direccion','msg_g_dest_doc')" title="Buscar por RUC/DNI">🔍</button>
+              <input type="text" id="g_dest_doc" placeholder="20600052111" style="flex:1;" oninput="validarCampoDocDest()" onblur="validarCampoDocDest()" onkeydown="if(event.key==='Enter'){event.preventDefault(); consultarRucODni('g_dest_doc','g_dest_tipodoc','g_destinatario','g_dest_direccion','msg_g_dest_doc','g_ubigeo_llegada');}">
+              <button type="button" style="width:42px; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text-dim); cursor:pointer;" onclick="consultarRucODni('g_dest_doc','g_dest_tipodoc','g_destinatario','g_dest_direccion','msg_g_dest_doc','g_ubigeo_llegada')" title="Buscar por RUC/DNI">🔍</button>
             </div>
             <div id="msg_g_dest_doc" style="font-size:11px; margin-top:3px; display:none;"></div>
           </div>
@@ -590,18 +639,78 @@
             <input type="text" id="g_destinatario" placeholder="C.G. LA ESMERALDA DE ANCO">
           </div>
           <div>
-            <label>Fecha de traslado</label>
-            <input type="date" id="g_fecha" onchange="validarCampoFechaGuia()">
-            <div id="msg_g_fecha" style="font-size:11px; margin-top:3px; display:none;"></div>
+            <label>Dirección del destinatario</label>
+            <input type="text" id="g_dest_direccion" placeholder="Dirección del destinatario">
           </div>
         </div>
 
-        <label>Dirección del destinatario</label>
-        <input type="text" id="g_dest_direccion" placeholder="Dirección del destinatario">
+        <!-- Solo Guía Transportista: confirmado con XML real (10283170140-31-EG03-143.xml) que trae
+             3 partes además del destinatario: Remitente (quien originalmente envía la mercadería),
+             Pagador del servicio (quien contrata el flete, puede ser el mismo que el destinatario),
+             y el Documento relacionado (la guía Remitente a la que corresponde este traslado). -->
+        <div id="boxDatosTransportistaGuia" style="display:none;">
+          <label>RUC del remitente (quien envía la mercadería)</label>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="g_trans_remitente_ruc" placeholder="20600052111" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault(); consultarRucODni('g_trans_remitente_ruc', null, 'g_trans_remitente_nombre', null, 'msg_g_trans_remitente');}">
+            <button type="button" style="width:42px; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text-dim); cursor:pointer;" onclick="consultarRucODni('g_trans_remitente_ruc', null, 'g_trans_remitente_nombre', null, 'msg_g_trans_remitente')" title="Buscar por RUC">🔍</button>
+          </div>
+          <div id="msg_g_trans_remitente" style="font-size:11px; margin-top:3px; display:none;"></div>
+          <label>Razón social del remitente</label>
+          <input type="text" id="g_trans_remitente_nombre" placeholder="Nombre o razón social del remitente">
+
+          <label style="margin-top:10px; display:flex; align-items:center; gap:6px; font-weight:normal;">
+            <input type="checkbox" id="chk_pagador_es_destinatario" checked onchange="onCambioPagadorEsDestinatario()" style="width:auto;">
+            Quien paga el servicio es el mismo destinatario
+          </label>
+          <div id="boxPagadorDistinto" style="display:none;">
+            <label>RUC de quien paga el servicio</label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="g_trans_pagador_ruc" placeholder="20600052111" style="flex:1;">
+              <button type="button" style="width:42px; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text-dim); cursor:pointer;" onclick="consultarRucODni('g_trans_pagador_ruc', null, 'g_trans_pagador_nombre', null, 'msg_g_trans_pagador')" title="Buscar por RUC">🔍</button>
+            </div>
+            <div id="msg_g_trans_pagador" style="font-size:11px; margin-top:3px; display:none;"></div>
+            <label>Razón social de quien paga</label>
+            <input type="text" id="g_trans_pagador_nombre" placeholder="Nombre o razón social">
+          </div>
+
+          <label style="margin-top:10px; display:block;">Documento relacionado (la guía Remitente de este traslado)</label>
+          <div class="row3">
+            <div>
+              <label>Tipo</label>
+              <select id="g_trans_reldoc_tipo">
+                <option value="09">Guía de Remisión Remitente</option>
+                <option value="01">Factura</option>
+                <option value="03">Boleta de Venta</option>
+              </select>
+            </div>
+            <div>
+              <label>Serie-número</label>
+              <input type="text" id="g_trans_reldoc_numero" placeholder="T001-00000123">
+            </div>
+            <div>
+              <label>RUC del emisor</label>
+              <input type="text" id="g_trans_reldoc_ruc" placeholder="20600052111">
+            </div>
+          </div>
+        </div>
 
         <div class="row2">
           <div>
             <label>Ubigeo de partida (6 dígitos)</label>
+            <select id="g_local_partida" onchange="usarLocalEnCampo('partida')" style="margin-bottom:6px;">
+              <option value="">— elegir uno de mis locales (opcional) —</option>
+            </select>
+            <div id="buscarRucPartidaBox" style="display:flex; gap:4px; margin-bottom:6px;">
+              <input type="text" id="g_ruc_partida" placeholder="RUC del proveedor (si es Compra)" style="flex:1;">
+              <button type="button" style="width:42px; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text-dim); cursor:pointer;" onclick="consultarRucODni('g_ruc_partida', null, 'g_nombre_partida_oculto', 'g_partida', 'msg_g_ruc_partida', 'g_ubigeo_partida')" title="Buscar RUC del proveedor para llenar Partida">🔍</button>
+            </div>
+            <input type="hidden" id="g_nombre_partida_oculto">
+            <div id="msg_g_ruc_partida" style="font-size:11px; margin-top:-3px; margin-bottom:6px; display:none;"></div>
+            <div id="cascadaPartida" style="display:none; gap:4px; margin-bottom:6px;">
+              <select id="g_dpto_partida" onchange="onCambioDepartamento('partida')" style="flex:1;"><option value="">Departamento</option></select>
+              <select id="g_prov_partida" onchange="onCambioProvincia('partida')" style="flex:1;"><option value="">Provincia</option></select>
+              <select id="g_dist_partida" onchange="onCambioDistrito('partida')" style="flex:1;"><option value="">Distrito</option></select>
+            </div>
             <input type="text" id="g_ubigeo_partida" placeholder="050101" maxlength="6" oninput="validarUbigeo('g_ubigeo_partida')">
             <div id="msg_g_ubigeo_partida" style="font-size:11px; margin-top:3px; display:none;"></div>
           </div>
@@ -613,6 +722,14 @@
         <div class="row2">
           <div>
             <label>Ubigeo de llegada (6 dígitos)</label>
+            <select id="g_local_llegada" onchange="usarLocalEnCampo('llegada')" style="margin-bottom:6px;">
+              <option value="">— elegir uno de mis locales (opcional) —</option>
+            </select>
+            <div id="cascadaLlegada" style="display:none; gap:4px; margin-bottom:6px;">
+              <select id="g_dpto_llegada" onchange="onCambioDepartamento('llegada')" style="flex:1;"><option value="">Departamento</option></select>
+              <select id="g_prov_llegada" onchange="onCambioProvincia('llegada')" style="flex:1;"><option value="">Provincia</option></select>
+              <select id="g_dist_llegada" onchange="onCambioDistrito('llegada')" style="flex:1;"><option value="">Distrito</option></select>
+            </div>
             <input type="text" id="g_ubigeo_llegada" placeholder="050906" maxlength="6" oninput="validarUbigeo('g_ubigeo_llegada')">
             <div id="msg_g_ubigeo_llegada" style="font-size:11px; margin-top:3px; display:none;"></div>
           </div>
@@ -630,21 +747,195 @@
               <option value="01">Transporte público</option>
             </select>
           </div>
+        </div>
+
+        <label id="lblTransbordo" style="display:flex; align-items:center; gap:6px; font-weight:normal; margin-top:4px;">
+          <input type="checkbox" id="chk_transbordo" style="width:auto;"> Realiza transbordo programado
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-weight:normal;">
+          <input type="checkbox" id="chk_m1l" onchange="onCambioM1L()" style="width:auto;"> Traslado en vehículos de categoría M1 o L
+        </label>
+
+        <!-- Cuando el traslado es en vehículo categoría M1 o L (auto/moto), SUNAT simplifica el
+             formulario: solo pide la placa (y, en Público, tampoco exige transportista/MTC/conductor).
+             Aplica igual para Privado y Público. -->
+        <div id="boxM1L" style="display:none;">
+          <div class="row2">
+            <div>
+              <label>Placa del vehículo</label>
+              <input type="text" id="g_placa_m1l" placeholder="Escriba">
+            </div>
+          </div>
+        </div>
+
+        <!-- Autorización especial para el traslado de la carga: opcional, independiente del
+             vehículo. Solo aplica a bienes que requieren permiso especial (armas, medicamentos
+             controlados, animales vivos, carga sobredimensionada, etc). -->
+        <label style="margin-top:6px; display:block;">Datos de la autorización especial para el traslado de la carga <span style="color:var(--text-dim); font-weight:normal;">(opcional)</span></label>
+        <div id="listaAutorizacionGuia" style="margin-bottom:6px;"></div>
+        <button type="button" class="add-item" onclick="abrirModalAutorizacion()">+ Agregar</button>
+
+        <!-- Modal: Agregar autorización especial -->
+        <div id="modalAutorizacion" class="modal-overlay" style="display:none;">
+          <div class="modal-box">
+            <div class="modal-head">
+              <span>Agregar autorización especial para el traslado de la carga</span>
+              <span style="cursor:pointer" onclick="cerrarModalAutorizacion()">✕</span>
+            </div>
+            <div class="row2">
+              <div>
+                <label>Entidad emisora de la autorización especial</label>
+                <select id="ma_entidad">
+                  <option value="">Seleccione</option>
+                  <option value="SUCAMEC">SUCAMEC - Superintendencia Nacional de Control de Servicios de Seguridad</option>
+                  <option value="DIGEMID">DIGEMID - Dirección General de Medicamentos, Insumos y Drogas</option>
+                  <option value="DIGESA">DIGESA - Dirección General de Salud Ambiental</option>
+                  <option value="SENASA">SENASA - Servicio Nacional de Sanidad Agraria</option>
+                  <option value="SERFOR">SERFOR - Servicio Nacional Forestal y de Fauna Silvestre</option>
+                  <option value="MTC">MTC - Ministerio de Transportes y Comunicaciones</option>
+                  <option value="PRODUCE">PRODUCE - Ministerio de la Producción</option>
+                  <option value="MIN. AMBIENTE">MIN. AMBIENTE - Ministerio del Ambiente</option>
+                  <option value="SANIPES">SANIPES - Organismo Nacional de Sanidad Pesquera</option>
+                  <option value="MML">MML - Municipalidad Metropolitana de Lima</option>
+                  <option value="MINSA">MINSA - Ministerio de Salud</option>
+                  <option value="GR">GR - Gobierno Regional</option>
+                  <option value="OSINERGMIN">OSINERGMIN - Organismo Supervisor de la Inversión en Energía y Minería</option>
+                </select>
+              </div>
+              <div>
+                <label>Número de autorización especial emitido por la entidad</label>
+                <input type="text" id="ma_numero" placeholder="">
+              </div>
+            </div>
+            <button class="btn-primary" style="margin-top:10px;" onclick="agregarAutorizacionGuia()">Agregar</button>
+          </div>
+        </div>
+
+        <!-- Datos del transportista (persona/empresa que hace el traslado): solo aplica en
+             Guía Remitente + modalidad Pública. RUC + N° MTC + autorización especial opcional. -->
+        <div id="boxDatosTransportistaRemitente" style="display:none;">
+          <label>Datos del transportista</label>
+          <div id="listaTransportistaGuia" style="margin-bottom:6px;"></div>
+          <div style="display:flex; gap:14px; align-items:center;">
+            <button type="button" class="add-item" id="btnAgregarTransportista" onclick="abrirModalTransportista()">+ Agregar</button>
+            <span style="cursor:pointer; color:var(--accent-2,#5aa9ff); font-size:12px;" onclick="abrirModalTransportistasFrecuentes()">🔍 Ver transportistas frecuentes</span>
+          </div>
+
+          <label style="margin-top:12px; display:flex; align-items:center; gap:6px; font-weight:normal;">
+            <input type="checkbox" id="chk_registrar_veh_conductor" onchange="onCambioRegistrarVehConductor()" style="width:auto;">
+            Registrar vehículos y conductores del transportista
+          </label>
+          <div style="font-size:11px; color:var(--text-dim); font-style:italic; margin-top:2px;">
+            "Marcar el recuadro si existe acuerdo con el transportista para registrar estos datos. En este caso, no se emitirá la GRE transportista (Base legal: último párrafo del numeral 3.1, artículo 3 de RS 255-2015/SUNAT)"
+          </div>
+        </div>
+
+        <!-- RUC/MTC propio: solo para Guía Transportista (el vehículo es el propio del transportista). -->
+        <div class="row2" id="filaRucMtc" style="display:none;">
           <div>
-            <label>Motivo de traslado</label>
-            <select id="g_motivo">
-              <option value="01">Venta</option>
-              <option value="02">Venta sujeta a confirmación del comprador</option>
-              <option value="04">Traslado entre establecimientos de la misma empresa</option>
-              <option value="08">Importación</option>
-              <option value="09">Exportación</option>
-              <option value="13">Otros</option>
-              <option value="14">Venta sujeta a confirmación (itinerante)</option>
-              <option value="18">Traslado emisor itinerante CP</option>
-              <option value="19">Traslado a zona primaria</option>
-              <option value="20">Consignación</option>
-              <option value="99">Donación</option>
-            </select>
+            <label>RUC transportista</label>
+            <input type="text" id="g_ructrans" placeholder="20600052111">
+          </div>
+          <div id="campoMTC">
+            <label>N° Registro MTC</label>
+            <input type="text" id="g_mtc" placeholder="Obligatorio si es transporte público" oninput="validarCampoMTC()">
+            <div id="msg_g_mtc" style="font-size:11px; margin-top:3px; display:none;"></div>
+          </div>
+        </div>
+
+        <!-- Datos de vehículo y conductor: en Privado siempre visibles; en Público solo cuando se
+             marca "Registrar vehículos y conductores del transportista". Soporta varios vehículos
+             (ej. tracto + carreta/semirremolque) y varios conductores, igual que el portal SUNAT. -->
+        <div id="camposTransportista" style="display:block;">
+          <label>Datos de vehículos</label>
+          <div id="listaVehiculosGuia" style="margin-bottom:6px;"></div>
+          <div style="display:flex; gap:14px; align-items:center;">
+            <button type="button" class="add-item" onclick="abrirModalVehiculo()">+ Agregar</button>
+            <span style="cursor:pointer; color:var(--accent-2,#5aa9ff); font-size:12px;" onclick="abrirModalVehiculosFrecuentes()">🔍 Ver vehículos frecuentes</span>
+          </div>
+
+          <label style="margin-top:12px; display:block;">Datos de conductores</label>
+          <div id="listaConductoresGuia" style="margin-bottom:6px;"></div>
+          <div style="display:flex; gap:14px; align-items:center;">
+            <button type="button" class="add-item" onclick="abrirModalConductor()">+ Agregar</button>
+            <span style="cursor:pointer; color:var(--accent-2,#5aa9ff); font-size:12px;" onclick="abrirModalConductoresFrecuentes()">🔍 Ver conductores frecuentes</span>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div>
+            <label>Fecha de inicio de traslado</label>
+            <input type="date" id="g_fecha_traslado" onchange="validarCampoFechaGuia()">
+          </div>
+        </div>
+
+        <div id="boxFechaEntrega" style="display:none;">
+          <label>Fecha de entrega de bienes al transportista <span style="color:var(--text-dim); font-weight:normal;">(obligatorio desde jun-2026 al registrar datos del transportista)</span></label>
+          <input type="date" id="g_fecha_entrega" onchange="validarCampoFechaGuia()">
+        </div>
+
+        <!-- Modal: Agregar Transportista -->
+        <div id="modalTransportista" class="modal-overlay" style="display:none;">
+          <div class="modal-box">
+            <div class="modal-head">
+              <span>Agregar Transportista</span>
+              <span style="cursor:pointer" onclick="cerrarModalTransportista()">✕</span>
+            </div>
+            <div class="row2">
+              <div>
+                <label>Número de RUC</label>
+                <input type="text" id="mt_ruc" placeholder="ESCRIBA" oninput="autocompletarTransportistaPorRuc()">
+                <div id="msg_mt_ruc" style="font-size:11px; margin-top:3px; display:none;"></div>
+              </div>
+              <div>
+                <label>Apellidos y nombres, denominación o razón social</label>
+                <input type="text" id="mt_razonsocial" placeholder="ESCRIBA">
+              </div>
+            </div>
+            <label style="margin-top:8px; display:block;">Número de registro MTC</label>
+            <input type="text" id="mt_mtc" placeholder="ESCRIBA">
+            <label style="margin-top:8px; display:block;">Datos de la autorización especial para el traslado de la carga (opcional)</label>
+            <div class="row2">
+              <div>
+                <label>Entidad emisora de la autorización</label>
+                <select id="mt_entidad">
+                  <option value="">Seleccione</option>
+                  <option value="SUCAMEC">SUCAMEC - Superintendencia Nacional de Control de Servicios de Seguridad</option>
+                  <option value="DIGEMID">DIGEMID - Dirección General de Medicamentos, Insumos y Drogas</option>
+                  <option value="DIGESA">DIGESA - Dirección General de Salud Ambiental</option>
+                  <option value="SENASA">SENASA - Servicio Nacional de Sanidad Agraria</option>
+                  <option value="SERFOR">SERFOR - Servicio Nacional Forestal y de Fauna Silvestre</option>
+                  <option value="MTC">MTC - Ministerio de Transportes y Comunicaciones</option>
+                  <option value="PRODUCE">PRODUCE - Ministerio de la Producción</option>
+                  <option value="MIN. AMBIENTE">MIN. AMBIENTE - Ministerio del Ambiente</option>
+                  <option value="SANIPES">SANIPES - Organismo Nacional de Sanidad Pesquera</option>
+                  <option value="MML">MML - Municipalidad Metropolitana de Lima</option>
+                  <option value="MINSA">MINSA - Ministerio de Salud</option>
+                  <option value="GR">GR - Gobierno Regional</option>
+                  <option value="OSINERGMIN">OSINERGMIN - Organismo Supervisor de la Inversión en Energía y Minería</option>
+                </select>
+              </div>
+              <div>
+                <label>Número de autorización</label>
+                <input type="text" id="mt_numautorizacion" placeholder="ESCRIBA">
+              </div>
+            </div>
+            <label style="margin-top:10px; display:flex; align-items:center; gap:6px; font-weight:normal;">
+              <input type="checkbox" id="mt_frecuente" style="width:auto;"> Guardar como transportista frecuente
+            </label>
+            <button class="btn-primary" style="margin-top:10px;" onclick="agregarTransportistaGuia()">Aceptar</button>
+          </div>
+        </div>
+
+        <!-- Modal: Transportistas frecuentes -->
+        <div id="modalTransportistasFrecuentes" class="modal-overlay" style="display:none;">
+          <div class="modal-box" style="max-width:640px;">
+            <div class="modal-head">
+              <span>Transportistas frecuentes</span>
+              <span style="cursor:pointer" onclick="cerrarModalTransportistasFrecuentes()">✕</span>
+            </div>
+            <div id="listaTransportistasFrecuentes" style="max-height:300px; overflow-y:auto;"></div>
+            <button class="btn-primary" style="margin-top:10px;" onclick="agregarSeleccionTransportistasFrecuentes()">Agregar</button>
           </div>
         </div>
 
@@ -662,53 +953,243 @@
             <input type="text" id="g_docref" placeholder="F001-00000001">
           </div>
         </div>
+        <div id="boxDocRelacionadoVenta" style="display:none; margin-top:-8px; margin-bottom:14px;">
+          <span style="cursor:pointer; color:var(--accent-2,#5aa9ff); font-size:12px;" onclick="abrirModalDocRelacionado()">🔍 Elegir de mis comprobantes emitidos (autocompleta los productos)</span>
+        </div>
 
-        <div id="camposTransportista" style="display:none;">
+        <!-- Modal: elegir documento relacionado (solo Venta) -->
+        <div id="modalDocRelacionado" class="modal-overlay" style="display:none;">
+          <div class="modal-box" style="max-width:640px;">
+            <div class="modal-head">
+              <span>Elegir comprobante emitido</span>
+              <span style="cursor:pointer" onclick="cerrarModalDocRelacionado()">✕</span>
+            </div>
+            <div id="listaDocRelacionado" style="max-height:340px; overflow-y:auto;"></div>
+          </div>
+        </div>
+
+        <label>Observaciones</label>
+        <input type="text" id="g_observaciones" placeholder="Notas adicionales sobre este traslado">
+
+        <!-- Casos especiales (para servicios a otras empresas, no solo el grifo propio) — confirmados
+             estructuralmente con el XML real de guía Remitente (elementos SellerSupplierParty,
+             OrderReference, AdditionalDocumentReference, FirstArrivalPortLocation, presentes en el
+             XSD aunque vacíos en ese caso concreto). -->
+        <div id="boxVentaTerceros" style="display:none;">
+          <label>RUC del vendedor (si es distinto al remitente — Venta con entrega a terceros)</label>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="g_vendedor_ruc" placeholder="20600052111" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault(); consultarRucODni('g_vendedor_ruc', null, 'g_vendedor_nombre', null, 'msg_g_vendedor');}">
+            <button type="button" style="width:42px; background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text-dim); cursor:pointer;" onclick="consultarRucODni('g_vendedor_ruc', null, 'g_vendedor_nombre', null, 'msg_g_vendedor')" title="Buscar por RUC">🔍</button>
+          </div>
+          <div id="msg_g_vendedor" style="font-size:11px; margin-top:3px; display:none;"></div>
+          <input type="text" id="g_vendedor_nombre" placeholder="Razón social del vendedor" style="margin-top:6px;">
+        </div>
+
+        <div id="boxPuertoLlegada" style="display:none;">
+          <label>Puerto/aeropuerto de llegada (solo Importación/Exportación)</label>
+          <input type="text" id="g_puerto_llegada" placeholder="Ej: Puerto del Callao">
+        </div>
+
+        <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin-top:6px;">
+          <input type="checkbox" id="chk_guia_baja" onchange="document.getElementById('boxGuiaBaja').style.display=this.checked?'block':'none';" style="width:auto;">
+          Esta guía reemplaza a una guía dada de baja
+        </label>
+        <div id="boxGuiaBaja" style="display:none;">
+          <label>Serie-número de la guía dada de baja</label>
+          <input type="text" id="g_guia_baja_numero" placeholder="T001-00000100">
+        </div>
+
+        <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin-top:6px;">
+          <input type="checkbox" id="chk_doc_adicional" onchange="document.getElementById('boxDocAdicional').style.display=this.checked?'block':'none';" style="width:auto;">
+          Agregar documento adicional relacionado (DAM, SCOP, manifiesto de carga, detracción, etc.)
+        </label>
+        <div id="boxDocAdicional" style="display:none;">
           <div class="row2">
             <div>
-              <label id="lbl_categoria_veh">Categoría de vehículo</label>
-              <select id="g_categoria">
-                <option value="M1">M1</option>
-                <option value="M2">M2</option>
-                <option value="M3">M3</option>
-                <option value="N1">N1</option>
-                <option value="N2">N2</option>
-                <option value="N3">N3</option>
+              <label>Tipo de documento adicional</label>
+              <select id="g_docadic_tipo">
+                <option value="01">N° DAM (Declaración Aduanera de Mercancías)</option>
+                <option value="02">N° de orden de entrega</option>
+                <option value="03">N° SCOP</option>
+                <option value="04">N° de manifiesto de carga</option>
+                <option value="05">N° de constancia de detracción</option>
+                <option value="06">Otros</option>
               </select>
             </div>
             <div>
-              <label>Placa vehículo</label>
-              <input type="text" id="g_placa" placeholder="C5T-760">
-            </div>
-          </div>
-          <div class="row2">
-            <div>
-              <label>RUC transportista</label>
-              <input type="text" id="g_ructrans" placeholder="20600052111">
-            </div>
-            <div id="campoMTC">
-              <label>N° Registro MTC</label>
-              <input type="text" id="g_mtc" placeholder="Obligatorio si es transporte público" oninput="validarCampoMTC()">
-              <div id="msg_g_mtc" style="font-size:11px; margin-top:3px; display:none;"></div>
-            </div>
-          </div>
-          <div class="row2">
-            <div>
-              <label>Conductor</label>
-              <input type="text" id="g_conductor" placeholder="Nombre del conductor">
-            </div>
-            <div>
-              <label>Licencia conductor</label>
-              <input type="text" id="g_licencia" placeholder="S-44276849">
+              <label>Número</label>
+              <input type="text" id="g_docadic_numero" placeholder="Número del documento">
             </div>
           </div>
         </div>
 
-        <table>
-          <thead><tr><th style="width:50%">Producto</th><th>Cant.</th><th>Unid.</th><th></th></tr></thead>
-          <tbody id="itemsGuiaBody"></tbody>
-        </table>
-        <button class="add-item" onclick="agregarItemGuia()">+ Agregar producto</button>
+        <!-- Modal: Agregar Vehículo -->
+        <div id="modalVehiculo" class="modal-overlay" style="display:none;">
+          <div class="modal-box">
+            <div class="modal-head">
+              <span>Agregar Vehículo</span>
+              <span style="cursor:pointer" onclick="cerrarModalVehiculo()">✕</span>
+            </div>
+            <label>Número de placa</label>
+            <input type="text" id="mv_placa" placeholder="ESCRIBA">
+            <label style="margin-top:10px; display:flex; align-items:center; gap:6px; font-weight:normal;">
+              <input type="checkbox" id="mv_frecuente" style="width:auto;"> Guardar como vehículo frecuente
+            </label>
+            <button class="btn-primary" style="margin-top:10px;" onclick="agregarVehiculoGuia()">Agregar</button>
+          </div>
+        </div>
+
+        <!-- Modal: Vehículos frecuentes -->
+        <div id="modalVehiculosFrecuentes" class="modal-overlay" style="display:none;">
+          <div class="modal-box" style="max-width:640px;">
+            <div class="modal-head">
+              <span>Vehículos frecuentes</span>
+              <span style="cursor:pointer" onclick="cerrarModalVehiculosFrecuentes()">✕</span>
+            </div>
+            <div id="listaVehiculosFrecuentes" style="max-height:300px; overflow-y:auto;"></div>
+            <button class="btn-primary" style="margin-top:10px;" onclick="agregarSeleccionVehiculosFrecuentes()">Agregar</button>
+          </div>
+        </div>
+
+        <!-- Modal: Conductores frecuentes -->
+        <div id="modalConductoresFrecuentes" class="modal-overlay" style="display:none;">
+          <div class="modal-box" style="max-width:640px;">
+            <div class="modal-head">
+              <span>Conductores frecuentes</span>
+              <span style="cursor:pointer" onclick="cerrarModalConductoresFrecuentes()">✕</span>
+            </div>
+            <div id="listaConductoresFrecuentes" style="max-height:300px; overflow-y:auto;"></div>
+            <button class="btn-primary" style="margin-top:10px;" onclick="agregarSeleccionConductoresFrecuentes()">Agregar</button>
+          </div>
+        </div>
+
+        <!-- Modal: Agregar Conductor -->
+        <div id="modalConductor" class="modal-overlay" style="display:none;">
+          <div class="modal-box">
+            <div class="modal-head">
+              <span>Agregar Conductor</span>
+              <span style="cursor:pointer" onclick="cerrarModalConductor()">✕</span>
+            </div>
+            <div class="row2">
+              <div>
+                <label>Número de licencia de conducir</label>
+                <input type="text" id="mc_licencia" placeholder="ESCRIBA">
+              </div>
+              <div>
+                <label>Tipo de documento de identidad</label>
+                <select id="mc_tipodoc">
+                  <option value="1">DOCUMENTO NACIONAL DE IDENTIDAD</option>
+                  <option value="4">CARNET DE EXTRANJERÍA</option>
+                  <option value="7">PASAPORTE</option>
+                  <option value="A">CÉDULA DIPLOMÁTICA DE IDENTIDAD</option>
+                  <option value="B">DOC.IDENT.PAIS.RESIDENCIA-NO.D</option>
+                  <option value="C">TAX IDENTIFICATION NUMBER - TIN - DOC TRIB PP.NN</option>
+                  <option value="D">IDENTIFICATION NUMBER - IN - DOC TRIB PP. JJ</option>
+                  <option value="E">TAM - TARJETA ANDINA DE MIGRACIÓN</option>
+                  <option value="F">PERMISO TEMPORAL DE PERMANENCIA - PTP</option>
+                  <option value="G">SALVOCONDUCTO</option>
+                </select>
+              </div>
+            </div>
+            <div class="row2">
+              <div>
+                <label>Número de documento de identidad</label>
+                <input type="text" id="mc_numdoc" placeholder="ESCRIBA" oninput="autocompletarConductorPorDoc()">
+                <div id="msg_mc_numdoc" style="font-size:11px; margin-top:3px; display:none;"></div>
+              </div>
+              <div>
+                <label>Apellidos y Nombres</label>
+                <input type="text" id="mc_nombres" placeholder="ESCRIBA">
+              </div>
+            </div>
+            <label style="margin-top:10px; display:flex; align-items:center; gap:6px; font-weight:normal;">
+              <input type="checkbox" id="mc_frecuente" style="width:auto;"> Guardar como conductor frecuente
+            </label>
+            <button class="btn-primary" style="margin-top:10px;" onclick="agregarConductorGuia()">Agregar</button>
+          </div>
+        </div>
+
+        <label>Detalle de bienes</label>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr>
+              <th>Bien norm.</th><th>Cód. Bien</th><th>Cód. prod. SUNAT</th><th>Cód. subpartida</th><th>Cód. GTIN</th>
+              <th style="width:30%">Descripción</th><th>Unid.</th><th>Cant.</th><th></th>
+            </tr></thead>
+            <tbody id="itemsGuiaBody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex; gap:14px; align-items:center; margin-top:6px;">
+          <button class="add-item" onclick="abrirModalBienGuia()">+ Agregar producto</button>
+          <span style="cursor:pointer; color:var(--accent-2,#5aa9ff); font-size:12px;" onclick="abrirModalBienesFrecuentes()">🔍 Bienes frecuentes</span>
+        </div>
+
+        <!-- Modal: Agregar Bien (misma estructura que usa el portal SUNAT) -->
+        <div id="modalBienGuia" class="modal-overlay" style="display:none;">
+          <div class="modal-box" style="max-width:560px;">
+            <div class="modal-head">
+              <span id="tituloModalBien">Agregar Bien</span>
+              <span style="cursor:pointer" onclick="cerrarModalBienGuia()">✕</span>
+            </div>
+            <label style="display:flex; align-items:center; gap:6px; font-weight:normal;">
+              <input type="checkbox" id="mb_normalizado" style="width:auto;"> Bien normalizado
+            </label>
+            <div class="row2">
+              <div>
+                <label>Código del bien</label>
+                <input type="text" id="mb_codbien" placeholder="">
+              </div>
+              <div>
+                <label>Código de subpartida nacional</label>
+                <input type="text" id="mb_subpartida" placeholder="">
+              </div>
+            </div>
+            <div class="row2">
+              <div>
+                <label>Código de producto SUNAT</label>
+                <input type="text" id="mb_codprodsunat" placeholder="">
+              </div>
+              <div>
+                <label>Código GTIN</label>
+                <input type="text" id="mb_gtin" placeholder="">
+              </div>
+            </div>
+            <label style="margin-top:8px; display:block;">Descripción detallada del bien</label>
+            <textarea id="mb_descripcion" rows="3" style="width:100%; box-sizing:border-box; border-radius:8px; padding:8px; font-family:inherit;"></textarea>
+            <div class="row2">
+              <div>
+                <label>Unidad de medida del bien</label>
+                <select id="mb_unidad">
+                  <option value="NIU">NIU - UNIDAD</option>
+                  <option value="GLL">GLL - GALÓN (US)</option>
+                  <option value="KGM">KGM - KILOGRAMO</option>
+                  <option value="LTR">LTR - LITRO</option>
+                  <option value="ZZ">ZZ - CAJA/PAQUETE</option>
+                </select>
+              </div>
+              <div>
+                <label>Cantidad</label>
+                <input type="text" id="mb_cantidad" placeholder="ESCRIBA">
+              </div>
+            </div>
+            <label style="margin-top:10px; display:flex; align-items:center; gap:6px; font-weight:normal;">
+              <input type="checkbox" id="mb_frecuente" style="width:auto;"> Guardar como bien frecuente
+            </label>
+            <button class="btn-primary" style="margin-top:10px;" onclick="agregarBienGuia()">Agregar</button>
+          </div>
+        </div>
+
+        <!-- Modal: Bienes frecuentes -->
+        <div id="modalBienesFrecuentes" class="modal-overlay" style="display:none;">
+          <div class="modal-box" style="max-width:640px;">
+            <div class="modal-head">
+              <span>Bienes frecuentes</span>
+              <span style="cursor:pointer" onclick="cerrarModalBienesFrecuentes()">✕</span>
+            </div>
+            <div id="listaBienesFrecuentes" style="max-height:340px; overflow-y:auto;"></div>
+            <button class="btn-primary" style="margin-top:10px;" onclick="agregarSeleccionBienesFrecuentes()">Agregar</button>
+          </div>
+        </div>
 
         <button class="btn-primary" onclick="generarGuia()">Generar guía</button>
       </div>
@@ -955,6 +1436,26 @@
       </div>
 
       <div class="card">
+        <h2>Mis locales <span class="n">(aparecen como opción de Partida y Llegada en Guías)</span></h2>
+        <div id="listaLocales" style="margin-bottom:14px;"></div>
+
+        <h2 style="font-size:13px; margin-top:18px;">Agregar local</h2>
+        <div class="row2">
+          <div>
+            <label>Nombre del local</label>
+            <input type="text" id="local_nombre" placeholder="ej. Tienda Huamanga, Almacén Central">
+          </div>
+          <div>
+            <label>Ubigeo (6 dígitos)</label>
+            <input type="text" id="local_ubigeo" placeholder="050101" maxlength="6">
+          </div>
+        </div>
+        <label>Dirección</label>
+        <input type="text" id="local_direccion" placeholder="Dirección completa del local">
+        <button class="btn-primary" onclick="agregarLocalEmpresa()">Agregar local</button>
+      </div>
+
+      <div class="card">
         <h2>Cuentas bancarias <span class="n">(aparecen en el PDF si las activas)</span></h2>
         <div id="listaBancos" style="margin-bottom:14px;"></div>
 
@@ -1072,6 +1573,322 @@ let docActualFact = 'factura';
 let docActualGuia = 'remitente';
 let items = [];
 let itemsGuia = [];
+let vehiculosGuia = [];
+let conductoresGuia = [];
+let transportistaGuia = [];
+let autorizacionesGuia = [];
+
+function abrirModalVehiculo(){
+  document.getElementById('mv_placa').value='';
+  document.getElementById('mv_frecuente').checked=false;
+  document.getElementById('modalVehiculo').style.display='flex';
+}
+function cerrarModalVehiculo(){ document.getElementById('modalVehiculo').style.display='none'; }
+function agregarVehiculoGuia(){
+  const placa = document.getElementById('mv_placa').value.trim();
+  if(!placa){ alert('Ingrese el número de placa'); return; }
+  vehiculosGuia.push({
+    id: 'v'+Date.now(),
+    tipo: vehiculosGuia.length===0 ? 'principal' : 'secundario',
+    placa
+  });
+  if(document.getElementById('mv_frecuente').checked){
+    guardarVehiculoFrecuente({placa});
+  }
+  cerrarModalVehiculo();
+  renderVehiculosGuia();
+}
+function guardarVehiculoFrecuente(v){
+  const emp = empresas[empresaActual];
+  if(!emp.vehiculosFrecuentes) emp.vehiculosFrecuentes = [];
+  const existe = emp.vehiculosFrecuentes.some(x=>x.placa===v.placa);
+  if(!existe) emp.vehiculosFrecuentes.push({id:'vf'+Date.now(), ...v});
+  guardarEmpresaEnServidor(empresaActual);
+}
+function guardarConductorFrecuente(c){
+  const emp = empresas[empresaActual];
+  if(!emp.conductoresFrecuentes) emp.conductoresFrecuentes = [];
+  const existe = emp.conductoresFrecuentes.some(x=>x.licencia===c.licencia && x.numDoc===c.numDoc);
+  if(!existe) emp.conductoresFrecuentes.push({id:'cf'+Date.now(), ...c});
+  guardarEmpresaEnServidor(empresaActual);
+}
+
+function abrirModalVehiculosFrecuentes(){
+  const emp = empresas[empresaActual];
+  const lista = emp.vehiculosFrecuentes || [];
+  const box = document.getElementById('listaVehiculosFrecuentes');
+  if(lista.length===0){
+    box.innerHTML = '<div style="font-size:12px; color:var(--text-dim); padding:10px 0;">No hay vehículos frecuentes guardados aún.</div>';
+  } else {
+    box.innerHTML = lista.map(v=>`
+      <label style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.08); font-size:12px;">
+        <input type="checkbox" class="chk-veh-frec" value="${v.id}" style="width:auto;">
+        <span>PLACA: ${v.placa}</span>
+      </label>
+    `).join('');
+  }
+  document.getElementById('modalVehiculosFrecuentes').style.display='flex';
+}
+function cerrarModalVehiculosFrecuentes(){ document.getElementById('modalVehiculosFrecuentes').style.display='none'; }
+function agregarSeleccionVehiculosFrecuentes(){
+  const emp = empresas[empresaActual];
+  const seleccionados = Array.from(document.querySelectorAll('.chk-veh-frec:checked')).map(el=>el.value);
+  seleccionados.forEach(id=>{
+    const v = (emp.vehiculosFrecuentes||[]).find(x=>x.id===id);
+    if(v){
+      vehiculosGuia.push({id:'v'+Date.now()+Math.random(), tipo: vehiculosGuia.length===0 ? 'principal' : 'secundario', placa:v.placa});
+    }
+  });
+  cerrarModalVehiculosFrecuentes();
+  renderVehiculosGuia();
+}
+
+function abrirModalConductoresFrecuentes(){
+  const emp = empresas[empresaActual];
+  const lista = emp.conductoresFrecuentes || [];
+  const box = document.getElementById('listaConductoresFrecuentes');
+  const tipoDocTexto = {1:'DNI',4:'CARNÉ EXTR.',7:'PASAPORTE',A:'CÉD.DIPL.',B:'DOC.PAIS.RES.',C:'TIN',D:'IN',E:'TAM',F:'PTP',G:'SALVOCOND.'};
+  if(lista.length===0){
+    box.innerHTML = '<div style="font-size:12px; color:var(--text-dim); padding:10px 0;">No hay conductores frecuentes guardados aún.</div>';
+  } else {
+    box.innerHTML = lista.map(c=>`
+      <label style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.08); font-size:12px;">
+        <input type="checkbox" class="chk-cond-frec" value="${c.id}" style="width:auto;">
+        <span>LIC.: ${c.licencia} &nbsp; ${tipoDocTexto[c.tipoDoc]||''} &nbsp; ${c.numDoc} &nbsp; ${c.nombres}</span>
+      </label>
+    `).join('');
+  }
+  document.getElementById('modalConductoresFrecuentes').style.display='flex';
+}
+function cerrarModalConductoresFrecuentes(){ document.getElementById('modalConductoresFrecuentes').style.display='none'; }
+function agregarSeleccionConductoresFrecuentes(){
+  const emp = empresas[empresaActual];
+  const seleccionados = Array.from(document.querySelectorAll('.chk-cond-frec:checked')).map(el=>el.value);
+  seleccionados.forEach(id=>{
+    const c = (emp.conductoresFrecuentes||[]).find(x=>x.id===id);
+    if(c){
+      conductoresGuia.push({id:'c'+Date.now()+Math.random(), tipo: conductoresGuia.length===0 ? 'principal' : 'secundario', licencia:c.licencia, tipoDoc:c.tipoDoc, numDoc:c.numDoc, nombres:c.nombres});
+    }
+  });
+  cerrarModalConductoresFrecuentes();
+  renderConductoresGuia();
+}
+
+// Autocompleta Apellidos y Nombres del conductor cuando el documento es DNI (8 dígitos),
+// reusando la misma consulta RENIEC/SUNAT que ya usa el resto de FACTASH.
+async function autocompletarConductorPorDoc(){
+  const tipoDoc = document.getElementById('mc_tipodoc').value;
+  const numero = document.getElementById('mc_numdoc').value.trim();
+  if(tipoDoc !== '1' || numero.length !== 8) return; // solo autocompleta para DNI de 8 dígitos
+  await consultarRucODni('mc_numdoc','mc_tipodoc','mc_nombres',null,'msg_mc_numdoc',null);
+}
+
+function eliminarVehiculoGuia(id){
+  vehiculosGuia = vehiculosGuia.filter(v=>v.id!==id);
+  // reasignar el primero restante como "principal"
+  vehiculosGuia.forEach((v,i)=>{ v.tipo = i===0 ? 'principal' : 'secundario'; });
+  renderVehiculosGuia();
+}
+
+// ---------- Autorización especial para el traslado de la carga (opcional, independiente del vehículo) ----------
+function abrirModalAutorizacion(){
+  document.getElementById('ma_entidad').value='';
+  document.getElementById('ma_numero').value='';
+  document.getElementById('modalAutorizacion').style.display='flex';
+}
+function cerrarModalAutorizacion(){ document.getElementById('modalAutorizacion').style.display='none'; }
+function agregarAutorizacionGuia(){
+  const entidad = document.getElementById('ma_entidad').value;
+  const numero = document.getElementById('ma_numero').value.trim();
+  if(!entidad || !numero){ alert('Seleccione la entidad emisora e ingrese el número de autorización'); return; }
+  autorizacionesGuia.push({id:'a'+Date.now(), entidad, numero});
+  cerrarModalAutorizacion();
+  renderAutorizacionesGuia();
+}
+function eliminarAutorizacionGuia(id){
+  autorizacionesGuia = autorizacionesGuia.filter(a=>a.id!==id);
+  renderAutorizacionesGuia();
+}
+function renderAutorizacionesGuia(){
+  const box = document.getElementById('listaAutorizacionGuia');
+  if(!box) return;
+  if(autorizacionesGuia.length===0){
+    box.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Ninguna autorización agregada</div>';
+    return;
+  }
+  box.innerHTML = autorizacionesGuia.map(a=>`
+    <div class="item-row">
+      <span style="flex:1;">${a.entidad}: ${a.numero}</span>
+      <span class="x-remove" onclick="eliminarAutorizacionGuia('${a.id}')">✕</span>
+    </div>
+  `).join('');
+}
+function renderVehiculosGuia(){
+  const box = document.getElementById('listaVehiculosGuia');
+  if(!box) return;
+  if(vehiculosGuia.length===0){
+    box.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Ningún vehículo agregado</div>';
+    return;
+  }
+  box.innerHTML = vehiculosGuia.map(v=>`
+    <div class="item-row">
+      <span class="tag">${v.tipo}</span>
+      <span style="flex:1;">PLACA: ${v.placa}</span>
+      <span class="x-remove" onclick="eliminarVehiculoGuia('${v.id}')">✕</span>
+    </div>
+  `).join('');
+}
+
+function abrirModalConductor(){
+  document.getElementById('mc_licencia').value='';
+  document.getElementById('mc_tipodoc').value='1';
+  document.getElementById('mc_numdoc').value='';
+  document.getElementById('mc_nombres').value='';
+  document.getElementById('modalConductor').style.display='flex';
+}
+function cerrarModalConductor(){ document.getElementById('modalConductor').style.display='none'; }
+function agregarConductorGuia(){
+  const licencia = document.getElementById('mc_licencia').value.trim();
+  const numdoc = document.getElementById('mc_numdoc').value.trim();
+  const nombres = document.getElementById('mc_nombres').value.trim();
+  if(!licencia || !numdoc || !nombres){ alert('Complete licencia, documento y nombres del conductor'); return; }
+  const tipoDoc = document.getElementById('mc_tipodoc').value;
+  conductoresGuia.push({
+    id: 'c'+Date.now(),
+    tipo: conductoresGuia.length===0 ? 'principal' : 'secundario',
+    licencia, tipoDoc, numDoc: numdoc, nombres
+  });
+  if(document.getElementById('mc_frecuente').checked){
+    guardarConductorFrecuente({licencia, tipoDoc, numDoc: numdoc, nombres});
+  }
+  cerrarModalConductor();
+  renderConductoresGuia();
+}
+function eliminarConductorGuia(id){
+  conductoresGuia = conductoresGuia.filter(c=>c.id!==id);
+  conductoresGuia.forEach((c,i)=>{ c.tipo = i===0 ? 'principal' : 'secundario'; });
+  renderConductoresGuia();
+}
+function renderConductoresGuia(){
+  const box = document.getElementById('listaConductoresGuia');
+  if(!box) return;
+  if(conductoresGuia.length===0){
+    box.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Ningún conductor agregado</div>';
+    return;
+  }
+  const tipoDocTexto = {1:'DNI',4:'CARNÉ EXTRANJERÍA',7:'PASAPORTE'};
+  box.innerHTML = conductoresGuia.map(c=>`
+    <div class="item-row">
+      <span class="tag">${c.tipo}</span>
+      <span style="flex:1;">LIC.: ${c.licencia} &nbsp; ${tipoDocTexto[c.tipoDoc]||''} &nbsp; ${c.numDoc} &nbsp; ${c.nombres}</span>
+      <span class="x-remove" onclick="eliminarConductorGuia('${c.id}')">✕</span>
+    </div>
+  `).join('');
+}
+
+// ---------- Datos del transportista (Guía Remitente + modalidad Pública) ----------
+function abrirModalTransportista(){
+  document.getElementById('mt_ruc').value='';
+  document.getElementById('mt_razonsocial').value='';
+  document.getElementById('mt_mtc').value='';
+  document.getElementById('mt_entidad').value='';
+  document.getElementById('mt_numautorizacion').value='';
+  document.getElementById('mt_frecuente').checked=false;
+  document.getElementById('modalTransportista').style.display='flex';
+}
+function cerrarModalTransportista(){ document.getElementById('modalTransportista').style.display='none'; }
+async function autocompletarTransportistaPorRuc(){
+  const ruc = document.getElementById('mt_ruc').value.trim();
+  if(ruc.length !== 11) return; // solo autocompleta con RUC completo (11 dígitos)
+  await consultarRucODni('mt_ruc','','mt_razonsocial',null,'msg_mt_ruc',null);
+}
+function agregarTransportistaGuia(){
+  const ruc = document.getElementById('mt_ruc').value.trim();
+  const razonSocial = document.getElementById('mt_razonsocial').value.trim();
+  const mtc = document.getElementById('mt_mtc').value.trim();
+  if(!ruc || !razonSocial){ alert('Complete el RUC y la razón social del transportista'); return; }
+  const entidad = document.getElementById('mt_entidad').value || '';
+  const numAutorizacion = document.getElementById('mt_numautorizacion').value.trim() || '';
+  transportistaGuia = [{ id:'t'+Date.now(), ruc, razonSocial, mtc, entidad, numAutorizacion }]; // solo uno a la vez
+  if(document.getElementById('mt_frecuente').checked){
+    guardarTransportistaFrecuente({ruc, razonSocial, mtc, entidad, numAutorizacion});
+  }
+  cerrarModalTransportista();
+  renderTransportistaGuia();
+}
+function eliminarTransportistaGuia(id){
+  transportistaGuia = transportistaGuia.filter(t=>t.id!==id);
+  renderTransportistaGuia();
+}
+function renderTransportistaGuia(){
+  const box = document.getElementById('listaTransportistaGuia');
+  const btn = document.getElementById('btnAgregarTransportista');
+  if(!box) return;
+  if(transportistaGuia.length===0){
+    box.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Ningún transportista agregado</div>';
+    if(btn) btn.disabled = false;
+    return;
+  }
+  box.innerHTML = transportistaGuia.map(t=>`
+    <div class="item-row">
+      <span class="tag">RUC</span>
+      <span style="flex:1;">${t.ruc} &nbsp; ${t.razonSocial}${t.mtc ? ` &nbsp; MTC: ${t.mtc}`:''}</span>
+      <span class="x-remove" onclick="eliminarTransportistaGuia('${t.id}')">✕</span>
+    </div>
+  `).join('');
+  if(btn) btn.disabled = true; // el portal SUNAT solo permite un transportista por guía
+}
+function guardarTransportistaFrecuente(t){
+  const emp = empresas[empresaActual];
+  if(!emp.transportistasFrecuentes) emp.transportistasFrecuentes = [];
+  const existe = emp.transportistasFrecuentes.some(x=>x.ruc===t.ruc);
+  if(!existe) emp.transportistasFrecuentes.push({id:'tf'+Date.now(), ...t});
+  guardarEmpresaEnServidor(empresaActual);
+}
+function abrirModalTransportistasFrecuentes(){
+  const emp = empresas[empresaActual];
+  const lista = emp.transportistasFrecuentes || [];
+  const box = document.getElementById('listaTransportistasFrecuentes');
+  if(lista.length===0){
+    box.innerHTML = '<div style="font-size:12px; color:var(--text-dim); padding:10px 0;">No hay transportistas frecuentes guardados aún.</div>';
+  } else {
+    box.innerHTML = lista.map(t=>`
+      <label style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.08); font-size:12px;">
+        <input type="radio" name="chk-trans-frec" class="chk-trans-frec" value="${t.id}" style="width:auto;">
+        <span>RUC ${t.ruc} &nbsp; ${t.razonSocial}${t.mtc ? ` &nbsp; MTC: ${t.mtc}`:''}</span>
+      </label>
+    `).join('');
+  }
+  document.getElementById('modalTransportistasFrecuentes').style.display='flex';
+}
+function cerrarModalTransportistasFrecuentes(){ document.getElementById('modalTransportistasFrecuentes').style.display='none'; }
+function agregarSeleccionTransportistasFrecuentes(){
+  const emp = empresas[empresaActual];
+  const sel = document.querySelector('.chk-trans-frec:checked');
+  if(sel){
+    const t = (emp.transportistasFrecuentes||[]).find(x=>x.id===sel.value);
+    if(t) transportistaGuia = [{id:'t'+Date.now(), ruc:t.ruc, razonSocial:t.razonSocial, mtc:t.mtc, entidad:t.entidad, numAutorizacion:t.numAutorizacion}];
+  }
+  cerrarModalTransportistasFrecuentes();
+  renderTransportistaGuia();
+}
+
+// Se activa con el checkbox "Registrar vehículos y conductores del transportista" (solo Remitente+Público):
+// muestra el bloque de vehículo/conductor propio y habilita la Fecha de entrega de bienes al transportista.
+function onCambioRegistrarVehConductor(){
+  const chk = document.getElementById('chk_registrar_veh_conductor');
+  const activo = chk ? chk.checked : false;
+  document.getElementById('camposTransportista').style.display = activo ? 'block' : 'none';
+  const fechaEntregaInput = document.getElementById('g_fecha_entrega');
+  document.getElementById('boxFechaEntrega').style.display = activo ? 'block' : 'none';
+  if(fechaEntregaInput) fechaEntregaInput.disabled = !activo;
+  if(!activo){
+    vehiculosGuia = [];
+    conductoresGuia = [];
+    renderVehiculosGuia();
+    renderConductoresGuia();
+  }
+}
 let emitidos = []; // {empresa, tipo, serie, cliente, monto, fecha}
 
 const docLabels = {factura:'Factura', boleta:'Boleta', nc:'Nota de Crédito', nd:'Nota de Débito', retencion:'Retención', percepcion:'Percepción', liquidacion:'Liquidación de Compra', ticket:'Ticket', notaventa:'Nota de Venta', proforma:'Proforma', ordenpago:'Orden de Pago'};
@@ -1405,16 +2222,81 @@ function cambiarDoc(grupo, doc){
   } else {
     docActualGuia = doc;
     document.getElementById('tituloDocGuia').textContent = 'Nueva Guía de Remisión ' + (doc==='remitente'?'Remitente':'Transportista');
-    document.getElementById('camposTransportista').style.display = (doc==='transportista') ? 'block':'none';
-    if(doc==='transportista') onModalidadChange();
+
+    // Remitente: partida/llegada se llenan por búsqueda de RUC (proveedor/cliente) o "mis locales".
+    // Transportista: es una persona que recoge/entrega en cualquier lugar del país, así que se
+    // llena manual con Departamento → Provincia → Distrito (no tiene sentido buscar por RUC ahí).
+    document.getElementById('cascadaPartida').style.display = (doc==='transportista') ? 'flex' : 'none';
+    document.getElementById('cascadaLlegada').style.display = (doc==='transportista') ? 'flex' : 'none';
+    document.getElementById('boxDatosTransportistaGuia').style.display = (doc==='transportista') ? 'block' : 'none';
+    document.getElementById('buscarRucPartidaBox').style.display = (doc==='remitente') ? 'flex' : 'none';
+
+    onModalidadChange();
   }
   renderTodo();
 }
 
+function onCambioM1L(){
+  onModalidadChange();
+}
+
 function onModalidadChange(){
   const publico = document.getElementById('g_modalidad').value === '01';
-  document.getElementById('campoMTC').style.display = publico ? 'block' : 'none';
-  if(document.getElementById('msg_g_mtc')) validarCampoMTC();
+  const esM1L = document.getElementById('chk_m1l') ? document.getElementById('chk_m1l').checked : false;
+
+  // "Realiza transbordo programado" solo aplica en Transporte Privado.
+  const lblTransbordo = document.getElementById('lblTransbordo');
+  if(lblTransbordo){
+    lblTransbordo.style.display = (docActualGuia==='remitente' && !publico) ? 'flex' : 'none';
+    if(publico) document.getElementById('chk_transbordo').checked = false;
+  }
+
+  if(docActualGuia === 'remitente' && esM1L){
+    // Vehículo categoría M1/L (auto/moto): SUNAT solo pide la placa, sin transportista/MTC/conductor.
+    // Aplica igual en Privado y Público.
+    document.getElementById('boxM1L').style.display = 'block';
+    document.getElementById('boxDatosTransportistaRemitente').style.display = 'none';
+    document.getElementById('filaRucMtc').style.display = 'none';
+    document.getElementById('camposTransportista').style.display = 'none';
+    vehiculosGuia = []; conductoresGuia = []; transportistaGuia = [];
+    renderVehiculosGuia(); renderConductoresGuia(); renderTransportistaGuia();
+    if(document.getElementById('chk_registrar_veh_conductor')) document.getElementById('chk_registrar_veh_conductor').checked = false;
+    const fechaEntregaInput = document.getElementById('g_fecha_entrega');
+    document.getElementById('boxFechaEntrega').style.display = publico ? 'block' : 'none';
+    if(fechaEntregaInput) fechaEntregaInput.disabled = !publico;
+    return;
+  }
+  document.getElementById('boxM1L').style.display = 'none';
+
+  if(docActualGuia === 'remitente'){
+    // Público: se pide "Datos del transportista" (RUC/MTC/autorización) + el checkbox opcional
+    // que activa vehículo/conductor propio + Fecha de entrega (Res. 000108-2026/SUNAT).
+    // Privado: vehículo/conductor van directos, sin transportista ni checkbox.
+    document.getElementById('boxDatosTransportistaRemitente').style.display = publico ? 'block' : 'none';
+    document.getElementById('filaRucMtc').style.display = 'none'; // ese campo es solo para Guía Transportista
+
+    if(publico){
+      const chk = document.getElementById('chk_registrar_veh_conductor');
+      onCambioRegistrarVehConductor(); // aplica según el estado actual del checkbox
+    } else {
+      transportistaGuia = [];
+      renderTransportistaGuia();
+      if(document.getElementById('chk_registrar_veh_conductor')) document.getElementById('chk_registrar_veh_conductor').checked = false;
+      document.getElementById('camposTransportista').style.display = 'block';
+      document.getElementById('boxFechaEntrega').style.display = 'none';
+      const fechaEntregaInput = document.getElementById('g_fecha_entrega');
+      if(fechaEntregaInput) fechaEntregaInput.disabled = true;
+    }
+  } else {
+    // Guía Transportista: siempre necesita sus propios datos completos (vehículo, RUC, conductor),
+    // sin importar la modalidad, y no usa la fecha de entrega (ese campo es solo de Remitente).
+    document.getElementById('boxDatosTransportistaRemitente').style.display = 'none';
+    document.getElementById('campoMTC').style.display = 'block';
+    if(document.getElementById('msg_g_mtc')) validarCampoMTC();
+    document.getElementById('camposTransportista').style.display = 'block';
+    document.getElementById('filaRucMtc').style.display = 'flex';
+    document.getElementById('boxFechaEntrega').style.display = 'none';
+  }
 }
 
 function agregarItem(){
@@ -1578,27 +2460,119 @@ function renderCuotas(){
   document.getElementById('cuotasBox').innerHTML = html;
 }
 
-function agregarItemGuia(){
-  itemsGuia.push({producto:'', cant:1, unidad:'UND'});
+let editandoBienGuiaId = null; // si no es null, "Agregar" en el modal edita ese ítem en vez de crear uno nuevo
+
+function abrirModalBienGuia(){
+  editandoBienGuiaId = null;
+  document.getElementById('tituloModalBien').textContent = 'Agregar Bien';
+  document.getElementById('mb_normalizado').checked = false;
+  document.getElementById('mb_codbien').value = '';
+  document.getElementById('mb_subpartida').value = '';
+  document.getElementById('mb_codprodsunat').value = '';
+  document.getElementById('mb_gtin').value = '';
+  document.getElementById('mb_descripcion').value = '';
+  document.getElementById('mb_unidad').value = 'NIU';
+  document.getElementById('mb_cantidad').value = '';
+  document.getElementById('mb_frecuente').checked = false;
+  document.getElementById('modalBienGuia').style.display='flex';
+}
+function editarBienGuia(id){
+  const it = itemsGuia.find(x=>x.id===id);
+  if(!it) return;
+  editandoBienGuiaId = id;
+  document.getElementById('tituloModalBien').textContent = 'Editar Bien';
+  document.getElementById('mb_normalizado').checked = !!it.bienNormalizado;
+  document.getElementById('mb_codbien').value = it.codigoBien || '';
+  document.getElementById('mb_subpartida').value = it.codSubpartida || '';
+  document.getElementById('mb_codprodsunat').value = it.codProdSunat || '';
+  document.getElementById('mb_gtin').value = it.codGtin || '';
+  document.getElementById('mb_descripcion').value = it.descripcion || '';
+  document.getElementById('mb_unidad').value = it.unidad || 'NIU';
+  document.getElementById('mb_cantidad').value = it.cantidad || '';
+  document.getElementById('mb_frecuente').checked = false;
+  document.getElementById('modalBienGuia').style.display='flex';
+}
+function cerrarModalBienGuia(){ document.getElementById('modalBienGuia').style.display='none'; }
+function agregarBienGuia(){
+  const descripcion = document.getElementById('mb_descripcion').value.trim();
+  const cantidad = parseFloat(document.getElementById('mb_cantidad').value)||0;
+  if(!descripcion || !cantidad){ alert('Complete la descripción y la cantidad del bien'); return; }
+  const item = {
+    bienNormalizado: document.getElementById('mb_normalizado').checked,
+    codigoBien: document.getElementById('mb_codbien').value.trim(),
+    codSubpartida: document.getElementById('mb_subpartida').value.trim(),
+    codProdSunat: document.getElementById('mb_codprodsunat').value.trim(),
+    codGtin: document.getElementById('mb_gtin').value.trim(),
+    descripcion, unidad: document.getElementById('mb_unidad').value, cantidad
+  };
+  if(editandoBienGuiaId){
+    const idx = itemsGuia.findIndex(x=>x.id===editandoBienGuiaId);
+    if(idx>-1) itemsGuia[idx] = {...itemsGuia[idx], ...item};
+  } else {
+    itemsGuia.push({id:'b'+Date.now(), ...item});
+  }
+  if(document.getElementById('mb_frecuente').checked){
+    guardarBienFrecuente(item);
+  }
+  cerrarModalBienGuia();
   renderItemsGuia();
 }
-function quitarItemGuia(i){ itemsGuia.splice(i,1); renderItemsGuia(); }
-function renderItemsGuia(){
+function guardarBienFrecuente(it){
   const emp = empresas[empresaActual];
+  if(!emp.bienesFrecuentes) emp.bienesFrecuentes = [];
+  const existe = emp.bienesFrecuentes.some(x=>x.descripcion===it.descripcion && x.codigoBien===it.codigoBien);
+  if(!existe) emp.bienesFrecuentes.push({id:'bf'+Date.now(), ...it});
+  guardarEmpresaEnServidor(empresaActual);
+}
+function abrirModalBienesFrecuentes(){
+  const emp = empresas[empresaActual];
+  const lista = emp.bienesFrecuentes || [];
+  const box = document.getElementById('listaBienesFrecuentes');
+  if(lista.length===0){
+    box.innerHTML = '<div style="font-size:12px; color:var(--text-dim); padding:10px 0;">No hay bienes frecuentes guardados aún.</div>';
+  } else {
+    box.innerHTML = lista.map(b=>`
+      <label style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.08); font-size:12px;">
+        <input type="checkbox" class="chk-bien-frec" value="${b.id}" style="width:auto;">
+        <span>${b.descripcion} — ${b.unidad}${b.codigoBien ? ` — Cód: ${b.codigoBien}`:''}</span>
+      </label>
+    `).join('');
+  }
+  document.getElementById('modalBienesFrecuentes').style.display='flex';
+}
+function cerrarModalBienesFrecuentes(){ document.getElementById('modalBienesFrecuentes').style.display='none'; }
+function agregarSeleccionBienesFrecuentes(){
+  const emp = empresas[empresaActual];
+  const seleccionados = Array.from(document.querySelectorAll('.chk-bien-frec:checked')).map(el=>el.value);
+  seleccionados.forEach(id=>{
+    const b = (emp.bienesFrecuentes||[]).find(x=>x.id===id);
+    if(b){
+      itemsGuia.push({id:'b'+Date.now()+Math.random(), bienNormalizado:b.bienNormalizado, codigoBien:b.codigoBien, codSubpartida:b.codSubpartida, codProdSunat:b.codProdSunat, codGtin:b.codGtin, descripcion:b.descripcion, unidad:b.unidad, cantidad:0});
+    }
+  });
+  cerrarModalBienesFrecuentes();
+  renderItemsGuia();
+}
+function quitarItemGuia(id){ itemsGuia = itemsGuia.filter(it=>it.id!==id); renderItemsGuia(); }
+function renderItemsGuia(){
   const body = document.getElementById('itemsGuiaBody');
+  if(!body) return;
   body.innerHTML = '';
-  itemsGuia.forEach((it,i)=>{
+  itemsGuia.forEach((it)=>{
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>
-        <select onchange="itemsGuia[${i}].producto=this.value;">
-          <option value="">-- elegir --</option>
-          ${emp.productos.map(p=>`<option ${p.nombre===it.producto?'selected':''}>${p.nombre}</option>`).join('')}
-        </select>
+      <td style="text-align:center;">${it.bienNormalizado ? 'SÍ' : 'NO'}</td>
+      <td>${it.codigoBien||''}</td>
+      <td>${it.codProdSunat||''}</td>
+      <td>${it.codSubpartida||''}</td>
+      <td>${it.codGtin||''}</td>
+      <td>${it.descripcion||''}</td>
+      <td>${it.unidad||''}</td>
+      <td style="text-align:right;">${(parseFloat(it.cantidad)||0)}</td>
+      <td style="white-space:nowrap;">
+        <button class="rm-btn" style="background:none; color:var(--accent-2,#5aa9ff);" onclick="editarBienGuia('${it.id}')">✎</button>
+        <button class="rm-btn" onclick="quitarItemGuia('${it.id}')">✕</button>
       </td>
-      <td><input type="number" min="0" step="0.01" value="${it.cant}" oninput="itemsGuia[${i}].cant=parseFloat(this.value)||0;"></td>
-      <td><input type="text" value="${it.unidad}" oninput="itemsGuia[${i}].unidad=this.value;"></td>
-      <td><button class="rm-btn" onclick="quitarItemGuia(${i})">✕</button></td>
     `;
     body.appendChild(tr);
   });
@@ -1625,6 +2599,7 @@ function toggleDatosAdicionales(){
 function toggleCamposPercepcionDetraccion(){
   document.getElementById('camposPercepcionFact').style.display = document.getElementById('f_aplica_percepcion').checked ? 'block' : 'none';
   document.getElementById('camposDetraccionFact').style.display = document.getElementById('f_aplica_detraccion').checked ? 'block' : 'none';
+  if(document.getElementById('f_aplica_detraccion').checked) poblarSelectDetraccion();
 }
 
 function toggleCamposSectorPublico(){
@@ -1637,6 +2612,189 @@ function horaParaFecha(fechaInputVal){
   if(!fechaInputVal) return new Date().toTimeString().slice(0,8);
   const hoyStr = new Date().toISOString().slice(0,10);
   return fechaInputVal < hoyStr ? '23:59:59' : new Date().toTimeString().slice(0,8);
+}
+
+// Convierte un monto numérico a su representación en letras para la leyenda obligatoria
+// "SON : ... SOLES" que exige SUNAT en toda factura/boleta (confirmado con archivos .LEY reales).
+// Reusa la función numeroALetras() ya existente más abajo en el archivo (usada también para el PDF)
+// — evita duplicar la lógica de conversión a letras.
+function montoEnLetras(monto, moneda){
+  const nombreMoneda = moneda === 'USD' ? 'DÓLARES' : 'SOLES';
+  const texto = numeroALetras(monto); // ya devuelve "... CON XX/100 SOLES"
+  return `SON : ${texto.replace(/SOLES$/, nombreMoneda)}`;
+}
+
+// Agrupa los ítems por código de tributo IGV (mismo criterio que el archivo .TRI real de tu SFS:
+// un renglón resumen por cada código de tributo usado — 1000=Gravado, 9997=Exonerado, etc).
+function agruparTributos(detalle){
+  const grupos = {};
+  detalle.forEach(it=>{
+    const cod = it.codTriIGV;
+    if(!grupos[cod]) grupos[cod] = { codTriIGV: cod, nomTributoIgvItem: it.nomTributoIgvItem, codTipTributoIgvItem: it.codTipTributoIgvItem, mtoBaseIgvItem: 0, mtoIgvItem: 0 };
+    grupos[cod].mtoBaseIgvItem += parseFloat(it.mtoBaseIgvItem);
+    grupos[cod].mtoIgvItem += parseFloat(it.mtoIgvItem);
+  });
+  return Object.values(grupos).map(g=>({
+    ...g,
+    mtoBaseIgvItem: g.mtoBaseIgvItem.toFixed(2),
+    mtoIgvItem: g.mtoIgvItem.toFixed(2)
+  }));
+}
+
+// ---------- GENERADOR DE ARCHIVOS TXT "PALOTES" (CAB/DET/LEY/TRI/PAG) ----------
+// Confirmado columna por columna con tu Estructurador.xlsm (hoja ESTRURADOR) y con 2 boletas
+// reales tuyas (20613475398-03-BB01-00000001/00000007). Cada comprobante en tu SFS usa ESTOS
+// archivos de texto separados — NO un JSON único como sí ocurre con la guía.
+function lineaCAB(cabecera){
+  const orden = ["tipOperacion","fecEmision","horEmision","fecVencimiento","codLocalEmisor",
+    "tipDocUsuario","numDocUsuario","rznSocialUsuario","tipMoneda","sumTotTributos","sumTotValVenta",
+    "sumPrecioVenta","sumDescTotal","sumOtrosCargos","sumTotalAnticipos","sumImpVenta","ublVersionId","customizationId"];
+  return orden.map(k => (cabecera[k]===undefined||cabecera[k]===null||cabecera[k]==="") ? "" : cabecera[k]).join('|') + '|';
+}
+// Nota de Crédito/Débito (.NOT): estructura DISTINTA a Factura/Boleta (.CAB), confirmada con la
+// hoja oficial "Nota 2.1" — intercala motivo y documento afectado, y no lleva fecVencimiento ni codLocalEmisor así.
+function lineaNOT(cabecera){
+  const orden = ["tipOperacion","fecEmision","horEmision","codLocalEmisor","tipDocUsuario",
+    "numDocUsuario","rznSocialUsuario","tipMoneda","codMotivo","desMotivo","tipDocAfectado","numDocAfectado",
+    "sumTotTributos","sumTotValVenta","sumPrecioVenta","sumDescTotal","sumOtrosCargos","sumTotalAnticipos",
+    "sumImpVenta","ublVersionId","customizationId"];
+  return orden.map(k => (cabecera[k]===undefined||cabecera[k]===null||cabecera[k]==="") ? "" : cabecera[k]).join('|') + '|';
+}
+function lineaDET(it){
+  // 14 campos de IGV (confirmados) + 19 campos en blanco (ISC/Otro/ICBPER, no aplican al negocio
+  // de Vladi por ahora) + 3 campos finales (precio venta unitario, valor venta ítem, valor referencial).
+  const campos = [
+    it.codUnidadMedida, it.ctdUnidadItem, it.codProducto, it.codProductoSUNAT, it.desItem,
+    it.mtoValorUnitario, it.sumTotTributosItem, it.codTriIGV, it.mtoIgvItem, it.mtoBaseIgvItem,
+    it.nomTributoIgvItem, it.codTipTributoIgvItem, it.tipAfeIGV, it.porIgvItem,
+    '','','','','','','',          // ISC (7)
+    '','','','','','',             // Otro (6)
+    '','','','','','',             // ICBPER (6)
+    it.mtoPrecioVentaUnitario, it.mtoValorVentaItem, '0.00'   // valor referencial (gratuitos)
+  ];
+  return campos.map(v => (v===undefined||v===null) ? "" : v).join('|') + '|';
+}
+function lineaLEY(ley){ return `${ley.codLeyenda}|${ley.desLeyenda}|`; }
+function lineaTRI(tri){ return `${tri.codTriIGV}|${tri.nomTributoIgvItem}|${tri.codTipTributoIgvItem}|${tri.mtoBaseIgvItem}|${tri.mtoIgvItem}|`; }
+// Confirmados con la hoja OFICIAL "Factura y boleta 2.1" del Anexo I y II de SUNAT (tu Estructurador.xlsm
+// propio no los documentaba — por eso faltaban): .REL, .ACA, .ACV, .RTN.
+function lineaREL(r){ return `${r.indDocRelacionado}|${r.numIdeAnticipo||'-'}|${r.tipDocRelacionado}|${r.numDocRelacionado}|${r.tipDocEmisor||'-'}|${r.numDocEmisor||'-'}|${r.mtoDocRelacionado||'-'}|`; }
+function lineaACA(a){ return `${a.ctaBancoNacionDetraccion||'-'}|${a.codBienDetraccion||'-'}|${a.porDetraccion||'-'}|${a.mtoDetraccion||'-'}|${a.codMedioPago||'-'}|${a.codPaisCliente||'-'}|${a.codUbigeoCliente||'-'}|${a.desDireccionCliente||'-'}|${a.codPaisEntrega||'-'}|${a.codUbigeoEntrega||'-'}|${a.desDireccionEntrega||'-'}|`; }
+function lineaACV(v){ return `${v.tipVariableGlobal}|${v.codTipoVariableGlobal}|${v.porVariableGlobal}|${v.monMontoVariableGlobal}|${v.mtoVariableGlobal}|${v.monBaseImponibleVariableGlobal}|${v.mtoBaseImpVariableGlobal}|`; }
+function lineaRTN(r){ return `${r.impOperacion}|${r.porRetencion}|${r.impRetencion}|`; }
+
+// Arma TODOS los archivos TXT de un comprobante ya construido con buildFacturaJSON (reusa
+// exactamente los mismos datos calculados, solo cambia el formato de salida de JSON a "palotes").
+// Cada archivo adicional (.REL/.ACA/.ACV/.RTN/.PAG/.DPA) solo se agrega si el comprobante
+// realmente tiene ese dato (son "Mandatorio en conjunto": solo obligatorios si aplican).
+function buildFacturaTXT(jsonComprobante){
+  const {cabecera, detalle} = jsonComprobante;
+  const esNota = !!cabecera.codMotivo; // las notas siempre traen codMotivo; factura/boleta no
+  const archivos = {};
+  archivos[esNota ? 'NOT' : 'CAB'] = (esNota ? lineaNOT(cabecera) : lineaCAB(cabecera)) + '\n';
+  archivos.DET = detalle.map(lineaDET).join('\n') + '\n';
+  archivos.LEY = (cabecera.leyendas||[]).map(lineaLEY).join('\n') + '\n';
+  archivos.TRI = (cabecera.tributos||[]).map(lineaTRI).join('\n') + '\n';
+  if(cabecera.relacionados && cabecera.relacionados.length){
+    archivos.REL = cabecera.relacionados.map(lineaREL).join('\n') + '\n';
+  }
+  if(cabecera.adicionalCabecera){
+    archivos.ACA = lineaACA(cabecera.adicionalCabecera) + '\n';
+  }
+  if(cabecera.variablesGlobales && cabecera.variablesGlobales.length){
+    archivos.ACV = cabecera.variablesGlobales.map(lineaACV).join('\n') + '\n';
+  }
+  if(cabecera.retencion){
+    archivos.RTN = lineaRTN(cabecera.retencion) + '\n';
+  }
+  if(cabecera.datoPago){
+    archivos.PAG = `${cabecera.datoPago.formaPago}|${cabecera.datoPago.mtoNetoPendientePago}|${cabecera.datoPago.tipMonedaMtoNetoPendientePago}|\n`;
+  }
+  if(cabecera.detallePago && cabecera.detallePago.length){
+    archivos.DPA = cabecera.detallePago.map(c=>`${c.mtoCuotaPago}|${c.fecCuotaPago}|${c.tipMonedaCuotaPago}|`).join('\n') + '\n';
+  }
+  return archivos;
+}
+
+// Empaqueta los archivos TXT en un .zip con los nombres reales <RUC>-<tipo>-<serie>.<EXT>
+// (mismo patrón que tus archivos reales: 20613475398-03-BB01-00000001.CAB, etc).
+// Descarga cada archivo TXT (.CAB/.DET/.LEY/.TRI/.PAG/etc) POR SEPARADO, sin comprimir —
+// confirmado con el manual oficial del SFS: a la carpeta DATA se copian los archivos sueltos
+// con su extensión (.CAB, .DET, etc), NO un .zip. El .zip solo lo arma el propio SFS después,
+// al firmar y enviar a SUNAT (carpeta ENVIO) — eso no es algo que nosotros debamos hacer.
+async function descargarComprobanteTXTZip(jsonComprobante, ruc, tipoArchivo, serie){
+  const archivos = buildFacturaTXT(jsonComprobante);
+  for(const [ext, contenido] of Object.entries(archivos)){
+    descargarTXTPlano(contenido, `${ruc}-${tipoArchivo}-${serie}.${ext}`);
+    await new Promise(r=>setTimeout(r,150)); // pequeña pausa para que el navegador no bloquee descargas múltiples
+  }
+}
+
+// Catálogo N°54 SUNAT — Códigos y porcentajes de bienes/servicios sujetos a detracción.
+const DETRACCION_CATALOGO = {
+  '001':{desc:'Azúcar y melaza de caña', pct:10},
+  '002':{desc:'Arroz', pct:4},
+  '003':{desc:'Alcohol etílico', pct:10},
+  '004':{desc:'Recursos hidrobiológicos', pct:4},
+  '005':{desc:'Maíz amarillo duro', pct:4},
+  '008':{desc:'Madera', pct:4},
+  '009':{desc:'Arena y piedra', pct:10},
+  '010':{desc:'Residuos, subproductos, desechos, recortes y desperdicios', pct:15},
+  '011':{desc:'Bienes gravados con el IGV, por renuncia a la exoneración', pct:10},
+  '012':{desc:'Intermediación laboral y tercerización', pct:12},
+  '014':{desc:'Carnes y despojos comestibles', pct:4},
+  '017':{desc:'Harina, polvo y pellets de pescado', pct:4},
+  '019':{desc:'Arrendamiento de bienes muebles', pct:10},
+  '020':{desc:'Mantenimiento y reparación de bienes muebles', pct:12},
+  '021':{desc:'Movimiento de carga', pct:10},
+  '022':{desc:'Otros servicios empresariales', pct:12},
+  '024':{desc:'Comisión mercantil', pct:10},
+  '025':{desc:'Fabricación de bienes por encargo', pct:10},
+  '027':{desc:'Transporte de bienes', pct:4},
+  '028':{desc:'Transporte de personas', pct:4},
+  '030':{desc:'Contrato de construcción', pct:4},
+  '031':{desc:'Oro gravado con el IGV', pct:10},
+  '034':{desc:'Minerales metálicos no auríferos', pct:10},
+  '035':{desc:'Bienes exonerados del IGV', pct:1.5},
+  '037':{desc:'Demás servicios gravados con el IGV', pct:12},
+  '040':{desc:'Primera venta de inmuebles gravados con IGV', pct:4},
+  '099':{desc:'Ley N° 30737', pct:1.5}
+};
+function poblarSelectDetraccion(){
+  const sel = document.getElementById('f_cod_detraccion');
+  if(!sel || sel.options.length > 1) return; // ya poblado
+  Object.entries(DETRACCION_CATALOGO).forEach(([cod,d])=>{
+    const op = document.createElement('option');
+    op.value = cod;
+    op.textContent = `${cod} - ${d.desc} (${d.pct}%)`;
+    sel.appendChild(op);
+  });
+}
+function onCambioCodDetraccion(){
+  const cod = document.getElementById('f_cod_detraccion').value;
+  const d = DETRACCION_CATALOGO[cod];
+  if(d){
+    document.getElementById('f_pct_detraccion').value = d.pct;
+    calcularMontoDetraccion();
+  }
+}
+// Recalcula el total de la factura/boleta en curso (misma lógica que renderTotales) para poder
+// calcular automáticamente el monto de detracción a partir del porcentaje elegido.
+function totalFacturaActual(){
+  const emp = empresas[empresaActual];
+  const fechaEl = document.getElementById('f_fecha');
+  const fecha = fechaEl ? fechaEl.value : null;
+  let total = 0;
+  items.forEach(it=>{
+    const monto = it.cant*it.precio;
+    total += monto;
+  });
+  return total;
+}
+function calcularMontoDetraccion(){
+  const pct = parseFloat(document.getElementById('f_pct_detraccion').value) || 0;
+  const total = totalFacturaActual();
+  document.getElementById('f_monto_detraccion').value = (total * pct/100).toFixed(2);
 }
 
 function buildFacturaJSON(emp, serie, docTipo){
@@ -1694,7 +2852,11 @@ function buildFacturaJSON(emp, serie, docTipo){
     sumTotalAnticipos: "0.00",
     sumImpVenta: sumImpVenta.toFixed(2),
     ublVersionId: "2.1",
-    customizationId: "2.0"
+    customizationId: "2.0",
+    // Confirmado con archivos .LEY y .TRI reales de tu SFS: toda factura/boleta lleva la leyenda
+    // "SON : ... SOLES" (código 1000) y un resumen de tributos agrupado por código IGV.
+    leyendas: [{ codLeyenda: "1000", desLeyenda: montoEnLetras(sumImpVenta, "PEN") }],
+    tributos: agruparTributos(detalle)
   };
 
   if(esNota){
@@ -1709,26 +2871,42 @@ function buildFacturaJSON(emp, serie, docTipo){
   const leyenda = document.getElementById('f_leyenda').value;
   if(leyenda) cabecera.leyenda = leyenda;
 
+  // Documento relacionado (archivo .REL oficial): array "relacionados", 1=Guía (Catálogo N°12/1).
   const guiaRef = document.getElementById('f_guiaref').value;
-  if(guiaRef) cabecera.guiaRelacionada = guiaRef;
-
-  if(document.getElementById('f_aplica_percepcion').checked){
-    const regSel = document.getElementById('f_regimen_percepcion');
-    cabecera.percepcion = {
-      codRegimenPercepcion: regSel.value,
-      tasaPercepcion: regSel.selectedOptions[0].dataset.tasa,
-      montoPercepcion: parseFloat(document.getElementById('f_monto_percepcion').value || 0).toFixed(2),
-      montoTotalIncluidoPercepcion: (sumImpVenta + (parseFloat(document.getElementById('f_monto_percepcion').value)||0)).toFixed(2)
-    };
+  if(guiaRef){
+    cabecera.relacionados = [{
+      indDocRelacionado: 1, // 1=Guía
+      tipDocRelacionado: "09",
+      numDocRelacionado: guiaRef
+    }];
   }
 
+  // Percepción (archivo .ACV oficial, "variablesGlobales"): 51=Venta interna, 52=Adquisición de
+  // combustible, 53=Tasa especial (Catálogo N°53 SUNAT) — confirmado con el Anexo I oficial.
+  if(document.getElementById('f_aplica_percepcion').checked){
+    const regSel = document.getElementById('f_regimen_percepcion');
+    const montoPerc = parseFloat(document.getElementById('f_monto_percepcion').value || 0);
+    const codVariable = regSel.value === '02' ? '52' : '51'; // '02'=combustible en el select actual
+    cabecera.variablesGlobales = (cabecera.variablesGlobales || []).concat([{
+      tipVariableGlobal: "true",
+      codTipoVariableGlobal: codVariable,
+      porVariableGlobal: (parseFloat(regSel.selectedOptions[0].dataset.tasa)/100).toFixed(2),
+      monMontoVariableGlobal: "PEN",
+      mtoVariableGlobal: montoPerc.toFixed(2),
+      monBaseImponibleVariableGlobal: "PEN",
+      mtoBaseImpVariableGlobal: sumImpVenta.toFixed(2)
+    }]);
+  }
+
+  // Detracción (archivo .ACA oficial, sección "Detracciones"): nombres de campo exactos confirmados.
   if(document.getElementById('f_aplica_detraccion').checked){
-    cabecera.detraccion = {
-      codBienDetraccion: document.getElementById('f_cod_detraccion').value || "",
+    cabecera.adicionalCabecera = Object.assign({}, cabecera.adicionalCabecera, {
       ctaBancoNacionDetraccion: document.getElementById('f_cuenta_detraccion').value || "",
+      codBienDetraccion: document.getElementById('f_cod_detraccion').value || "",
       porDetraccion: document.getElementById('f_pct_detraccion').value || "",
-      montoDetraccion: parseFloat(document.getElementById('f_monto_detraccion').value || 0).toFixed(2)
-    };
+      mtoDetraccion: parseFloat(document.getElementById('f_monto_detraccion').value || 0).toFixed(2),
+      codMedioPago: "001" // Depósito en cuenta (Catálogo N°59) — el más común; avisar si necesitas otro
+    });
   }
 
   if(document.getElementById('f_venta_sector_publico').checked){
@@ -1740,21 +2918,43 @@ function buildFacturaJSON(emp, serie, docTipo){
     };
   }
 
+  // Retención del IGV (archivo .RTN oficial): se activa cuando el CLIENTE te retiene IGV a ti
+  // (agente de retención). Tasa estándar 3% (Régimen General).
   if(document.getElementById('f_aplica_ret_igv').checked){
-    cabecera.indClienteAgenteRetencion = true;
+    const tasaRet = 3;
+    cabecera.retencion = {
+      impOperacion: sumImpVenta.toFixed(2),
+      porRetencion: tasaRet.toFixed(2),
+      impRetencion: (sumImpVenta * tasaRet/100).toFixed(2)
+    };
   }
 
   const placaVenta = document.getElementById('f_placa_venta').value;
   if(placaVenta) cabecera.placaVehiculoVenta = placaVenta;
 
+  // Forma de pago (archivo .PAG oficial, objeto "datoPago") + cuotas (archivo .DPA oficial,
+  // array "detallePago") — nombres de campo exactos confirmados con el Anexo I de SUNAT.
+  const esCredito = document.getElementById('f_formapago') && document.getElementById('f_formapago').value === 'credito';
+  if(esCredito){
+    const totalFinanciado = parseFloat(document.getElementById('f_montofinanciado').value) || 0;
+    const n = parseInt(document.getElementById('f_ncuotas').value) || 0;
+    const montoCuota = n>0 ? parseFloat((totalFinanciado/n).toFixed(2)) : 0;
+    cabecera.datoPago = { formaPago: "Credito", mtoNetoPendientePago: totalFinanciado.toFixed(2), tipMonedaMtoNetoPendientePago: "PEN" };
+    cabecera.detallePago = Array.from({length:n}, (_,i)=>{
+      const fechaEl = document.getElementById(`cuota_fecha_${i+1}`);
+      return { mtoCuotaPago: montoCuota.toFixed(2), fecCuotaPago: fechaEl ? fechaEl.value : "", tipMonedaCuotaPago: "PEN" };
+    });
+  } else {
+    cabecera.datoPago = { formaPago: "Contado", mtoNetoPendientePago: "0.00", tipMonedaMtoNetoPendientePago: "PEN" };
+  }
+
   return { cabecera, detalle };
 }
 
 // ---------- RETENCIÓN / PERCEPCIÓN ----------
-// Nota: el manual oficial SUNAT para estos 2 documentos solo publica el TAG XML (UBL),
-// no un nombre de atributo JSON como en Factura/Guía. Los nombres de campo usados abajo
-// son una adaptación razonable siguiendo el mismo patrón de nombres que el resto de FACTASH
-// (ublVersionId, fecEmision, etc.) — CONFIRMAR con tu SFS antes de usarlo en producción real.
+// Estructura CONFIRMADA con el Anexo I y II oficial de SUNAT (archivo AnexosIyII_Formato1_5.xlsx,
+// hojas "Retencion" y "Percepcion", columna "Archivo JSON - Atributo") — ya no es una adaptación
+// a ciegas, son los nombres de atributo JSON reales que publica SUNAT para estos 2 documentos.
 
 const REGIMEN_RETENCION_TASA = {'01':3, '02':6};
 const REGIMEN_PERCEPCION = {
@@ -1812,57 +3012,94 @@ function calcularRetPer(){
   return {importeRel, montoRetPer, neto};
 }
 
+// Catálogo N°8 SUNAT (tipo de documento relacionado usado en Retención/Percepción) —
+// distinto del catálogo 01 general: aquí 01=Factura, 03=Boleta, 07=Nota Crédito, 08=Nota Débito.
 function buildRetPerJSON(emp, serie, doc){
   const esRetencion = doc === 'retencion';
   const ahora = new Date();
   const {importeRel, montoRetPer, neto} = calcularRetPer();
   const tasa = parseFloat(document.getElementById('rp_tasa').value) || 0;
+  const fechaEmision = ahora.toISOString().slice(0,10);
 
-  const base = {
-    ublVersionId: "2.0",
-    customizationId: "1.0",
-    id: serie,
-    fecEmision: ahora.toISOString().slice(0,10),
-    horEmision: ahora.toTimeString().slice(0,8),
-    numDocEmisor: emp.ruc,
-    tipDocEmisor: "6",
-    rznSocialEmisor: emp.nombre,
-    numDocContraparte: document.getElementById('rp_ruc').value || "",
-    tipDocContraparte: "6",
-    rznSocialContraparte: document.getElementById('rp_razonsocial').value || "",
-    observaciones: "-",
-    documentoRelacionado: {
-      tipDocRelacionado: document.getElementById('rp_tipodocrel').value,
-      numDocRelacionado: document.getElementById('rp_serierel').value || "",
-      fecEmisionRelacionado: document.getElementById('rp_fechaemisionrel').value || "",
-      importeTotalRelacionado: importeRel.toFixed(2),
-      monedaRelacionado: "PEN",
-      fechaMovimiento: document.getElementById('rp_fechamov').value || "",
-      numeroMovimiento: document.getElementById('rp_nummov').value || "1"
-    }
+  // Cabecera (archivo .RET o .PER): campos confirmados con el Anexo I oficial.
+  const cabecera = {
+    fecEmision: fechaEmision,
+    nroDocIdeReceptor: document.getElementById('rp_ruc').value || "",
+    tipDocIdeReceptor: "6",
+    desNomComReceptor: document.getElementById('rp_razonsocial').value || "",
+    desUbiReceptor: document.getElementById('rp_ubigeo').value || "",
+    desDirReceptor: document.getElementById('rp_direccion').value || "",
+    codPaisReceptor: "PE",
+    rznSocialReceptor: document.getElementById('rp_razonsocial').value || ""
   };
 
   if(esRetencion){
-    base.codRegimenRetencion = document.getElementById('rp_regimen').value;
-    base.tasaRetencion = tasa.toFixed(2);
-    base.importeTotalRetenido = montoRetPer.toFixed(2);
-    base.monedaRetenido = "PEN";
-    base.importeTotalPagado = neto.toFixed(2);
-    base.monedaPagado = "PEN";
-    base.documentoRelacionado.importeRetenido = montoRetPer.toFixed(2);
-    base.documentoRelacionado.importeNetoPagado = neto.toFixed(2);
+    cabecera.codRegRetencion = document.getElementById('rp_regimen').value;
+    cabecera.tasRetencion = tasa.toFixed(2);
+    cabecera.desObsRetencion = "-";
+    cabecera.mtoTotRetencion = montoRetPer.toFixed(2);
+    cabecera.codMonRetencion = "PEN";
+    cabecera.mtoImpTotPagRetencion = neto.toFixed(2);
+    cabecera.tipMonImpTotPagRetencion = "PEN";
   } else {
-    base.codRegimenPercepcion = document.getElementById('rp_regimen').value;
-    base.porcentajePercepcion = tasa.toFixed(2);
-    base.importeTotalPercibido = montoRetPer.toFixed(2);
-    base.monedaPercibido = "PEN";
-    base.importeTotalCobrado = neto.toFixed(2);
-    base.monedaCobrado = "PEN";
-    base.documentoRelacionado.importePercibido = montoRetPer.toFixed(2);
-    base.documentoRelacionado.importeTotalCobrado = neto.toFixed(2);
+    cabecera.codRegPercepcion = document.getElementById('rp_regimen').value;
+    cabecera.tasPercepcion = tasa.toFixed(2);
+    cabecera.desObsPercepcion = "-";
+    cabecera.mtoTotPercepcion = montoRetPer.toFixed(2);
+    cabecera.codMonPercepcion = "PEN";
+    cabecera.mtoImpTotPagPercepcion = neto.toFixed(2);
+    cabecera.tipMonImpTotPagPercepcion = "PEN";
   }
 
-  return base;
+  // Detalle (archivo .DRE o .DPE): datos del documento relacionado + el movimiento de pago/cobro.
+  const detalle = [{
+    tipDocRelacionado: document.getElementById('rp_tipodocrel').value,
+    nroDocRelacionado: document.getElementById('rp_serierel').value || "",
+    fecEmiDocRelacionado: document.getElementById('rp_fechaemisionrel').value || "",
+    mtoImpTotDocRelacionado: importeRel.toFixed(2),
+    tipMonDocRelacionado: "PEN",
+    fecPagDocRelacionado: document.getElementById('rp_fechamov').value || "",
+    nroPagDocRelacionado: document.getElementById('rp_nummov').value || "1",
+    mtoPagDocRelacionado: importeRel.toFixed(2),
+    tipMonPagDocRelacionado: "PEN",
+    mtoTotPagNetoDocRelacionado: neto.toFixed(2),
+    tipMonTotPagNetoDocRelacionado: "PEN"
+  }];
+
+  // SUNAT reutiliza el mismo nombre de atributo (mtoRetDocRelacionado/tipMonRetDocRelacionado)
+  // tanto para Retención como para Percepción — confirmado en el Anexo I oficial, hoja "Percepcion".
+  detalle[0].mtoRetDocRelacionado = montoRetPer.toFixed(2);
+  detalle[0].tipMonRetDocRelacionado = "PEN";
+  detalle[0].fecRetDocRelacionado = fechaEmision;
+
+  return { cabecera, detalle };
+}
+
+// Generador TXT para Retención (.RET/.DRE) y Percepción (.PER/.DPE) — orden de columnas
+// confirmado con el Anexo I oficial de SUNAT (hojas "Retencion" y "Percepcion").
+function lineaRET(cab, esRetencion){
+  const prefijo = esRetencion ? 'Retencion' : 'Percepcion';
+  const orden = ["fecEmision","nroDocIdeReceptor","tipDocIdeReceptor","desNomComReceptor","desUbiReceptor",
+    "desDirReceptor","desUrbReceptor","desDepReceptor","desProReceptor","desDisReceptor","codPaisReceptor","rznSocialReceptor",
+    `codReg${prefijo}`, `tas${prefijo}`, `desObs${prefijo}`, `mtoTot${prefijo}`, `codMon${prefijo}`,
+    `mtoImpTotPag${prefijo}`, `tipMonImpTotPag${prefijo}`];
+  return orden.map(k => (cab[k]===undefined||cab[k]===null) ? "" : cab[k]).join('|') + '|';
+}
+function lineaDRE(it){
+  const orden = ["tipDocRelacionado","nroDocRelacionado","fecEmiDocRelacionado","mtoImpTotDocRelacionado","tipMonDocRelacionado",
+    "fecPagDocRelacionado","nroPagDocRelacionado","mtoPagDocRelacionado","tipMonPagDocRelacionado",
+    "mtoRetDocRelacionado","tipMonRetDocRelacionado","fecRetDocRelacionado",
+    "mtoTotPagNetoDocRelacionado","tipMonTotPagNetoDocRelacionado",
+    "tipMonRefTipCambio","tasTipCambio","facTipCambio","fecTipCambio"];
+  return orden.map(k => (it[k]===undefined||it[k]===null) ? "" : it[k]).join('|') + '|';
+}
+async function descargarRetPerTXT(jsonComprobante, ruc, tipoArchivo, serie, esRetencion){
+  const {cabecera, detalle} = jsonComprobante;
+  const extCab = esRetencion ? 'RET' : 'PER';
+  const extDet = esRetencion ? 'DRE' : 'DPE';
+  descargarTXTPlano(lineaRET(cabecera, esRetencion) + '\n', `${ruc}-${tipoArchivo}-${serie}.${extCab}`);
+  await new Promise(r=>setTimeout(r,150));
+  descargarTXTPlano(detalle.map(lineaDRE).join('\n') + '\n', `${ruc}-${tipoArchivo}-${serie}.${extDet}`);
 }
 
 function generarRetPer(){
@@ -1884,6 +3121,7 @@ function generarRetPer(){
   });
 
   descargarJSON(json, `${emp.ruc}-${tipDocArchivo}-${serie}.json`);
+  descargarRetPerTXT(json, emp.ruc, tipDocArchivo, serie, doc==='retencion');
 
   document.getElementById('rp_ruc').value = '';
   document.getElementById('rp_razonsocial').value = '';
@@ -2001,7 +3239,179 @@ async function enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonCompro
   }
 }
 
-async function consultarRucODni(idDoc, idTipoDoc, idNombre, idDireccion, idMsg){
+// Llena los selects de "elegir local propio" (Partida y Llegada) con los locales
+// guardados en Configuración de la empresa actual.
+function renderLocalesSelectsGuia(){
+  const emp = empresas[empresaActual];
+  const locales = emp.locales || [];
+  const opciones = '<option value="">— elegir uno de mis locales (opcional) —</option>' +
+    locales.map(l => `<option value="${l.id}">${l.nombre}</option>`).join('');
+  const selPartida = document.getElementById('g_local_partida');
+  const selLlegada = document.getElementById('g_local_llegada');
+  if(selPartida) selPartida.innerHTML = opciones;
+  if(selLlegada) selLlegada.innerHTML = opciones;
+}
+
+// Al elegir un local del desplegable, rellena el ubigeo y la dirección del campo
+// correspondiente (partida o llegada).
+// Selector de Departamento → Provincia → Distrito (igual que en el portal de SUNAT),
+// usando el catálogo público oficial de ubigeos de Perú. Al elegir un distrito, se
+// rellena automático el código de ubigeo de 6 dígitos (formato INEI, el que usa SUNAT).
+const UBIGEO_API_BASE = 'https://jmc-software-x.github.io/public-ubigeo-pe/data';
+let ubigeoDepartamentosCache = null;
+
+async function cargarDepartamentosUbigeo(){
+  if(ubigeoDepartamentosCache) return ubigeoDepartamentosCache;
+  try{
+    const resp = await fetch(`${UBIGEO_API_BASE}/hierarchy.json`);
+    ubigeoDepartamentosCache = await resp.json();
+  } catch(err){ ubigeoDepartamentosCache = []; }
+  return ubigeoDepartamentosCache;
+}
+
+async function initSelectoresUbigeoGuia(){
+  const departamentos = await cargarDepartamentosUbigeo();
+  const opciones = '<option value="">Departamento</option>' +
+    departamentos.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+  ['g_dpto_partida', 'g_dpto_llegada'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el && el.options.length <= 1) el.innerHTML = opciones;
+  });
+}
+
+// Cuando el motivo es "Compra", el destinatario (quien recibe la mercadería) eres tú mismo —
+// no tiene sentido escribirlo a mano, se llena automático con los datos de tu empresa
+// (Configuración) y se bloquea para evitar errores. Para Venta u otros motivos, el campo
+// vuelve a estar libre para digitar el RUC del cliente a quien le estás vendiendo.
+function onCambioMotivoGuia(){
+  const emp = empresas[empresaActual];
+  const motivoVal = document.getElementById('g_motivo').value;
+  const esCompra = motivoVal === '02';
+  const campoDoc = document.getElementById('g_dest_doc');
+  const campoTipo = document.getElementById('g_dest_tipodoc');
+  const campoNombre = document.getElementById('g_destinatario');
+  const campoDireccion = document.getElementById('g_dest_direccion');
+
+  const boxVT = document.getElementById('boxVentaTerceros');
+  if(boxVT) boxVT.style.display = (motivoVal === '03') ? 'block' : 'none';
+  const boxPL = document.getElementById('boxPuertoLlegada');
+  if(boxPL) boxPL.style.display = (motivoVal === '08' || motivoVal === '09') ? 'block' : 'none';
+
+  if(esCompra){
+    campoDoc.value = emp.ruc;
+    campoTipo.value = '6';
+    campoNombre.value = emp.nombre;
+    campoDireccion.value = emp.direccion || '';
+    campoDoc.readOnly = true;
+    campoTipo.disabled = true;
+    campoNombre.readOnly = true;
+    campoDoc.style.opacity = '0.6';
+    campoNombre.style.opacity = '0.6';
+  } else {
+    // Si venía de "Compra" y el usuario cambia a otro motivo, se limpia y se desbloquea
+    // para que digite el RUC real del cliente al que le está vendiendo.
+    if(campoDoc.readOnly){
+      campoDoc.value = '';
+      campoNombre.value = '';
+      campoDireccion.value = '';
+    }
+    campoDoc.readOnly = false;
+    campoTipo.disabled = false;
+    campoNombre.readOnly = false;
+    campoDoc.style.opacity = '1';
+    campoNombre.style.opacity = '1';
+  }
+
+  // "Elegir de mis comprobantes emitidos" solo aplica cuando el motivo es Venta: ahí sí podemos
+  // autocompletar los productos porque el comprobante lo emitimos nosotros mismos en FACTASH.
+  // En Compra no es posible: SUNAT no expone el detalle de ítems de comprobantes de terceros
+  // (proveedores) a través de ninguna consulta pública, así que ahí el llenado sigue siendo manual.
+  const boxDocVenta = document.getElementById('boxDocRelacionadoVenta');
+  if(boxDocVenta) boxDocVenta.style.display = (document.getElementById('g_motivo').value === '01') ? 'block' : 'none';
+}
+
+function abrirModalDocRelacionado(){
+  const emp = empresas[empresaActual];
+  const propios = emitidos.filter(e=>e.empresa===empresaActual && (e.tipo==='factura'||e.tipo==='boleta') && e.detalle && e.detalle.items && e.detalle.items.length).slice(0,30);
+  const box = document.getElementById('listaDocRelacionado');
+  if(propios.length===0){
+    box.innerHTML = '<div style="font-size:12px; color:var(--text-dim); padding:10px 0;">No hay facturas/boletas emitidas con productos para elegir.</div>';
+  } else {
+    box.innerHTML = propios.map((e,i)=>`
+      <div class="item-row" style="cursor:pointer;" onclick="elegirDocRelacionado(${emitidos.indexOf(e)})">
+        <span style="flex:1;">${e.tipo==='factura'?'FACTURA':'BOLETA'} ${e.serie} — ${e.cliente||''} (${e.detalle.items.length} producto${e.detalle.items.length===1?'':'s'})</span>
+      </div>
+    `).join('');
+  }
+  document.getElementById('modalDocRelacionado').style.display='flex';
+}
+function cerrarModalDocRelacionado(){ document.getElementById('modalDocRelacionado').style.display='none'; }
+function elegirDocRelacionado(idxEmitido){
+  const comp = emitidos[idxEmitido];
+  if(!comp) return;
+  const emp = empresas[empresaActual];
+  document.getElementById('g_docref').value = comp.serie;
+  itemsGuia = comp.detalle.items.map(it=>{
+    const prodCat = emp.productos.find(p=>p.nombre===it.producto);
+    return {
+      id: 'b'+Date.now()+Math.random(),
+      bienNormalizado: false,
+      codigoBien: (prodCat && prodCat.codigo) || '',
+      codSubpartida: '', codProdSunat: (prodCat && prodCat.codigoSunat) || '', codGtin: '',
+      descripcion: it.producto,
+      unidad: (prodCat && prodCat.unidad) || 'NIU',
+      cantidad: it.cant
+    };
+  });
+  renderItemsGuia();
+  cerrarModalDocRelacionado();
+}
+
+async function onCambioDepartamento(cual){
+  const depId = document.getElementById(`g_dpto_${cual}`).value;
+  const selProv = document.getElementById(`g_prov_${cual}`);
+  const selDist = document.getElementById(`g_dist_${cual}`);
+  selProv.innerHTML = '<option value="">Provincia</option>';
+  selDist.innerHTML = '<option value="">Distrito</option>';
+  if(!depId) return;
+  try{
+    const resp = await fetch(`${UBIGEO_API_BASE}/departments/${depId}.json`);
+    const data = await resp.json();
+    selProv.innerHTML = '<option value="">Provincia</option>' +
+      data.provinces.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  } catch(err){ /* si falla la carga, el usuario puede seguir escribiendo el ubigeo a mano */ }
+}
+
+async function onCambioProvincia(cual){
+  const provId = document.getElementById(`g_prov_${cual}`).value;
+  const selDist = document.getElementById(`g_dist_${cual}`);
+  selDist.innerHTML = '<option value="">Distrito</option>';
+  if(!provId) return;
+  try{
+    const resp = await fetch(`${UBIGEO_API_BASE}/provinces/${provId}.json`);
+    const data = await resp.json();
+    selDist.innerHTML = '<option value="">Distrito</option>' +
+      data.districts.map(d => `<option value="${d.inei}">${d.name}</option>`).join('');
+  } catch(err){ /* si falla la carga, el usuario puede seguir escribiendo el ubigeo a mano */ }
+}
+
+function onCambioDistrito(cual){
+  const ubigeo = document.getElementById(`g_dist_${cual}`).value;
+  if(ubigeo) document.getElementById(`g_ubigeo_${cual}`).value = ubigeo;
+}
+
+function usarLocalEnCampo(cual){
+  const emp = empresas[empresaActual];
+  const selId = cual === 'partida' ? 'g_local_partida' : 'g_local_llegada';
+  const idLocal = document.getElementById(selId).value;
+  if(!idLocal) return;
+  const local = (emp.locales||[]).find(l => l.id === idLocal);
+  if(!local) return;
+  document.getElementById(`g_ubigeo_${cual}`).value = local.ubigeo;
+  if(local.direccion) document.getElementById(`g_${cual}`).value = local.direccion;
+}
+
+async function consultarRucODni(idDoc, idTipoDoc, idNombre, idDireccion, idMsg, idUbigeo){
   const numero = document.getElementById(idDoc).value.trim();
 
   if(!numero){ return; }
@@ -2024,6 +3434,12 @@ async function consultarRucODni(idDoc, idTipoDoc, idNombre, idDireccion, idMsg){
     const nombreEncontrado = data.nombre || (data.raw && data.raw.full_name) || '';
     document.getElementById(idNombre).value = nombreEncontrado;
     if(idDireccion && document.getElementById(idDireccion)) document.getElementById(idDireccion).value = data.direccion || '';
+
+    // Ubigeo SUNAT (6 dígitos) — solo viene para RUC (empresas), no para DNI (personas).
+    if(idUbigeo && document.getElementById(idUbigeo)){
+      const ubigeoEncontrado = data.ubigeo || (data.raw && data.raw.ubigeo) || '';
+      if(ubigeoEncontrado) document.getElementById(idUbigeo).value = ubigeoEncontrado;
+    }
 
     if(msgEl){
       msgEl.style.color = nombreEncontrado ? 'var(--accent-2)' : 'var(--danger)';
@@ -2093,6 +3509,22 @@ function validarCampoFechaGuia(){
   const val = document.getElementById('g_fecha').value;
   const {texto, tipo} = calcularMensajeFecha(val);
   mostrarMensajeCampo('msg_g_fecha', texto, tipo);
+
+  // Las 3 fechas deben seguir un orden lógico: Emisión ≤ Entrega al transportista ≤ Inicio de traslado.
+  // Desde jun-2026 (R.S. 000108-2026/SUNAT) la fecha de inicio de traslado es obligatoria cuando
+  // se llenan los datos completos del transportista en la guía Remitente.
+  const emision = document.getElementById('g_fecha').value;
+  const entrega = document.getElementById('g_fecha_entrega') ? document.getElementById('g_fecha_entrega').value : '';
+  const traslado = document.getElementById('g_fecha_traslado') ? document.getElementById('g_fecha_traslado').value : '';
+
+  if(emision && entrega && entrega < emision){
+    alert('La fecha de entrega de bienes al transportista no puede ser anterior a la fecha de emisión.');
+  }
+  if(entrega && traslado && traslado < entrega){
+    alert('La fecha de inicio de traslado no puede ser anterior a la fecha de entrega al transportista.');
+  } else if(emision && traslado && !entrega && traslado < emision){
+    alert('La fecha de inicio de traslado no puede ser anterior a la fecha de emisión.');
+  }
 }
 
 function calcularMensajeFecha(val){
@@ -2133,6 +3565,9 @@ function buildLiquidacionJSON(emp, serie){
   const tipoDocSel = document.getElementById('f_tipodoc').value;
   const fechaEmisionVal = document.getElementById('f_fecha').value;
 
+  // Mismo detalle confirmado que factura/boleta (Catálogo 01 de SUNAT trata la Liquidación de
+  // Compra como parte de la misma familia UBL Invoice, tipDocumento "04") — se reusa la misma
+  // lógica de cálculo e IGV por ítem, ya probada.
   const detalle = items.filter(it=>it.producto).map(it=>{
     const esGravado = it.afectacion === '10';
     const tasa = tasaIGVEmpresa(emp, fechaEmisionVal, it.actividadTurismo);
@@ -2144,9 +3579,15 @@ function buildLiquidacionJSON(emp, serie){
       codUnidadMedida: it.unidad || "NIU",
       ctdUnidadItem: it.cant.toFixed(2),
       codProducto: (prodCat && prodCat.codigo) || "-",
+      codProductoSUNAT: (prodCat && prodCat.codigoSunat) || "-",
       desItem: it.producto,
       mtoValorUnitario: valorUnitario.toFixed(2),
+      sumTotTributosItem: igvItem.toFixed(2),
+      codTriIGV: esGravado ? 1000 : (it.afectacion==='20'?9997:it.afectacion==='30'?9998:it.afectacion==='17'?9995:9996),
       mtoIgvItem: igvItem.toFixed(2),
+      mtoBaseIgvItem: valorVentaItem.toFixed(2),
+      nomTributoIgvItem: "IGV",
+      codTipTributoIgvItem: "VAT",
       tipAfeIGV: it.afectacion,
       porIgvItem: (tasa*100).toFixed(2),
       mtoPrecioVentaUnitario: it.precio.toFixed(2),
@@ -2155,26 +3596,40 @@ function buildLiquidacionJSON(emp, serie){
   });
 
   const sumTotValVenta = detalle.reduce((s,d)=>s+parseFloat(d.mtoValorVentaItem),0);
-  const sumTotTributos = detalle.reduce((s,d)=>s+parseFloat(d.mtoIgvItem),0);
+  const sumTotTributos = detalle.reduce((s,d)=>s+parseFloat(d.sumTotTributosItem),0);
   const sumImpVenta = sumTotValVenta + sumTotTributos;
 
+  // Cabecera con los MISMOS nombres de clave que ya confirmamos en factura/boleta (tipDocUsuario/
+  // numDocUsuario/rznSocialUsuario) — aquí representan al VENDEDOR informal (a quien tú, como
+  // comprador, le emites esta liquidación en su nombre), pero se mantiene el mismo nombre de campo
+  // para que el generador TXT (lineaCAB) funcione igual que con los demás documentos.
   const cabecera = {
-    tipDocumento: "04",
-    fecEmision: document.getElementById('f_fecha').value || ahora.toISOString().slice(0,10),
-    horEmision: horaParaFecha(document.getElementById('f_fecha').value),
-    tipDocVendedor: tipoDocSel,
-    numDocVendedor: document.getElementById('f_doc').value || "-",
-    rznSocialVendedor: document.getElementById('f_cliente').value || "-",
-    ubigeoDomicilioVendedor: document.getElementById('f_liq_ubigeo_dom').value || "",
-    dirDomicilioVendedor: document.getElementById('f_liq_dir_dom').value || "",
-    ubigeoPuntoVenta: document.getElementById('f_liq_ubigeo_pv').value || "",
-    dirPuntoVenta: document.getElementById('f_liq_dir_pv').value || "",
+    tipOperacion: "0200", // Catálogo 51 SUNAT: liquidación de compra
+    fecEmision: fechaEmisionVal || ahora.toISOString().slice(0,10),
+    horEmision: horaParaFecha(fechaEmisionVal),
+    fecVencimiento: "",
+    codLocalEmisor: "",
+    tipDocUsuario: tipoDocSel,
+    numDocUsuario: document.getElementById('f_doc').value || "-",
+    rznSocialUsuario: document.getElementById('f_cliente').value || "-",
     tipMoneda: "PEN",
     sumTotTributos: sumTotTributos.toFixed(2),
     sumTotValVenta: sumTotValVenta.toFixed(2),
+    sumPrecioVenta: sumImpVenta.toFixed(2),
+    sumDescTotal: "0.00",
+    sumOtrosCargos: "0.00",
+    sumTotalAnticipos: "0.00",
     sumImpVenta: sumImpVenta.toFixed(2),
     ublVersionId: "2.1",
-    customizationId: "2.0"
+    customizationId: "2.0",
+    leyendas: [{ codLeyenda: "1000", desLeyenda: montoEnLetras(sumImpVenta, "PEN") }],
+    tributos: agruparTributos(detalle),
+    // Datos propios de la Liquidación de Compra (domicilio del vendedor y punto de venta) — no
+    // tienen equivalente en factura, se mantienen con nombre propio.
+    ubigeoDomicilioVendedor: document.getElementById('f_liq_ubigeo_dom') ? document.getElementById('f_liq_ubigeo_dom').value : "",
+    dirDomicilioVendedor: document.getElementById('f_liq_dir_dom') ? document.getElementById('f_liq_dir_dom').value : "",
+    ubigeoPuntoVenta: document.getElementById('f_liq_ubigeo_pv') ? document.getElementById('f_liq_ubigeo_pv').value : "",
+    dirPuntoVenta: document.getElementById('f_liq_dir_pv') ? document.getElementById('f_liq_dir_pv').value : ""
   };
 
   return { cabecera, detalle };
@@ -2266,6 +3721,10 @@ function generarComprobante(){
 }
 
 // Arma el JSON exacto que espera tu SFS (mismo esquema de campos que tu Hoja2 real)
+function onCambioPagadorEsDestinatario(){
+  document.getElementById('boxPagadorDistinto').style.display = document.getElementById('chk_pagador_es_destinatario').checked ? 'none' : 'block';
+}
+
 function buildGuiaJSON(emp, serie){
   const modalidadCod = document.getElementById('g_modalidad').value; // 01 público / 02 privado
   const esPublico = modalidadCod === '01';
@@ -2275,7 +3734,7 @@ function buildGuiaJSON(emp, serie){
   const cabecera = {
     fecEmision: document.getElementById('g_fecha').value || ahora.toISOString().slice(0,10),
     horEmision: horaStr,
-    tipDocGuia: "09",
+    tipDocGuia: docActualGuia === 'transportista' ? "31" : "09", // 09=Guía Remisión Remitente, 31=Guía Remisión Transportista (Catálogo N°01 SUNAT)
     serNumDocGuia: serie,
     numDocDestinatario: document.getElementById('g_dest_doc').value || "",
     tipDocDestinatario: document.getElementById('g_dest_tipodoc').value || "6",
@@ -2283,37 +3742,132 @@ function buildGuiaJSON(emp, serie){
     dirDestinatario: document.getElementById('g_dest_direccion').value || "",
     motTrasladoDatosEnvio: document.getElementById('g_motivo').value,
     desMotivoTrasladoDatosEnvio: document.getElementById('g_motivo').selectedOptions[0].text,
-    indTransbordoProgDatosEnvio: "false",
+    indTransbordoProgDatosEnvio: (document.getElementById('chk_transbordo') && document.getElementById('chk_transbordo').checked) ? "true" : "false",
     psoBrutoTotalBienesDatosEnvio: parseFloat(document.getElementById('g_peso').value||0).toFixed(3),
     uniMedidaPesoBrutoDatosEnvio: "KGM",
     numBultosDatosEnvio: document.getElementById('g_bultos').value || "1",
     modTrasladoDatosEnvio: modalidadCod,
-    fecInicioTrasladoDatosEnvio: document.getElementById('g_fecha').value || ahora.toISOString().slice(0,10),
-    fecEntregaBienesTransportista: document.getElementById('g_fecha').value || ahora.toISOString().slice(0,10),
-    numDocTransportista: document.getElementById('g_ructrans') ? document.getElementById('g_ructrans').value : "",
+    fecInicioTrasladoDatosEnvio: document.getElementById('g_fecha_traslado').value || document.getElementById('g_fecha').value || ahora.toISOString().slice(0,10),
+    fecEntregaBienesTransportista: document.getElementById('g_fecha_entrega').value || document.getElementById('g_fecha').value || ahora.toISOString().slice(0,10),
+    numDocTransportista: docActualGuia==='remitente' ? (transportistaGuia.length ? transportistaGuia[0].ruc : "") : (document.getElementById('g_ructrans') ? document.getElementById('g_ructrans').value : ""),
     tipDocTransportista: "6",
-    nomTransportista: esPublico ? "" : "",
-    numPlacaTransPrivado: document.getElementById('g_placa') ? document.getElementById('g_placa').value : "",
-    numDocIdeConductorTransPrivado: "",
-    tipDocIdeConductorTransPrivado: "1",
-    nomConductorTransPrivado: document.getElementById('g_conductor') ? document.getElementById('g_conductor').value : "",
+    nomTransportista: docActualGuia==='remitente' ? (transportistaGuia.length ? transportistaGuia[0].razonSocial : "") : "",
+    numPlacaTransPrivado: (document.getElementById('chk_m1l') && document.getElementById('chk_m1l').checked) ? document.getElementById('g_placa_m1l').value : (vehiculosGuia.length ? vehiculosGuia[0].placa : ""),
+    numDocIdeConductorTransPrivado: conductoresGuia.length ? conductoresGuia[0].numDoc : "",
+    tipDocIdeConductorTransPrivado: conductoresGuia.length ? conductoresGuia[0].tipoDoc : "1",
+    nomConductorTransPrivado: conductoresGuia.length ? conductoresGuia[0].nombres : "",
+    // Vehículos y conductores adicionales (ej. tracto+carreta, o más de un conductor).
+    // NOTA: nombre de campo tentativo — falta confirmar con el proveedor del SFS el
+    // esquema exacto que espera para vehículos/conductores adicionales.
+    vehiculosAdicionales: vehiculosGuia.map(v=>({placa:v.placa, tipo:v.tipo, entidadAutorizacion:v.entidad, numAutorizacion:v.numAutorizacion})),
+    conductoresAdicionales: conductoresGuia.map(c=>({licencia:c.licencia, tipoDoc:c.tipoDoc, numDoc:c.numDoc, nombres:c.nombres, tipo:c.tipo})),
+    // Autorización especial para el traslado de la carga (opcional) — ej. SUCAMEC, DIGEMID, MTC, etc.
+    autorizacionesEspeciales: autorizacionesGuia.map(a=>({entidad:a.entidad, numero:a.numero})),
     ubiLlegada: document.getElementById('g_ubigeo_llegada').value || "",
     dirLlegada: document.getElementById('g_llegada').value || "",
     ubiPartida: document.getElementById('g_ubigeo_partida').value || "",
     dirPartida: document.getElementById('g_partida').value || "",
-    obsGuia: "",
+    obsGuia: document.getElementById('g_observaciones') ? document.getElementById('g_observaciones').value.trim() : "",
     ublVersionId: "2.1",
     customizationId: "2.0"
   };
-  if(esPublico){
-    cabecera.numRegistroMTC = document.getElementById('g_mtc') ? document.getElementById('g_mtc').value : "";
+  // ---------- SOLO GUÍA TRANSPORTISTA ----------
+  // Confirmado con un XML real de otra empresa (10283170140-31-EG03-143.xml, aceptado por SUNAT):
+  // la guía Transportista trae 3 partes que Remitente no tiene — Remitente (quien envía),
+  // Pagador del servicio (quien contrata el flete), y Documento relacionado (la guía Remitente
+  // de este traslado). También confirma que SÍ existe vehículo secundario (TransportEquipment/
+  // AttachedTransportEquipment) y conductor con "JobTitle: Principal/Secundario".
+  // OJO: el XML confirma que estos DATOS existen y se envían a SUNAT — pero como es de otra
+  // empresa (no de tu SFS), NO confirma con certeza el nombre exacto de la CLAVE JSON que tu
+  // propio sistema usa para cada uno. Los nombres de abajo siguen el mismo estilo camelCase que
+  // ya confirmamos en tu Remitente real, como mejor conjetura razonada — no como 100% certeza.
+  if(docActualGuia === 'transportista'){
+    cabecera.numDocRemitente = document.getElementById('g_trans_remitente_ruc').value || "";
+    cabecera.tipDocRemitente = "6";
+    cabecera.rznSocialRemitente = document.getElementById('g_trans_remitente_nombre').value || "";
+
+    const pagadorEsDestinatario = document.getElementById('chk_pagador_es_destinatario').checked;
+    if(pagadorEsDestinatario){
+      cabecera.numDocPagadorServicio = cabecera.numDocDestinatario;
+      cabecera.tipDocPagadorServicio = cabecera.tipDocDestinatario;
+      cabecera.rznSocialPagadorServicio = cabecera.rznSocialDestinatario;
+    } else {
+      cabecera.numDocPagadorServicio = document.getElementById('g_trans_pagador_ruc').value || "";
+      cabecera.tipDocPagadorServicio = "6";
+      cabecera.rznSocialPagadorServicio = document.getElementById('g_trans_pagador_nombre').value || "";
+    }
+
+    const relDocNumero = document.getElementById('g_trans_reldoc_numero').value;
+    if(relDocNumero){
+      cabecera.documentoRelacionado = {
+        tipDocRelacionado: document.getElementById('g_trans_reldoc_tipo').value,
+        numDocRelacionado: relDocNumero,
+        numDocRucEmisor: document.getElementById('g_trans_reldoc_ruc').value || ""
+      };
+    }
   }
 
-  const detalle = itemsGuia.filter(it=>it.producto).map(it=>({
+  if(esPublico){
+    cabecera.numRegistroMTC = docActualGuia==='remitente' ? (transportistaGuia.length ? transportistaGuia[0].mtc : "") : (document.getElementById('g_mtc') ? document.getElementById('g_mtc').value : "");
+  }
+
+  // Indicadores de modalidad (faltaban): reflejan en el JSON qué opciones se marcaron en el
+  // formulario — antes se mandaban los datos (placa, vehículo, etc.) pero sin el indicador booleano
+  // que dice explícitamente en qué modo se generó la guía.
+  const esM1L = docActualGuia === 'remitente' && document.getElementById('chk_m1l') && document.getElementById('chk_m1l').checked;
+  cabecera.indTrasladoVehiculoM1L = esM1L ? "true" : "false";
+  if(docActualGuia === 'remitente' && esPublico){
+    const registraTransportista = document.getElementById('chk_registrar_veh_conductor') && document.getElementById('chk_registrar_veh_conductor').checked;
+    cabecera.indDatosTransportista = registraTransportista ? "true" : "false";
+  }
+
+  // Autorización especial DEL TRANSPORTISTA (distinta a la autorización especial de la carga que
+  // ya va en autorizacionesEspeciales) — solo aplica en Público con datos del transportista.
+  if(transportistaGuia.length && transportistaGuia[0].entidad){
+    cabecera.transportistaAutorizacionEspecial = {
+      entidadEmisora: transportistaGuia[0].entidad,
+      numeroAutorizacion: transportistaGuia[0].numAutorizacion || ""
+    };
+  }
+
+  // ---------- CASOS ESPECIALES (para clientes de FACTASH con operaciones distintas al grifo) ----------
+  // Confirmados estructuralmente con el XML real de tu guía Remitente (elementos SellerSupplierParty,
+  // OrderReference, AdditionalDocumentReference, FirstArrivalPortLocation, Consignment — presentes en
+  // el XML aunque vacíos en tu caso concreto, porque tu guía no los necesitaba). Nombres de clave JSON
+  // en el mismo estilo camelCase confirmado — sin dato real que los use todavía, así que quedan como
+  // mejor conjetura razonada hasta que un cliente real los necesite y podamos verificarlo.
+  cabecera.numConsignacion = "001"; // valor fijo observado en tu XML real (cac:Consignment/ID)
+
+  if(document.getElementById('g_vendedor_ruc') && document.getElementById('g_vendedor_ruc').value){
+    cabecera.numDocVendedor = document.getElementById('g_vendedor_ruc').value;
+    cabecera.tipDocVendedor = "6";
+    cabecera.rznSocialVendedor = document.getElementById('g_vendedor_nombre').value || "";
+  }
+
+  if(document.getElementById('chk_guia_baja') && document.getElementById('chk_guia_baja').checked){
+    cabecera.guiaDadaDeBaja = document.getElementById('g_guia_baja_numero').value || "";
+  }
+
+  if(document.getElementById('chk_doc_adicional') && document.getElementById('chk_doc_adicional').checked){
+    cabecera.documentoAdicionalRelacionado = {
+      tipDocAdicional: document.getElementById('g_docadic_tipo').value,
+      numDocAdicional: document.getElementById('g_docadic_numero').value || ""
+    };
+  }
+
+  if(document.getElementById('g_puerto_llegada') && document.getElementById('g_puerto_llegada').value){
+    cabecera.puertoLlegada = document.getElementById('g_puerto_llegada').value;
+  }
+
+  // Confirmado con un JSON real de tu SFS (NubeFacT): el detalle de cada bien SOLO lleva estos
+  // 4 campos — uniMedidaItem, canItem, desItem, codItem. No existen campos separados para
+  // subpartida nacional, GTIN ni bien normalizado; esos datos quedan solo como referencia interna
+  // en FACTASH (para tu catálogo e impresión), pero no se envían al SFS.
+  const detalle = itemsGuia.filter(it=>it.descripcion).map(it=>({
     uniMedidaItem: it.unidad || "NIU",
-    canItem: (parseFloat(it.cant)||0).toFixed(2),
-    desItem: it.producto,
-    codItem: ""
+    canItem: (parseFloat(it.cantidad)||0).toFixed(2),
+    desItem: it.descripcion,
+    codItem: it.codigoBien || ""
   }));
 
   return { cabecera, detalle };
@@ -2321,6 +3875,17 @@ function buildGuiaJSON(emp, serie){
 
 function descargarJSON(objeto, nombreArchivo){
   const blob = new Blob([JSON.stringify(objeto, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombreArchivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function descargarTXTPlano(texto, nombreArchivo){
+  const blob = new Blob([texto], {type:'text/plain'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -2346,7 +3911,7 @@ function generarGuia(){
     monto: null,
     fecha: document.getElementById('g_fecha').value || new Date().toISOString().slice(0,10),
     jsonSFS,
-    detalle: { items: itemsGuia.map(it=>({producto:it.producto, cant:it.cant, unidad:it.unidad})) },
+    detalle: { items: itemsGuia.map(it=>({bienNormalizado:it.bienNormalizado, codigoBien:it.codigoBien, codSubpartida:it.codSubpartida, codProdSunat:it.codProdSunat, codGtin:it.codGtin, descripcion:it.descripcion, unidad:it.unidad, cantidad:it.cantidad})) },
     sunatEstado: 'enviando'
   };
   emitidos.unshift(registro);
@@ -2354,23 +3919,62 @@ function generarGuia(){
   guardarEmpresaEnServidor(empresaActual); // el correlativo de la empresa avanzó
 
   itemsGuia = [];
-  document.getElementById('g_destinatario').value='';
-  document.getElementById('g_dest_doc').value='';
-  document.getElementById('g_dest_direccion').value='';
-  document.getElementById('g_dest_tipodoc').value='6';
+  vehiculosGuia = [];
+  conductoresGuia = [];
+  transportistaGuia = [];
+  autorizacionesGuia = [];
+  renderVehiculosGuia();
+  renderConductoresGuia();
+  renderTransportistaGuia();
+  renderAutorizacionesGuia();
+  if(document.getElementById('chk_registrar_veh_conductor')) document.getElementById('chk_registrar_veh_conductor').checked = false;
+  if(document.getElementById('chk_m1l')) document.getElementById('chk_m1l').checked = false;
+  if(document.getElementById('g_trans_remitente_ruc')){
+    document.getElementById('g_trans_remitente_ruc').value = '';
+    document.getElementById('g_trans_remitente_nombre').value = '';
+    document.getElementById('chk_pagador_es_destinatario').checked = true;
+    document.getElementById('boxPagadorDistinto').style.display = 'none';
+    document.getElementById('g_trans_pagador_ruc').value = '';
+    document.getElementById('g_trans_pagador_nombre').value = '';
+    document.getElementById('g_trans_reldoc_numero').value = '';
+    document.getElementById('g_trans_reldoc_ruc').value = '';
+  }
+  if(document.getElementById('g_vendedor_ruc')){
+    document.getElementById('g_vendedor_ruc').value = '';
+    document.getElementById('g_vendedor_nombre').value = '';
+    document.getElementById('chk_guia_baja').checked = false;
+    document.getElementById('boxGuiaBaja').style.display = 'none';
+    document.getElementById('g_guia_baja_numero').value = '';
+    document.getElementById('chk_doc_adicional').checked = false;
+    document.getElementById('boxDocAdicional').style.display = 'none';
+    document.getElementById('g_docadic_numero').value = '';
+    document.getElementById('g_puerto_llegada').value = '';
+  }
+  if(document.getElementById('chk_transbordo')) document.getElementById('chk_transbordo').checked = false;
+  if(document.getElementById('g_placa_m1l')) document.getElementById('g_placa_m1l').value = '';
+  if(docActualGuia==='remitente') onModalidadChange();
   document.getElementById('g_partida').value='';
   document.getElementById('g_llegada').value='';
+  document.getElementById('g_observaciones').value='';
+  onCambioMotivoGuia(); // si el motivo es Compra, vuelve a llenar el destinatario con los datos propios; si no, limpia normal
+  if(document.getElementById('g_motivo').value !== '02'){
+    document.getElementById('g_destinatario').value='';
+    document.getElementById('g_dest_doc').value='';
+    document.getElementById('g_dest_direccion').value='';
+    document.getElementById('g_dest_tipodoc').value='6';
+  }
   renderTodo();
   cambiarTab('emitidos');
 
-  enviarAlBridgeSiCorresponde(emp, '09', serie, jsonSFS).then(resultado=>{
+  const tipDocGuiaArchivo = docActualGuia === 'transportista' ? '31' : '09';
+  enviarAlBridgeSiCorresponde(emp, tipDocGuiaArchivo, serie, jsonSFS).then(resultado=>{
     if(!resultado.automatico){
       registro.sunatEstado = null;
-      descargarJSON(jsonSFS, `${emp.ruc}-09-${serie}.json`);
+      descargarJSON(jsonSFS, `${emp.ruc}-${tipDocGuiaArchivo}-${serie}.json`);
     } else {
       registro.sunatEstado = resultado.estado === 'aceptado' ? 'aceptado' : (resultado.estado === 'error_conexion' ? 'pendiente' : 'rechazado');
       registro.sunatDescripcion = resultado.descripcion;
-      if(resultado.estado === 'error_conexion') descargarJSON(jsonSFS, `${emp.ruc}-09-${serie}.json`);
+      if(resultado.estado === 'error_conexion') descargarJSON(jsonSFS, `${emp.ruc}-${tipDocGuiaArchivo}-${serie}.json`);
     }
     actualizarEmitidoEnServidor(registro);
     renderTodo();
@@ -2386,22 +3990,26 @@ let filasMasivoProcesadas = [];
 const formatosMasivo = {
   factura: {
     esGuia:false,
-    cabeceraCols: ['Grupo','Cliente','TipoDoc(RUC/DNI/CE/PAS/SD)','NumDoc','Direccion','FormaPago(Contado/Credito)','NumCuotas','GuiaRef'],
-    itemCols: ['Producto','Cantidad','PrecioUnit','Afectacion(Gravado/Exonerado/Inafecto/Exportacion)'],
+    cabeceraCols: ['Grupo','Fecha(AAAA-MM-DD)','Cliente','TipoDoc(RUC/DNI/CE/PAS/SD)','NumDoc','Direccion','FormaPago(Contado/Credito)','NumCuotas','GuiaRef'],
+    itemCols: ['Producto','CodigoProducto','Cantidad','PrecioUnit','Afectacion(Gravado/Exonerado/Inafecto/Exportacion)'],
   },
   boleta: {
     esGuia:false,
-    cabeceraCols: ['Grupo','Cliente','TipoDoc(RUC/DNI/CE/PAS/SD)','NumDoc','Direccion','FormaPago(Contado/Credito)','NumCuotas','GuiaRef'],
-    itemCols: ['Producto','Cantidad','PrecioUnit','Afectacion(Gravado/Exonerado/Inafecto/Exportacion)'],
+    cabeceraCols: ['Grupo','Fecha(AAAA-MM-DD)','Cliente','TipoDoc(RUC/DNI/CE/PAS/SD)','NumDoc','Direccion','FormaPago(Contado/Credito)','NumCuotas','GuiaRef'],
+    itemCols: ['Producto','CodigoProducto','Cantidad','PrecioUnit','Afectacion(Gravado/Exonerado/Inafecto/Exportacion)'],
   },
   remitente: {
     esGuia:true,
-    cabeceraCols: ['Grupo','Destinatario','RUCDestinatario','DirDestinatario','UbigeoPartida','DirPartida','UbigeoLlegada','DirLlegada','Motivo','DocRef'],
+    cabeceraCols: ['Grupo','Fecha(AAAA-MM-DD)','Destinatario','RUCDestinatario','DirDestinatario','UbigeoPartida','DirPartida','UbigeoLlegada','DirLlegada',
+      'Motivo','Modalidad(Publico/Privado)','FechaInicioTraslado','FechaEntregaTransportista','PesoBruto(KG)','NumBultos',
+      'Placa','ConductorDoc','ConductorNombre','ConductorLicencia','RUCTransportista','NombreTransportista','MTC','DocRef'],
     itemCols: ['Producto','Cantidad','Unidad'],
   },
   transportista: {
     esGuia:true,
-    cabeceraCols: ['Grupo','Destinatario','RUCDestinatario','DirDestinatario','UbigeoPartida','DirPartida','UbigeoLlegada','DirLlegada','Modalidad(Publico/Privado)','Motivo','DocRef','Categoria','Placa','RUCTransportista','MTC','Conductor','Licencia'],
+    cabeceraCols: ['Grupo','Fecha(AAAA-MM-DD)','Destinatario','RUCDestinatario','DirDestinatario','UbigeoPartida','DirPartida','UbigeoLlegada','DirLlegada',
+      'FechaInicioTraslado','PesoBruto(KG)','NumBultos','Placa','ConductorDoc','ConductorNombre','ConductorLicencia','MTC',
+      'RemitenteRUC','RemitenteNombre','DocRelacionadoNumero','DocRelacionadoRUC'],
     itemCols: ['Producto','Cantidad','Unidad'],
   },
 };
@@ -2409,10 +4017,43 @@ const formatosMasivo = {
 const AFECTACION_WORD_TO_CODE = {gravado:'10', exonerado:'20', inafecto:'30', exportacion:'17', donacion:'40'};
 const TIPODOC_WORD_TO_CODE = {ruc:'6', dni:'1', ce:'4', pas:'7', sd:'0'};
 
+const EJEMPLOS_MASIVO = {
+  factura: [
+    ['1','2026-07-17','EMPRESA DEMO SAC','RUC','20600052111','AV. EJEMPLO 123 - AYACUCHO','Contado','','','ACEITE VEGETAL 1L','','10','8.50','Gravado'],
+    ['1','2026-07-17','EMPRESA DEMO SAC','RUC','20600052111','AV. EJEMPLO 123 - AYACUCHO','Contado','','','ARROZ EXTRA 1KG','','20','4.20','Gravado'],
+    ['1','2026-07-17','EMPRESA DEMO SAC','RUC','20600052111','AV. EJEMPLO 123 - AYACUCHO','Contado','','','AZUCAR RUBIA 1KG','','5','3.80','Gravado'],
+    ['2','2026-07-17','JUAN PEREZ RAMOS','DNI','45678912','CALLE LAS FLORES 456','Credito','3','','FIDEOS 500G','','15','2.90','Gravado'],
+    ['2','2026-07-17','JUAN PEREZ RAMOS','DNI','45678912','CALLE LAS FLORES 456','Credito','3','','LENTEJA 1KG','','8','5.50','Gravado'],
+  ],
+  boleta: [
+    ['1','2026-07-17','MARIA LOPEZ QUISPE','DNI','12345678','JR. LIMA 200','Contado','','','GASEOSA 500ML','','3','3.50','Gravado'],
+    ['1','2026-07-17','MARIA LOPEZ QUISPE','DNI','12345678','JR. LIMA 200','Contado','','','GALLETAS','','5','1.20','Gravado'],
+    ['2','2026-07-17','PUBLICO GENERAL','SD','','-','Contado','','','PAN FRANCES','','10','0.50','Gravado'],
+  ],
+  remitente: [
+    ['1','2026-07-17','COMITE DE GESTION AYACUCHO 6','20600052111','JIRON LIMA S/N - PINCOCALLA','050110','AA.HH. COVADONGA MZ A2 LOTE 10','050906','JIRON LIMA S/N - PINCOCALLA',
+      '01','Privado','2026-07-18','','5.900','1','C5T760','1','JUAN PEREZ RAMOS','S44276849','','','','',
+      'ACEITE VEGETAL 1L','10','LTR'],
+    ['1','2026-07-17','COMITE DE GESTION AYACUCHO 6','20600052111','JIRON LIMA S/N - PINCOCALLA','050110','AA.HH. COVADONGA MZ A2 LOTE 10','050906','JIRON LIMA S/N - PINCOCALLA',
+      '01','Privado','2026-07-18','','5.900','1','C5T760','1','JUAN PEREZ RAMOS','S44276849','','','','',
+      'ARROZ EXTRA 1KG','20','KGM'],
+    ['2','2026-07-17','JUAN PEREZ RAMOS','45678912','CALLE LAS FLORES 456','050110','AA.HH. COVADONGA MZ A2 LOTE 10','050101','CALLE LAS FLORES 456',
+      '01','Publico','2026-07-18','2026-07-18','12.000','2','','','','',
+      '20612763306','TRANSPORTES ANDINOS SAC','MTC12345','',
+      'FIDEOS 500G','15','KGM'],
+  ],
+  transportista: [
+    ['1','2026-07-17','COMITE DE GESTION AYACUCHO 6','20600052111','JIRON LIMA S/N - PINCOCALLA','050110','AA.HH. COVADONGA MZ A2 LOTE 10','050906','JIRON LIMA S/N - PINCOCALLA',
+      '2026-07-18','5.900','1','C5T760','1','JUAN PEREZ RAMOS','S44276849','MTC12345',
+      '20612763306','ALIMENTOS NUTRITIVOS J&D EIRL','T001-00000751','20612763306',
+      'ACEITE VEGETAL 1L','10','LTR'],
+  ]
+};
 function descargarPlantillaExcel(){
   const f = formatosMasivo[docActualMasivo];
   const headers = [...f.cabeceraCols, ...f.itemCols];
-  const ws = XLSX.utils.aoa_to_sheet([headers]);
+  const filas = [headers, ...(EJEMPLOS_MASIVO[docActualMasivo]||[])];
+  const ws = XLSX.utils.aoa_to_sheet(filas);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Datos');
   XLSX.writeFile(wb, `plantilla_${docActualMasivo}.xlsx`);
@@ -2550,9 +4191,9 @@ function procesarMasivo(){
 }
 
 const MOTIVO_TEXTO_A_CODIGO = {
-  'venta':'01', 'venta sujeta a confirmacion del comprador':'02', 'traslado entre establecimientos de la misma empresa':'04',
+  'venta':'01', 'compra':'02', 'venta sujeta a confirmacion del comprador':'14', 'traslado entre establecimientos de la misma empresa':'04',
   'importacion':'08', 'exportacion':'09', 'otros':'13', 'traslado emisor itinerante cp':'18',
-  'traslado a zona primaria':'19', 'consignacion':'20', 'donacion':'99'
+  'traslado a zona primaria':'19', 'venta con entrega a terceros':'03', 'consignacion':'20', 'donacion':'99'
 };
 function motivoACodigo(texto){
   const key = (texto||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
@@ -2564,11 +4205,13 @@ function buildGuiaJSONMasivo(g, serie, esTransportista){
   const modalidadTexto = (cab['Modalidad(Publico/Privado)']||'Privado').toLowerCase();
   const esPublico = modalidadTexto.startsWith('publ');
   const ahora = new Date();
+  const fechaEmision = cab['Fecha(AAAA-MM-DD)'] || ahora.toISOString().slice(0,10);
+  const conductorDoc = cab['ConductorDoc']||'';
 
   const cabecera = {
-    fecEmision: ahora.toISOString().slice(0,10),
+    fecEmision: fechaEmision,
     horEmision: ahora.toTimeString().slice(0,8),
-    tipDocGuia: "09",
+    tipDocGuia: esTransportista ? "31" : "09", // 09=Guía Remisión Remitente, 31=Guía Remisión Transportista
     serNumDocGuia: serie,
     numDocDestinatario: cab['RUCDestinatario'] || "",
     tipDocDestinatario: (cab['RUCDestinatario']||'').length === 8 ? "1" : "6",
@@ -2577,28 +4220,45 @@ function buildGuiaJSONMasivo(g, serie, esTransportista){
     motTrasladoDatosEnvio: motivoACodigo(cab['Motivo']),
     desMotivoTrasladoDatosEnvio: cab['Motivo'] || "Venta",
     indTransbordoProgDatosEnvio: "false",
-    psoBrutoTotalBienesDatosEnvio: "0.000",
+    psoBrutoTotalBienesDatosEnvio: cab['PesoBruto(KG)'] || "0.000",
     uniMedidaPesoBrutoDatosEnvio: "KGM",
-    numBultosDatosEnvio: "1",
+    numBultosDatosEnvio: cab['NumBultos'] || "1",
     modTrasladoDatosEnvio: esPublico ? "01" : "02",
-    fecInicioTrasladoDatosEnvio: ahora.toISOString().slice(0,10),
-    fecEntregaBienesTransportista: ahora.toISOString().slice(0,10),
-    numDocTransportista: esTransportista ? (cab['RUCTransportista']||"") : "",
+    fecInicioTrasladoDatosEnvio: cab['FechaInicioTraslado'] || fechaEmision,
+    fecEntregaBienesTransportista: cab['FechaEntregaTransportista'] || fechaEmision,
+    numDocTransportista: esTransportista ? "" : (esPublico ? (cab['RUCTransportista']||"") : ""),
     tipDocTransportista: "6",
-    nomTransportista: "",
-    numPlacaTransPrivado: esTransportista ? (cab['Placa']||"") : "",
-    numDocIdeConductorTransPrivado: "",
-    tipDocIdeConductorTransPrivado: "1",
-    nomConductorTransPrivado: esTransportista ? (cab['Conductor']||"") : "",
+    nomTransportista: esTransportista ? "" : (esPublico ? (cab['NombreTransportista']||"") : ""),
+    numPlacaTransPrivado: cab['Placa'] || "",
+    numDocIdeConductorTransPrivado: conductorDoc,
+    tipDocIdeConductorTransPrivado: conductorDoc.length === 8 ? "1" : "6",
+    nomConductorTransPrivado: cab['ConductorNombre'] || "",
     ubiLlegada: cab['UbigeoLlegada'] || "",
     dirLlegada: cab['DirLlegada'] || "",
     ubiPartida: cab['UbigeoPartida'] || "",
     dirPartida: cab['DirPartida'] || "",
-    obsGuia: "",
+    obsGuia: cab['ConductorLicencia'] ? `LICENCIA: ${cab['ConductorLicencia']}` : "",
     ublVersionId: "2.1",
     customizationId: "2.0"
   };
-  if(esPublico && esTransportista) cabecera.numRegistroMTC = cab['MTC'] || "";
+  if(esPublico || esTransportista) cabecera.numRegistroMTC = cab['MTC'] || "";
+
+  // Solo Guía Transportista: Remitente (quien envía), y documento relacionado a la guía Remitente
+  // original — mismo criterio "sin confirmar 100%" que en el formulario individual.
+  if(esTransportista){
+    cabecera.numDocRemitente = cab['RemitenteRUC'] || "";
+    cabecera.tipDocRemitente = "6";
+    cabecera.rznSocialRemitente = cab['RemitenteNombre'] || "";
+    if(cab['DocRelacionadoNumero']){
+      cabecera.documentoRelacionado = {
+        tipDocRelacionado: "09",
+        numDocRelacionado: cab['DocRelacionadoNumero'],
+        numDocRucEmisor: cab['DocRelacionadoRUC'] || ""
+      };
+    }
+  } else if(cab['DocRef']){
+    cabecera.documentoRelacionado = { tipDocRelacionado: "01", numDocRelacionado: cab['DocRef'], numDocRucEmisor: "" };
+  }
 
   const detalle = g.items.map(it=>({
     uniMedidaItem: it['Unidad'] || "NIU",
@@ -2615,7 +4275,8 @@ function buildFacturaJSONMasivo(g, serie, docTipo){
   const cab = g.cabecera;
   const tipDocMap = {ruc:'6', dni:'1', ce:'4', pas:'7', sd:'0'};
   const tipDocUsuario = tipDocMap[(cab['TipoDoc(RUC/DNI/CE/PAS/SD)']||'RUC').toLowerCase()] || '6';
-  const tasa = tasaIGVEmpresa(empresas[empresaActual], ahora.toISOString().slice(0,10));
+  const fechaEmision = cab['Fecha(AAAA-MM-DD)'] || ahora.toISOString().slice(0,10);
+  const tasa = tasaIGVEmpresa(empresas[empresaActual], fechaEmision);
 
   const detalle = g.items.map(it=>{
     const afectTexto = (it['Afectacion(Gravado/Exonerado/Inafecto/Exportacion)']||'Gravado').toLowerCase();
@@ -2629,7 +4290,7 @@ function buildFacturaJSONMasivo(g, serie, docTipo){
     return {
       codUnidadMedida: "NIU",
       ctdUnidadItem: cant.toFixed(2),
-      codProducto: "-",
+      codProducto: it['CodigoProducto'] || "-",
       codProductoSUNAT: "-",
       desItem: it['Producto']||"",
       mtoValorUnitario: valorUnitario.toFixed(2),
@@ -2652,7 +4313,7 @@ function buildFacturaJSONMasivo(g, serie, docTipo){
 
   const cabecera = {
     tipOperacion: "0101",
-    fecEmision: ahora.toISOString().slice(0,10),
+    fecEmision: fechaEmision,
     horEmision: ahora.toTimeString().slice(0,8),
     fecVencimiento: "-",
     codLocalEmisor: "-",
@@ -2668,16 +4329,37 @@ function buildFacturaJSONMasivo(g, serie, docTipo){
     sumTotalAnticipos: "0.00",
     sumImpVenta: sumImpVenta.toFixed(2),
     ublVersionId: "2.1",
-    customizationId: "2.0"
+    customizationId: "2.0",
+    // Confirmado con tus archivos .LEY y .TRI reales: son obligatorios en todo comprobante,
+    // el import masivo se había quedado sin esto — ya corregido.
+    leyendas: [{ codLeyenda: "1000", desLeyenda: montoEnLetras(sumImpVenta, "PEN") }],
+    tributos: agruparTributos(detalle)
   };
+
+  if(cab['Direccion']) cabecera.dirDomicilioUsuario = cab['Direccion'];
+  if(cab['GuiaRef']) cabecera.relacionados = [{ indDocRelacionado: 1, tipDocRelacionado: "09", numDocRelacionado: cab['GuiaRef'] }];
+
+  const esCredito = (cab['FormaPago(Contado/Credito)']||'').toLowerCase().startsWith('cred');
+  if(esCredito){
+    const n = parseInt(cab['NumCuotas'])||1;
+    const montoCuota = parseFloat((sumImpVenta/n).toFixed(2));
+    cabecera.datoPago = { formaPago: "Credito", mtoNetoPendientePago: sumImpVenta.toFixed(2), tipMonedaMtoNetoPendientePago: "PEN" };
+    // Sin fechas de vencimiento en la plantilla masiva (no se pidieron columnas por cuota individual);
+    // se reparten mensuales desde la fecha de emisión como aproximación razonable.
+    cabecera.detallePago = Array.from({length:n}, (_,i)=>{
+      const fv = new Date(fechaEmision); fv.setMonth(fv.getMonth()+i+1);
+      return { mtoCuotaPago: montoCuota.toFixed(2), fecCuotaPago: fv.toISOString().slice(0,10), tipMonedaCuotaPago: "PEN" };
+    });
+  } else {
+    cabecera.datoPago = { formaPago: "Contado", mtoNetoPendientePago: "0.00", tipMonedaMtoNetoPendientePago: "PEN" };
+  }
 
   return { cabecera, detalle };
 }
 
-function confirmarMasivo(){
+async function confirmarMasivo(){
   const emp = empresas[empresaActual];
   const f = formatosMasivo[docActualMasivo];
-  const loteJSON = [];
 
   // Regla SFS: boletas >S/700 requieren DNI (8 dígitos) del cliente
   if(docActualMasivo === 'boleta'){
@@ -2686,8 +4368,6 @@ function confirmarMasivo(){
       const montoGrupo = g.items.reduce((s,it)=>{
         const cant = parseFloat(it['Cantidad'])||0;
         const precio = parseFloat(it['PrecioUnit'])||0;
-        const afect = (it['Afectacion(Gravado/Exonerado/Inafecto/Exportacion)']||'gravado').toLowerCase();
-        const igv = afect==='gravado' ? tasaIGVEmpresa(empresas[empresaActual], new Date().toISOString().slice(0,10)) : 0;
         return s + cant*precio; // el precio ya incluye IGV
       },0);
       const tipoDocGrupo = (g.cabecera['TipoDoc(RUC/DNI/CE/PAS/SD)']||'').toLowerCase();
@@ -2702,28 +4382,32 @@ function confirmarMasivo(){
     }
   }
 
-  filasMasivoProcesadas.forEach(g=>{
+  const total = filasMasivoProcesadas.length;
+  const conBridge = !!emp.bridgeEmpresaId;
+  document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">⏳ Enviando 0/${total}...</div>`;
+
+  let ok = 0, rechazados = 0, sinConexion = 0;
+
+  for(const g of filasMasivoProcesadas){
     const correlativo = emp.correlativos[docActualMasivo]++;
     const serie = `${emp.series[docActualMasivo]}-${String(correlativo).padStart(8,'0')}`;
     let monto = null;
+    let jsonDoc, tipDocArchivo;
     if(!f.esGuia){
       monto = g.items.reduce((s,it)=>{
         const cant = parseFloat(it['Cantidad'])||0;
         const precio = parseFloat(it['PrecioUnit'])||0;
-        const afect = (it['Afectacion(Gravado/Exonerado/Inafecto/Exportacion)']||'gravado').toLowerCase();
-        const igv = afect==='gravado' ? tasaIGVEmpresa(empresas[empresaActual], new Date().toISOString().slice(0,10)) : 0;
         return s + cant*precio; // el precio ya incluye IGV
       },0);
-      const jsonFactura = buildFacturaJSONMasivo(g, serie, docActualMasivo);
-      const tipDocArchivo = (docActualMasivo==='factura') ? '01' : '03';
-      loteJSON.push({ archivo: `${emp.ruc}-${tipDocArchivo}-${serie}.json`, ...jsonFactura });
+      jsonDoc = buildFacturaJSONMasivo(g, serie, docActualMasivo);
+      tipDocArchivo = (docActualMasivo==='factura') ? '01' : '03';
     } else {
-      const jsonGuia = buildGuiaJSONMasivo(g, serie, docActualMasivo==='transportista');
-      loteJSON.push({ archivo: `${emp.ruc}-09-${serie}.json`, ...jsonGuia });
+      jsonDoc = buildGuiaJSONMasivo(g, serie, docActualMasivo==='transportista');
+      tipDocArchivo = docActualMasivo==='transportista' ? '31' : '09';
     }
     const nombreCab = g.cabecera['Cliente'] || g.cabecera['Destinatario'] || '(sin nombre)';
 
-    emitidos.unshift({
+    const registro = {
       empresa: empresaActual,
       grupo: f.esGuia ? 'guias' : 'facturacion',
       tipo: docActualMasivo,
@@ -2731,19 +4415,41 @@ function confirmarMasivo(){
       cliente: `${nombreCab} (${g.grupo})`,
       monto,
       fecha: new Date().toISOString().slice(0,10),
-      detalle: g // queda guardado el detalle completo (cabecera + items) por si se necesita luego
-    });
-  });
+      detalle: g, // queda guardado el detalle completo (cabecera + items) por si se necesita luego
+      jsonSUNAT: jsonDoc,
+      sunatEstado: conBridge ? 'enviando' : null
+    };
+    emitidos.unshift(registro);
+    guardarEmitidoEnServidor(registro);
 
-  if(loteJSON.length){
-    const prefijo = f.esGuia ? 'lote_guias' : 'lote_comprobantes';
-    descargarJSON(loteJSON, `${prefijo}_${emp.usuario}_${new Date().toISOString().slice(0,10)}.json`);
+    if(conBridge){
+      const resultado = await enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonDoc);
+      if(resultado.automatico){
+        registro.sunatEstado = resultado.estado === 'aceptado' ? 'aceptado' : 'rechazado';
+        registro.sunatDescripcion = resultado.descripcion;
+        if(resultado.estado === 'aceptado') ok++; else rechazados++;
+      } else {
+        registro.sunatEstado = 'pendiente';
+        registro.sunatDescripcion = 'Sin conexión al servidor — no se pudo enviar automáticamente.';
+        sinConexion++;
+      }
+      actualizarEmitidoEnServidor(registro);
+    } else {
+      sinConexion++;
+    }
+
+    document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">⏳ Enviando ${ok+rechazados+sinConexion}/${total}...</div>`;
   }
 
-  const total = filasMasivoProcesadas.length;
+  guardarEmpresaEnServidor(empresaActual); // avanzó el correlativo de la empresa
+
   filasMasivoProcesadas = [];
   document.getElementById('masivoInput').value = '';
-  document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">✅ ${total} documento(s) generado(s) correctamente</div>`;
+  if(conBridge){
+    document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">✅ ${ok} aceptado(s) · ✕ ${rechazados} rechazado(s) · ⚠ ${sinConexion} sin conexión (de ${total})</div>`;
+  } else {
+    document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">✅ ${total} documento(s) generado(s). Esta empresa no tiene "Envío automático a SUNAT" configurado en Configuración — actívalo para que el masivo se mande directo a tu servidor sin descargar nada.</div>`;
+  }
   document.getElementById('btnConfirmarMasivo').style.display = 'none';
   document.getElementById('resumenMasivo').textContent = '';
   renderTodo();
@@ -2922,6 +4628,30 @@ function guardarConfigEmpresa(){
   guardarEmpresaEnServidor(empresaActual);
 }
 
+function agregarLocalEmpresa(){
+  const emp = empresas[empresaActual];
+  const nombre = document.getElementById('local_nombre').value.trim();
+  const ubigeo = document.getElementById('local_ubigeo').value.trim();
+  const direccion = document.getElementById('local_direccion').value.trim();
+  if(!nombre || !ubigeo || ubigeo.length !== 6){ alert('Pon un nombre y un ubigeo válido de 6 dígitos.'); return; }
+  if(!emp.locales) emp.locales = [];
+  emp.locales.push({ id: 'l'+Date.now(), nombre, ubigeo, direccion });
+  document.getElementById('local_nombre').value = '';
+  document.getElementById('local_ubigeo').value = '';
+  document.getElementById('local_direccion').value = '';
+  renderConfigEmpresa();
+  guardarEmpresaEnServidor(empresaActual);
+  autoguardarLocal();
+}
+
+function eliminarLocalEmpresa(id){
+  const emp = empresas[empresaActual];
+  emp.locales = (emp.locales||[]).filter(l=>l.id!==id);
+  renderConfigEmpresa();
+  guardarEmpresaEnServidor(empresaActual);
+  autoguardarLocal();
+}
+
 function agregarBancoEmpresa(){
   const emp = empresas[empresaActual];
   const cuenta = document.getElementById('banco_cuenta').value.trim();
@@ -2970,6 +4700,14 @@ function renderConfigEmpresa(){
     const el = document.getElementById(`cfg_correl_${tipo}`);
     if(el){ el.value = ''; el.placeholder = `Actual: ${emp.correlativos[tipo] || 1}`; }
   });
+
+  document.getElementById('listaLocales').innerHTML = (emp.locales||[]).map(l=>`
+    <div class="list-item">
+      <div class="top"><span class="serie">${l.nombre}</span></div>
+      <div class="cliente">Ubigeo: ${l.ubigeo}${l.direccion?' · '+l.direccion:''}</div>
+      <button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-size:10px; margin-top:6px;" onclick="eliminarLocalEmpresa('${l.id}')">🗑️ Eliminar</button>
+    </div>
+  `).join('') || `<div class="empty-state">Sin locales registrados — agrega al menos uno para poder elegirlo en Guías</div>`;
 
   document.getElementById('listaBancos').innerHTML = (emp.bancos||[]).map(b=>`
     <div class="list-item">
@@ -3108,6 +4846,8 @@ function renderEmitidos(){
       <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'a4')">📄 PDF A4</button>
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'ticket')">🧾 Ticket</button>
+        ${['factura','boleta','nc','nd','liquidacion'].includes(e.tipo) && e.jsonSUNAT ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="descargarComprobanteTXTZip(emitidos[${idx}].jsonSUNAT, emp.ruc, '${{factura:'01',boleta:'03',nc:'07',nd:'08',liquidacion:'04'}[e.tipo]}', emitidos[${idx}].serie)">🗂️ Descargar archivos TXT (.CAB/.DET/...)</button>` : ''}
+        ${['retencion','percepcion'].includes(e.tipo) && e.jsonSUNAT ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="descargarRetPerTXT(emitidos[${idx}].jsonSUNAT, emp.ruc, '${e.tipo==='retencion'?'20':'40'}', emitidos[${idx}].serie, ${e.tipo==='retencion'})">🗂️ Descargar archivos TXT (${e.tipo==='retencion'?'.RET/.DRE':'.PER/.DPE'})</button>` : ''}
         ${!emp.bridgeEmpresaId ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="document.getElementById('cdrInput_${idx}').click()">📥 Cargar CDR SUNAT</button>
         <input type="file" id="cdrInput_${idx}" accept=".xml" style="display:none;" onchange="cargarCDR(${idx}, this.files[0])">` : ''}
         ${e.anulado ? `<span class="badge nc">ANULADO</span>` : `<button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="anularComprobante(${idx})">🗑️ Anular</button>`}
@@ -3181,6 +4921,7 @@ function generarResumenDiario(){
 
 function anularComprobante(idx){
   const e = emitidos[idx];
+  const esRetPer = e.tipo === 'retencion' || e.tipo === 'percepcion';
   const motivo = prompt('Motivo de la anulación (ej. Error en el RUC del cliente, Error en el monto, etc.):');
   if(motivo === null) return; // canceló
   if(!motivo.trim()){
@@ -3190,21 +4931,52 @@ function anularComprobante(idx){
 
   const emp = empresas[e.empresa];
   const ahora = new Date();
+  const fechaHoy = ahora.toISOString().slice(0,10).replace(/-/g,'');
+
+  if(esRetPer){
+    // Retención/Percepción usan "Reversión" (.RDR), NO Comunicación de Baja (.CBA) — confirmado
+    // con la hoja oficial "Reversión" del Anexo II (tipDocBaja 20=Retención, 40=Percepción).
+    const correlativoRev = (emp.correlativos.reversion = (emp.correlativos.reversion||0) + 1);
+    const reversion = {
+      resumenReversion: [{
+        fecGeneracion: e.fecha,
+        fecComunicacion: ahora.toISOString().slice(0,10),
+        tipDocBaja: e.tipo === 'retencion' ? '20' : '40',
+        numDocBaja: e.serie,
+        desMotivoBaja: motivo.trim()
+      }]
+    };
+    e.anulado = true;
+    e.motivoAnulacion = motivo.trim();
+    guardarEmpresaEnServidor(e.empresa);
+    descargarJSON(reversion, `${emp.ruc}-RR-${fechaHoy}-${String(correlativoRev).padStart(3,'0')}.json`);
+    descargarTXTPlano(reversion.resumenReversion.map(r=>`${r.fecGeneracion}|${r.fecComunicacion}|${r.tipDocBaja}|${r.numDocBaja}|${r.desMotivoBaja}|`).join('\n')+'\n', `${emp.ruc}-RR-${fechaHoy}-${String(correlativoRev).padStart(3,'0')}.RDR`);
+    renderTodo();
+    return;
+  }
+
+
+  // Correlativo propio de la comunicación (independiente del documento anulado) — formato n..3,
+  // confirmado con el patrón de nombre de archivo RRRRRRRRRRR-RA-YYYYMMDD-CCC.CBA del Anexo II oficial.
+  const correlativoBaja = (emp.correlativos.comunicacionBaja = (emp.correlativos.comunicacionBaja||0) + 1);
+  const correlativoStr = String(correlativoBaja).padStart(3,'0');
 
   const comunicacionBaja = {
-    resumenBajas: {
+    resumenBajas: [{
       fecGeneracion: e.fecha,
       fecComunicacion: ahora.toISOString().slice(0,10),
       tipDocBaja: TIPO_DOC_CATALOGO1[e.tipo] || '01',
       numDocBaja: e.serie,
       desMotivoBaja: motivo.trim()
-    }
+    }]
   };
 
   e.anulado = true;
   e.motivoAnulacion = motivo.trim();
+  guardarEmpresaEnServidor(e.empresa); // avanzó el correlativo de comunicación de baja
 
-  descargarJSON(comunicacionBaja, `${emp.ruc}-RA-${ahora.toISOString().slice(0,10).replace(/-/g,'')}-${e.serie.replace('/','')}.json`);
+  descargarJSON(comunicacionBaja, `${emp.ruc}-RA-${fechaHoy}-${correlativoStr}.json`);
+  descargarTXTPlano(comunicacionBaja.resumenBajas.map(r=>`${r.fecGeneracion}|${r.fecComunicacion}|${r.tipDocBaja}|${r.numDocBaja}|${r.desMotivoBaja}|`).join('\n')+'\n', `${emp.ruc}-RA-${fechaHoy}-${correlativoStr}.CBA`);
 
   renderTodo();
 }
@@ -3252,12 +5024,15 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
 
   const filasGuia = filasItems.map(it => `
     <tr>
+      <td style="text-align:center;">${it.bienNormalizado ? 'SÍ' : 'NO'}</td>
       <td>${it.codigo!=='-' ? it.codigo : ''}</td>
-      <td style="text-align:right;">${(parseFloat(it.cant)||0).toFixed(2)}</td>
-      <td style="text-align:center;">${it.unidad||'UND'}</td>
+      <td>${it.codProdSunat||''}</td>
+      <td>${it.codGtin||''}</td>
       <td>${it.desc}</td>
+      <td style="text-align:center;">${it.unidad||'UND'}</td>
+      <td style="text-align:right;">${(parseFloat(it.cant)||0).toFixed(2)}</td>
     </tr>
-  `).join('') || `<tr><td colspan="4" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
+  `).join('') || `<tr><td colspan="7" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
 
   // Link oficial de consulta pública SUNAT para verificar la guía (mismo dominio que usa
   // el propio QR una vez que SUNAT acepta el documento).
@@ -3373,10 +5148,13 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
       <table class="items">
         <thead>
           <tr>
-            <th style="width:14%;">Código</th>
-            <th style="width:10%; text-align:right;">Cant.</th>
-            <th style="width:10%; text-align:center;">U.M.</th>
-            <th>Descripción</th>
+            <th style="width:8%; text-align:center;">Bien norm.</th>
+            <th style="width:12%;">Código de Bien</th>
+            <th style="width:12%;">Cód. prod. SUNAT</th>
+            <th style="width:10%;">Cód. GTIN</th>
+            <th>Descripción Detallada</th>
+            <th style="width:9%; text-align:center;">Unid.</th>
+            <th style="width:9%; text-align:right;">Cant.</th>
           </tr>
         </thead>
         <tbody>${filasGuia}</tbody>
@@ -3433,6 +5211,20 @@ function imprimirComprobante(idx, formato){
   let filasItems = [];
   if(e.detalle && e.detalle.items){
     filasItems = e.detalle.items.map(it => {
+      if(esGuia){
+        // Guías usan la estructura real de "bienes" de SUNAT (código, subpartida, GTIN, etc).
+        return {
+          bienNormalizado: !!it.bienNormalizado,
+          codigo: it.codigoBien || '-',
+          codProdSunat: it.codProdSunat || '',
+          codSubpartida: it.codSubpartida || '',
+          codGtin: it.codGtin || '',
+          desc: it.descripcion || '',
+          cant: it.cantidad || 0,
+          unidad: it.unidad || '',
+          precio: 0
+        };
+      }
       const nombreProd = it['Producto']||it.producto||'';
       const prodCat = emp.productos.find(p=>p.nombre===nombreProd);
       return {
@@ -3653,6 +5445,11 @@ function renderTodo(){
   actualizarFormatoMasivo();
   actualizarSeriesVisibles();
   renderConfigEmpresa();
+  renderLocalesSelectsGuia();
+  renderVehiculosGuia();
+  renderConductoresGuia();
+  renderTransportistaGuia();
+  renderAutorizacionesGuia();
 }
 
 // Corrige el bug donde el recuadro de serie mostraba siempre "F001-00000001" fijo,
@@ -3786,7 +5583,10 @@ window.addEventListener('beforeunload', autoguardarLocal);
 
 // init — solo prepara items vacíos, la app se muestra recién tras login
 agregarItem();
-agregarItemGuia();
+renderItemsGuia();
+initSelectoresUbigeoGuia();
+onModalidadChange();
+onCambioMotivoGuia();
 </script>
 
 </body>
