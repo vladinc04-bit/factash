@@ -3756,13 +3756,6 @@ function buildGuiaJSON(emp, serie){
     numDocIdeConductorTransPrivado: conductoresGuia.length ? conductoresGuia[0].numDoc : "",
     tipDocIdeConductorTransPrivado: conductoresGuia.length ? conductoresGuia[0].tipoDoc : "1",
     nomConductorTransPrivado: conductoresGuia.length ? conductoresGuia[0].nombres : "",
-    // Vehículos y conductores adicionales (ej. tracto+carreta, o más de un conductor).
-    // NOTA: nombre de campo tentativo — falta confirmar con el proveedor del SFS el
-    // esquema exacto que espera para vehículos/conductores adicionales.
-    vehiculosAdicionales: vehiculosGuia.map(v=>({placa:v.placa, tipo:v.tipo, entidadAutorizacion:v.entidad, numAutorizacion:v.numAutorizacion})),
-    conductoresAdicionales: conductoresGuia.map(c=>({licencia:c.licencia, tipoDoc:c.tipoDoc, numDoc:c.numDoc, nombres:c.nombres, tipo:c.tipo})),
-    // Autorización especial para el traslado de la carga (opcional) — ej. SUCAMEC, DIGEMID, MTC, etc.
-    autorizacionesEspeciales: autorizacionesGuia.map(a=>({entidad:a.entidad, numero:a.numero})),
     ubiLlegada: document.getElementById('g_ubigeo_llegada').value || "",
     dirLlegada: document.getElementById('g_llegada').value || "",
     ubiPartida: document.getElementById('g_ubigeo_partida').value || "",
@@ -3812,13 +3805,29 @@ function buildGuiaJSON(emp, serie){
   }
 
   // Indicadores de modalidad (faltaban): reflejan en el JSON qué opciones se marcaron en el
-  // formulario — antes se mandaban los datos (placa, vehículo, etc.) pero sin el indicador booleano
-  // que dice explícitamente en qué modo se generó la guía.
+  // Indicadores de modalidad — SOLO se agregan cuando aplican de verdad (no siempre en "false"),
+  // porque encontramos evidencia real de que el SFS de NUTRI puede rechazar el JSON completo si
+  // trae campos que no reconoce (guía T001-00000752, 17 jul 2026 — rechazada con estos campos
+  // presentes aunque fueran "false"/vacíos; tu guía real aceptada T001-00000751 no los tenía).
   const esM1L = docActualGuia === 'remitente' && document.getElementById('chk_m1l') && document.getElementById('chk_m1l').checked;
-  cabecera.indTrasladoVehiculoM1L = esM1L ? "true" : "false";
+  if(esM1L) cabecera.indTrasladoVehiculoM1L = "true";
   if(docActualGuia === 'remitente' && esPublico){
     const registraTransportista = document.getElementById('chk_registrar_veh_conductor') && document.getElementById('chk_registrar_veh_conductor').checked;
-    cabecera.indDatosTransportista = registraTransportista ? "true" : "false";
+    if(registraTransportista) cabecera.indDatosTransportista = "true";
+  }
+
+  // Vehículo/conductor SECUNDARIO (tracto+carreta, más de un conductor) — solo si hay más de uno.
+  // Autorización especial de la carga — solo si se agregó alguna.
+  // Siguen "sin confirmar" (nombre de clave no probado con SUNAT real), pero ahora al menos no se
+  // envían vacíos en el caso normal de un solo vehículo/conductor, que es tu operación de siempre.
+  if(vehiculosGuia.length > 1){
+    cabecera.vehiculosAdicionales = vehiculosGuia.slice(1).map(v=>({placa:v.placa, tipo:v.tipo}));
+  }
+  if(conductoresGuia.length > 1){
+    cabecera.conductoresAdicionales = conductoresGuia.slice(1).map(c=>({licencia:c.licencia, tipoDoc:c.tipoDoc, numDoc:c.numDoc, nombres:c.nombres, tipo:c.tipo}));
+  }
+  if(autorizacionesGuia.length){
+    cabecera.autorizacionesEspeciales = autorizacionesGuia.map(a=>({entidad:a.entidad, numero:a.numero}));
   }
 
   // Autorización especial DEL TRANSPORTISTA (distinta a la autorización especial de la carga que
@@ -3836,7 +3845,9 @@ function buildGuiaJSON(emp, serie){
   // el XML aunque vacíos en tu caso concreto, porque tu guía no los necesitaba). Nombres de clave JSON
   // en el mismo estilo camelCase confirmado — sin dato real que los use todavía, así que quedan como
   // mejor conjetura razonada hasta que un cliente real los necesite y podamos verificarlo.
-  cabecera.numConsignacion = "001"; // valor fijo observado en tu XML real (cac:Consignment/ID)
+  // numConsignacion NO se manda — no estaba en tu JSON real aceptado (T001-00000751), el SFS
+  // probablemente lo genera solo internamente. Se había agregado por comparación con el XML pero
+  // sin evidencia real de que haga falta — quitado tras el rechazo de T001-00000752.
 
   if(document.getElementById('g_vendedor_ruc') && document.getElementById('g_vendedor_ruc').value){
     cabecera.numDocVendedor = document.getElementById('g_vendedor_ruc').value;
