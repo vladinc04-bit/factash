@@ -4838,11 +4838,12 @@ function renderEmitidos(){
       </div>
       <div class="cliente">${e.cliente} · ${e.fecha} ${
         e.sunatEstado==='aceptado' ? '<span class="badge fact" style="margin-left:6px;">✓ Aceptado SUNAT</span>' :
-        e.sunatEstado==='rechazado' ? `<span class="badge nc" style="margin-left:6px;" title="${(e.sunatDescripcion||'').replace(/"/g,'')}">✕ Rechazado SUNAT</span>` :
+        e.sunatEstado==='rechazado' ? `<span class="badge nc" style="margin-left:6px;">✕ Rechazado SUNAT</span>` :
         e.sunatEstado==='enviando' ? '<span class="badge" style="margin-left:6px; opacity:.6;">⏳ Enviando a SUNAT...</span>' :
-        e.sunatEstado==='pendiente' ? `<span class="badge" style="margin-left:6px; opacity:.7;" title="${(e.sunatDescripcion||'').replace(/"/g,'')}">⚠ Sin conexión — JSON descargado</span>` :
+        e.sunatEstado==='pendiente' ? `<span class="badge" style="margin-left:6px; opacity:.7;">⚠ Sin conexión — JSON descargado</span>` :
         (e.grupo==='guias' ? '<span class="badge" style="margin-left:6px; opacity:.6;">⏳ Pendiente CDR</span>' : '')
       }</div>
+      ${(e.sunatEstado==='rechazado' || e.sunatEstado==='pendiente') && e.sunatDescripcion ? `<div style="font-size:12px; color:#f79b9b; margin-top:4px;">${e.sunatDescripcion.replace(/</g,'&lt;')}</div>` : ''}
       <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'a4')">📄 PDF A4</button>
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'ticket')">🧾 Ticket</button>
