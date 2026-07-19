@@ -3246,7 +3246,7 @@ async function enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonCompro
     }
 
     if(reg && EN_PROCESO.includes(reg.ind_situ)){
-      return { automatico: true, estado: 'pendiente', descripcion: `SUNAT todavía está procesando este documento (ticket: ${reg.num_ticket || 's/n'}). Vuelve a intentar "Reintentar" en unos minutos.` };
+      return { automatico: true, estado: 'en_proceso', descripcion: `SUNAT todavía está procesando este documento (ticket: ${reg.num_ticket || 's/n'}). Vuelve a intentar "Reintentar" en unos minutos.` };
     }
     const aceptado = reg && ACEPTADOS.includes(reg.ind_situ);
     return {
@@ -3732,7 +3732,7 @@ function generarComprobante(){
         registro.sunatEstado = null;
         descargarJSON(jsonSUNAT, `${emp.ruc}-${tipDocArchivo}-${serie}.json`);
       } else {
-        registro.sunatEstado = resultado.estado === 'aceptado' ? 'aceptado' : (resultado.estado === 'error_conexion' ? 'pendiente' : 'rechazado');
+        registro.sunatEstado = mapEstadoBridge(resultado);
         registro.sunatDescripcion = resultado.descripcion;
         if(resultado.estado === 'error_conexion') descargarJSON(jsonSUNAT, `${emp.ruc}-${tipDocArchivo}-${serie}.json`);
       }
@@ -3757,6 +3757,16 @@ function calcularRUCDesdeDNI(dni){
   if(digito === 10) digito = 0;
   else if(digito === 11) digito = 1;
   return base + digito;
+}
+
+// Traduce el resultado de enviarAlBridgeSiCorresponde a un estado consistente para guardar en
+// el registro emitido — evita repetir esta lógica (y el riesgo de que alguna copia se quede
+// desactualizada) en cada punto donde se llama al bridge.
+function mapEstadoBridge(resultado){
+  if(resultado.estado === 'aceptado') return 'aceptado';
+  if(resultado.estado === 'en_proceso') return 'en_proceso';
+  if(resultado.estado === 'error_conexion') return 'pendiente';
+  return 'rechazado';
 }
 
 function onCambioPagadorEsDestinatario(){
@@ -4031,7 +4041,7 @@ function generarGuia(){
       registro.sunatEstado = null;
       descargarJSON(jsonSFS, `${emp.ruc}-${tipDocGuiaArchivo}-${serie}.json`);
     } else {
-      registro.sunatEstado = resultado.estado === 'aceptado' ? 'aceptado' : (resultado.estado === 'error_conexion' ? 'pendiente' : 'rechazado');
+      registro.sunatEstado = mapEstadoBridge(resultado);
       registro.sunatDescripcion = resultado.descripcion;
       if(resultado.estado === 'error_conexion') descargarJSON(jsonSFS, `${emp.ruc}-${tipDocGuiaArchivo}-${serie}.json`);
     }
@@ -4484,7 +4494,7 @@ async function confirmarMasivo(){
     if(conBridge){
       const resultado = await enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonDoc);
       if(resultado.automatico){
-        registro.sunatEstado = resultado.estado === 'aceptado' ? 'aceptado' : 'rechazado';
+        registro.sunatEstado = mapEstadoBridge(resultado);
         registro.sunatDescripcion = resultado.descripcion;
         if(resultado.estado === 'aceptado') ok++; else rechazados++;
       } else {
@@ -4898,11 +4908,12 @@ function renderEmitidos(){
       <div class="cliente">${e.cliente} · ${e.fecha} ${
         e.sunatEstado==='aceptado' ? '<span class="badge fact" style="margin-left:6px;">✓ Aceptado SUNAT</span>' :
         e.sunatEstado==='rechazado' ? `<span class="badge nc" style="margin-left:6px;">✕ Rechazado SUNAT</span>` :
+        e.sunatEstado==='en_proceso' ? `<span class="badge" style="margin-left:6px; background:rgba(245,158,11,.15); color:#f7c266;">⏳ SUNAT procesando (ticket)</span>` :
         e.sunatEstado==='enviando' ? '<span class="badge" style="margin-left:6px; opacity:.6;">⏳ Enviando a SUNAT...</span>' :
         e.sunatEstado==='pendiente' ? `<span class="badge" style="margin-left:6px; opacity:.7;">⚠ Sin conexión — JSON descargado</span>` :
         (e.grupo==='guias' ? '<span class="badge" style="margin-left:6px; opacity:.6;">⏳ Pendiente CDR</span>' : '')
       }</div>
-      ${(e.sunatEstado==='rechazado' || e.sunatEstado==='pendiente') && e.sunatDescripcion ? `<div style="font-size:12px; color:#f79b9b; margin-top:4px;">${e.sunatDescripcion.replace(/</g,'&lt;')}</div>` : ''}
+      ${(e.sunatEstado==='rechazado' || e.sunatEstado==='pendiente' || e.sunatEstado==='en_proceso') && e.sunatDescripcion ? `<div style="font-size:12px; color:${e.sunatEstado==='en_proceso'?'#f7c266':'#f79b9b'}; margin-top:4px;">${e.sunatDescripcion.replace(/</g,'&lt;')}</div>` : ''}
       <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'a4')">📄 PDF A4</button>
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'ticket')">🧾 Ticket</button>
@@ -4910,7 +4921,7 @@ function renderEmitidos(){
         ${['retencion','percepcion'].includes(e.tipo) && e.jsonSUNAT ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="descargarRetPerTXT(emitidos[${idx}].jsonSUNAT, emp.ruc, '${e.tipo==='retencion'?'20':'40'}', emitidos[${idx}].serie, ${e.tipo==='retencion'})">🗂️ Descargar archivos TXT (${e.tipo==='retencion'?'.RET/.DRE':'.PER/.DPE'})</button>` : ''}
         ${!emp.bridgeEmpresaId ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="document.getElementById('cdrInput_${idx}').click()">📥 Cargar CDR SUNAT</button>
         <input type="file" id="cdrInput_${idx}" accept=".xml" style="display:none;" onchange="cargarCDR(${idx}, this.files[0])">` : ''}
-        ${!e.anulado && (e.sunatEstado==='rechazado'||e.sunatEstado==='pendiente') ? `<button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="reintentarEnvio(${idx})">🔁 Reintentar (mismo N°)</button>
+        ${!e.anulado && (e.sunatEstado==='rechazado'||e.sunatEstado==='pendiente'||e.sunatEstado==='en_proceso') ? `<button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="reintentarEnvio(${idx})">🔁 Reintentar (mismo N°)</button>
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="borrarIntentoRechazado(${idx})">🗑️ Borrar intento</button>` : ''}
         ${e.anulado ? `<span class="badge nc">ANULADO</span>` : `<button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="anularComprobante(${idx})">🗑️ Anular</button>`}
       </div>
@@ -4942,7 +4953,7 @@ async function reintentarEnvio(idx){
     e.sunatEstado = null;
     descargarJSON(jsonDoc, `${emp.ruc}-${tipDocArchivo}-${e.serie}.json`);
   } else {
-    e.sunatEstado = resultado.estado === 'aceptado' ? 'aceptado' : (resultado.estado === 'error_conexion' ? 'pendiente' : 'rechazado');
+    e.sunatEstado = mapEstadoBridge(resultado);
     e.sunatDescripcion = resultado.descripcion;
   }
   actualizarEmitidoEnServidor(e);
@@ -5611,6 +5622,10 @@ function borrarIntentoRechazado(idx){
   const e = emitidos[idx];
   if(e.sunatEstado === 'aceptado'){
     alert('No se puede borrar un comprobante ya aceptado por SUNAT — usa "Anular" si necesitas darlo de baja.');
+    return;
+  }
+  if(e.sunatEstado === 'en_proceso'){
+    alert('SUNAT todavía está procesando este documento — espera a que quede Aceptado o Rechazado antes de borrarlo (podría llegar a ser válido).');
     return;
   }
   if(!confirm(`¿Borrar este intento rechazado de ${e.serie}? Esto solo lo quita de tu lista en FACTASH, no afecta nada en SUNAT (nunca llegó a ser válido).`)) return;
