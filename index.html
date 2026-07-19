@@ -4888,7 +4888,8 @@ function renderEmitidos(){
         ${['retencion','percepcion'].includes(e.tipo) && e.jsonSUNAT ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="descargarRetPerTXT(emitidos[${idx}].jsonSUNAT, emp.ruc, '${e.tipo==='retencion'?'20':'40'}', emitidos[${idx}].serie, ${e.tipo==='retencion'})">🗂️ Descargar archivos TXT (${e.tipo==='retencion'?'.RET/.DRE':'.PER/.DPE'})</button>` : ''}
         ${!emp.bridgeEmpresaId ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="document.getElementById('cdrInput_${idx}').click()">📥 Cargar CDR SUNAT</button>
         <input type="file" id="cdrInput_${idx}" accept=".xml" style="display:none;" onchange="cargarCDR(${idx}, this.files[0])">` : ''}
-        ${!e.anulado && (e.sunatEstado==='rechazado'||e.sunatEstado==='pendiente') ? `<button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="reintentarEnvio(${idx})">🔁 Reintentar (mismo N°)</button>` : ''}
+        ${!e.anulado && (e.sunatEstado==='rechazado'||e.sunatEstado==='pendiente') ? `<button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="reintentarEnvio(${idx})">🔁 Reintentar (mismo N°)</button>
+        <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="borrarIntentoRechazado(${idx})">🗑️ Borrar intento</button>` : ''}
         ${e.anulado ? `<span class="badge nc">ANULADO</span>` : `<button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="anularComprobante(${idx})">🗑️ Anular</button>`}
       </div>
     </div>
@@ -5574,6 +5575,28 @@ async function guardarEmpresaEnServidor(idEmpresa){
 
 // Guarda un comprobante/guía emitido nuevo en el servidor. Devuelve el id que asignó el
 // servidor (útil para luego actualizarlo, ej. al cargar el CDR de SUNAT).
+// Borra un emitido del servidor (ej. un intento rechazado que se mandó por error con un número
+// repetido y ya no hace falta conservar). Usa el mismo endpoint REST que ya existe para PUT.
+async function eliminarEmitidoDelServidor(idServidor){
+  try{
+    await fetch(`${FACTASH_API_URL}/api/emitidos/${idServidor}`, { method: 'DELETE' });
+  } catch(err){ /* sin conexión — igual se borra localmente, se resincroniza cuando vuelva internet */ }
+}
+
+// Borra un registro rechazado/pendiente del listado — solo para intentos que nunca llegaron a
+// aceptarse (no se puede borrar uno ya aceptado por SUNAT, ese queda como historial real).
+function borrarIntentoRechazado(idx){
+  const e = emitidos[idx];
+  if(e.sunatEstado === 'aceptado'){
+    alert('No se puede borrar un comprobante ya aceptado por SUNAT — usa "Anular" si necesitas darlo de baja.');
+    return;
+  }
+  if(!confirm(`¿Borrar este intento rechazado de ${e.serie}? Esto solo lo quita de tu lista en FACTASH, no afecta nada en SUNAT (nunca llegó a ser válido).`)) return;
+  if(e.idServidor) eliminarEmitidoDelServidor(e.idServidor);
+  emitidos.splice(idx, 1);
+  renderTodo();
+}
+
 async function guardarEmitidoEnServidor(registro){
   try{
     const resp = await fetch(`${FACTASH_API_URL}/api/emitidos`, {
