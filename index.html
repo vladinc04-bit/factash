@@ -3224,13 +3224,35 @@ async function enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonCompro
     if(!data.ok){
       return { automatico: true, estado: 'rechazado', descripcion: (data.mensaje || 'Error al procesar en el SFS.') };
     }
-    const reg = data.registro;
-    // ind_situ: 03 = Enviado y Aceptado, 06 = Con errores (ver bandeja real del SFS)
-    const aceptado = reg && (reg.ind_situ === '03' || reg.ind_situ === '01' && reg.fec_envi);
+    let reg = data.registro;
+
+    // Catálogo real de ind_situ (confirmado en tu SFS): 01 Por Generar XML, 02 XML Generado,
+    // 03/11 Enviado y Aceptado, 04/12 Aceptado con Observaciones, 05/10 Rechazado, 06 Con Errores,
+    // 07 Por Validar XML, 08 Enviado a SUNAT Por Procesar, 09 Enviado a SUNAT Procesando.
+    // 08/09 NO son un rechazo — SUNAT solo tardó y devolvió un ticket para consultar después.
+    const ACEPTADOS = ['03','04','11','12'];
+    const EN_PROCESO = ['08','09'];
+    const RECHAZADOS = ['05','06','10'];
+
+    if(reg && EN_PROCESO.includes(reg.ind_situ)){
+      // Espera un poco y vuelve a consultar la bandeja una vez antes de rendirse — evita marcar
+      // como "rechazado" algo que en realidad sigue en trámite en SUNAT.
+      await new Promise(r=>setTimeout(r, 6000));
+      try{
+        const respEstado = await fetch(`${BRIDGE_API_URL}/estado/${emp.bridgeEmpresaId}/${emp.ruc}/${tipDocArchivo}/${serie}`);
+        const dataEstado = await respEstado.json();
+        if(dataEstado.ok && dataEstado.registro) reg = dataEstado.registro;
+      } catch(e){ /* si falla la reconsulta, seguimos con el registro que ya teníamos */ }
+    }
+
+    if(reg && EN_PROCESO.includes(reg.ind_situ)){
+      return { automatico: true, estado: 'pendiente', descripcion: `SUNAT todavía está procesando este documento (ticket: ${reg.num_ticket || 's/n'}). Vuelve a intentar "Reintentar" en unos minutos.` };
+    }
+    const aceptado = reg && ACEPTADOS.includes(reg.ind_situ);
     return {
       automatico: true,
       estado: aceptado ? 'aceptado' : 'rechazado',
-      descripcion: reg ? reg.des_obse : 'Sin respuesta del SFS.'
+      descripcion: reg ? (reg.des_obse && reg.des_obse !== '-' ? reg.des_obse : (RECHAZADOS.includes(reg.ind_situ) ? 'Rechazado por SUNAT sin detalle adicional.' : '')) : 'Sin respuesta del SFS.'
     };
   } catch(err){
     // Si el bridge no responde (servidor caído, sin internet, etc.), no se bloquea la emisión —
