@@ -4181,8 +4181,10 @@ const formatosMasivo = {
     esGuia:true,
     cabeceraCols: ['Grupo','Fecha(AAAA-MM-DD)','Destinatario','RUCDestinatario','DirDestinatario','UbigeoPartida','DirPartida','UbigeoLlegada','DirLlegada',
       'Motivo','Modalidad(Publico/Privado)','FechaInicioTraslado','FechaEntregaTransportista','PesoBruto(KG)','NumBultos',
-      'Placa','ConductorDoc','ConductorNombre','ConductorLicencia','RUCTransportista','NombreTransportista','MTC','DocRef'],
-    itemCols: ['Producto','Cantidad','Unidad'],
+      'Placa','TUCE','ConductorDoc','ConductorApellidos','ConductorNombres','ConductorLicencia',
+      'RegistrarVehConductor(SI/NO)','RUCTransportista','NombreTransportista','MTC',
+      'ProveedorRUC','ProveedorNombre','DocRef'],
+    itemCols: ['Producto','CodigoProducto','Cantidad','Unidad'],
   },
   transportista: {
     esGuia:true,
@@ -4210,16 +4212,21 @@ const EJEMPLOS_MASIVO = {
     ['2','2026-07-17','PUBLICO GENERAL','SD','','-','Contado','','','PAN FRANCES','','10','0.50','Gravado'],
   ],
   remitente: [
-    ['1','2026-07-17','COMITE DE GESTION AYACUCHO 6','20600052111','JIRON LIMA S/N - PINCOCALLA','050110','AA.HH. COVADONGA MZ A2 LOTE 10','050906','JIRON LIMA S/N - PINCOCALLA',
-      '01','Privado','2026-07-18','','5.900','1','C5T760','1','JUAN PEREZ RAMOS','S44276849','','','','',
-      'ACEITE VEGETAL 1L','10','LTR'],
-    ['1','2026-07-17','COMITE DE GESTION AYACUCHO 6','20600052111','JIRON LIMA S/N - PINCOCALLA','050110','AA.HH. COVADONGA MZ A2 LOTE 10','050906','JIRON LIMA S/N - PINCOCALLA',
-      '01','Privado','2026-07-18','','5.900','1','C5T760','1','JUAN PEREZ RAMOS','S44276849','','','','',
-      'ARROZ EXTRA 1KG','20','KGM'],
-    ['2','2026-07-17','JUAN PEREZ RAMOS','45678912','CALLE LAS FLORES 456','050110','AA.HH. COVADONGA MZ A2 LOTE 10','050101','CALLE LAS FLORES 456',
-      '01','Publico','2026-07-18','2026-07-18','12.000','2','','','','',
-      '20612763306','TRANSPORTES ANDINOS SAC','MTC12345','',
-      'FIDEOS 500G','15','KGM'],
+    ['1','2026-07-20','COMITÉ DE GESTION DE CONTRATACIONES AYACUCHO 6','20600052111','JIRON LIMA S/N - PINCOCALLA','050110','JR. JOSE CARLOS MARIATEGUI NRO. 417 AYACUCHO - HUAMANGA - SAN JUAN BAUTISTA','051009','AA.HH. COVADONGA MZ A2 LOTE 10',
+      '01','Privado','2026-07-20','','2.000','1','C5T760','','44276849','OCHOA TACCSI','ANDERSON QUNAR','S44276849',
+      'NO','','','',
+      '','','',
+      'ARROZ FORTIFICADO DE 1000 GR MARCA DOÑA TIMO','250002','1.00','KGM'],
+    ['1','2026-07-20','COMITÉ DE GESTION DE CONTRATACIONES AYACUCHO 6','20600052111','JIRON LIMA S/N - PINCOCALLA','050110','JR. JOSE CARLOS MARIATEGUI NRO. 417 AYACUCHO - HUAMANGA - SAN JUAN BAUTISTA','051009','AA.HH. COVADONGA MZ A2 LOTE 10',
+      '01','Privado','2026-07-20','','2.000','1','C5T760','','44276849','OCHOA TACCSI','ANDERSON QUNAR','S44276849',
+      'NO','','','',
+      '','','',
+      'CEREAL EXTRUIDO DE 30 GR MARCA CEREALES ANDINOS','250004','1.00','KGM'],
+    ['2','2026-07-20','COMITÉ DE GESTION DE CONTRATACIONES AYACUCHO 6','20600052111','JIRON LIMA S/N - PINCOCALLA','050110','JR. JOSE CARLOS MARIATEGUI NRO. 417 AYACUCHO - HUAMANGA - SAN JUAN BAUTISTA','051009','AA.HH. COVADONGA MZ A2 LOTE 10',
+      '01','Publico','2026-07-20','2026-07-20','2.000','1','C5T760','','44276849','OCHOA TACCSI','ANDERSON QUNAR','S44276849',
+      'SI','10442768493','OCHOA TACCSI ANDERSON QUNAR','',
+      '','','',
+      'ARROZ FORTIFICADO DE 1000 GR MARCA DOÑA TIMO','250002','1.00','KGM'],
   ],
   transportista: [
     ['1','2026-07-17','COMITE DE GESTION AYACUCHO 6','20600052111','JIRON LIMA S/N - PINCOCALLA','050110','AA.HH. COVADONGA MZ A2 LOTE 10','050906','JIRON LIMA S/N - PINCOCALLA',
@@ -4386,6 +4393,9 @@ function buildGuiaJSONMasivo(g, serie, esTransportista){
   const ahora = new Date();
   const fechaEmision = cab['Fecha(AAAA-MM-DD)'] || ahora.toISOString().slice(0,10);
   const conductorDoc = cab['ConductorDoc']||'';
+  const conductorApellidos = cab['ConductorApellidos']||'';
+  const conductorNombres = cab['ConductorNombres']||cab['ConductorNombre']||''; // ConductorNombre = compat con plantillas viejas
+  const nombreCompletoConductor = [conductorApellidos, conductorNombres].filter(Boolean).join(' ');
 
   const cabecera = {
     fecEmision: fechaEmision,
@@ -4411,7 +4421,7 @@ function buildGuiaJSONMasivo(g, serie, esTransportista){
     numPlacaTransPrivado: cab['Placa'] || "",
     numDocIdeConductorTransPrivado: conductorDoc,
     tipDocIdeConductorTransPrivado: conductorDoc.length === 8 ? "1" : "6",
-    nomConductorTransPrivado: cab['ConductorNombre'] || "",
+    nomConductorTransPrivado: nombreCompletoConductor,
     ubiLlegada: cab['UbigeoLlegada'] || "",
     dirLlegada: cab['DirLlegada'] || "",
     ubiPartida: cab['UbigeoPartida'] || "",
@@ -4421,6 +4431,18 @@ function buildGuiaJSONMasivo(g, serie, esTransportista){
     customizationId: "2.0"
   };
   if(esPublico || esTransportista) cabecera.numRegistroMTC = cab['MTC'] || "";
+
+  // Indicador de vehículo/conductor registrado — solo Público + columna marcada "SI"
+  if(!esTransportista && esPublico && (cab['RegistrarVehConductor(SI/NO)']||'').toUpperCase().startsWith('SI')){
+    cabecera.indDatosTransportista = "true";
+  }
+
+  // Proveedor (para motivo Compra) — mismo patrón que el formulario individual (cabecera.numDocVendedor)
+  if(!esTransportista && cab['ProveedorRUC']){
+    cabecera.numDocVendedor = cab['ProveedorRUC'];
+    cabecera.tipDocVendedor = "6";
+    cabecera.rznSocialVendedor = cab['ProveedorNombre'] || "";
+  }
 
   // Solo Guía Transportista: Remitente (quien envía), y documento relacionado a la guía Remitente
   // original — mismo criterio "sin confirmar 100%" que en el formulario individual.
@@ -4443,10 +4465,85 @@ function buildGuiaJSONMasivo(g, serie, esTransportista){
     uniMedidaItem: it['Unidad'] || "NIU",
     canItem: (parseFloat(it['Cantidad'])||0).toFixed(2),
     desItem: it['Producto'] || "",
-    codItem: ""
+    codItem: it['CodigoProducto'] || ""
   }));
 
   return { cabecera, detalle };
+}
+
+// ===========================================================================
+// Conversión al PIPELINE NUEVO para una fila de Emisión Masiva (Guía Remitente)
+// Mismo patrón que convertirGuiaAFormatoNuevo() del formulario individual, pero
+// leyendo directo de las columnas de la plantilla masiva (con apellidos y
+// nombres del conductor YA SEPARADOS en ConductorApellidos/ConductorNombres).
+// ===========================================================================
+function convertirGuiaMasivaAFormatoNuevo(g, serie){
+  const cab = g.cabecera;
+  const emp = empresas[empresaActual];
+  const modalidadTexto = (cab['Modalidad(Publico/Privado)']||'Privado').toLowerCase();
+  const esPublico = modalidadTexto.startsWith('publ');
+  const esCompra = motivoACodigo(cab['Motivo']) === '02';
+  const fechaEmision = cab['Fecha(AAAA-MM-DD)'] || new Date().toISOString().slice(0,10);
+  const [serieParte, correlativoParte] = serie.split('-');
+
+  const datos = {
+    rucEmisor: emp.ruc,
+    razonSocialEmisor: emp.razonSocial,
+    serie: serieParte,
+    correlativo: correlativoParte,
+    fecEmision: fechaEmision,
+    horEmision: new Date().toTimeString().slice(0,8),
+    numDocDestinatario: cab['RUCDestinatario'] || "",
+    tipDocDestinatario: (cab['RUCDestinatario']||'').length === 8 ? "1" : "6",
+    rznSocialDestinatario: cab['Destinatario'] || "",
+    motTraslado: motivoACodigo(cab['Motivo']),
+    pesoBrutoTotal: cab['PesoBruto(KG)'] || "0.000",
+    uniMedidaPeso: "KGM",
+    numBultos: cab['NumBultos'] || "1",
+    modTraslado: esPublico ? "01" : "02",
+    fecInicioTraslado: cab['FechaInicioTraslado'] || fechaEmision,
+    numPlacaVehiculo: cab['Placa'] || "",
+    tuceVehiculo: cab['TUCE'] || "",
+    conductores: [{
+      jobTitle: 'Principal',
+      tipoDoc: (cab['ConductorDoc']||'').length === 8 ? '1' : '6',
+      numDoc: cab['ConductorDoc'] || "",
+      apellidos: cab['ConductorApellidos'] || "",
+      nombres: cab['ConductorNombres'] || cab['ConductorNombre'] || "",
+      licencia: cab['ConductorLicencia'] || "",
+    }],
+    ubigeoLlegada: cab['UbigeoLlegada'] || "",
+    dirLlegada: cab['DirLlegada'] || "",
+    ubigeoPartida: cab['UbigeoPartida'] || "",
+    dirPartida: cab['DirPartida'] || "",
+    items: g.items.map((it, i) => ({
+      numOrden: String(i + 1),
+      cantidad: (parseFloat(it['Cantidad'])||0).toFixed(2),
+      unidadMedida: it['Unidad'] || "KGM",
+      descripcion: it['Producto'] || "",
+      codBien: it['CodigoProducto'] || "",
+    })),
+  };
+
+  if(esCompra && cab['ProveedorRUC']){
+    datos.numDocProveedor = cab['ProveedorRUC'];
+    datos.tipDocProveedor = cab['ProveedorRUC'].length === 8 ? '1' : '6';
+    datos.rznSocialProveedor = cab['ProveedorNombre'] || "";
+  }
+
+  if(esPublico){
+    datos.numDocTransportista = cab['RUCTransportista'] || "";
+    datos.tipDocTransportista = "6";
+    datos.nomTransportista = cab['NombreTransportista'] || "";
+    datos.numRegistroMTC = cab['MTC'] || "";
+    datos.fecEntregaBienesTransportista = cab['FechaEntregaTransportista'] || fechaEmision;
+  }
+
+  if(esPublico && (cab['RegistrarVehConductor(SI/NO)']||'').toUpperCase().startsWith('SI')){
+    datos.indicadoresEspeciales = ['SUNAT_Envio_IndicadorVehiculoConductoresTransp'];
+  }
+
+  return datos;
 }
 
 function buildFacturaJSONMasivo(g, serie, docTipo){
