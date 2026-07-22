@@ -1247,9 +1247,11 @@
       Columnas separadas por tabulación o "|", en este orden: <b id="formatoCols"></b>
     </div>
 
-    <div style="display:flex; gap:8px; margin-bottom:16px;">
-      <button class="doc-btn" style="flex:1;" onclick="descargarPlantillaExcel()">⬇️ Descargar plantilla Excel</button>
-      <button class="doc-btn" id="btnSubirExcelWrap" style="flex:1; display:none;" onclick="document.getElementById('masivoExcelFile').click()">⬆️ Subir Excel con datos</button>
+    <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+      <button class="doc-btn" style="flex:1; min-width:180px;" onclick="descargarPlantillaExcel()">⬇️ Descargar plantilla Excel</button>
+      <button class="doc-btn" id="btnPlantillaPublico" style="flex:1; min-width:180px; display:none; border-color:#5aa9ff;" onclick="descargarPlantillaRemitentePorModalidad('publico')">⬇️ Plantilla Guía Remitente — PÚBLICO</button>
+      <button class="doc-btn" id="btnPlantillaPrivado" style="flex:1; min-width:180px; display:none; border-color:#5aa9ff;" onclick="descargarPlantillaRemitentePorModalidad('privado')">⬇️ Plantilla Guía Remitente — PRIVADO</button>
+      <button class="doc-btn" id="btnSubirExcelWrap" style="flex:1; min-width:180px;" onclick="document.getElementById('masivoExcelFile').click()">⬆️ Subir Excel con datos</button>
       <input type="file" id="masivoExcelFile" accept=".xlsx,.xls" style="display:none;" onchange="cargarExcelMasivo(this)">
     </div>
 
@@ -2196,7 +2198,7 @@ function cambiarTab(tab){
     document.getElementById('tab-'+t).style.display = (t===tab)?'block':'none';
   });
   if(tab==='masivo'){
-    document.getElementById('btnSubirExcelWrap').style.display = esAdmin ? 'block' : 'none';
+    document.getElementById('btnSubirExcelWrap').style.display = 'block';
   }
   renderTodo();
 }
@@ -4245,12 +4247,41 @@ function descargarPlantillaExcel(){
   XLSX.writeFile(wb, `plantilla_${docActualMasivo}.xlsx`);
 }
 
+// IMPORTANTE: el sistema lee las columnas del Excel/texto por POSICIÓN FIJA
+// (ver procesarMasivo/cargarExcelMasivo), no por nombre de columna — por eso
+// ambas plantillas (Público/Privado) deben tener EXACTAMENTE las mismas 32
+// columnas en el mismo orden que formatosMasivo.remitente, sin importar la
+// modalidad. Lo único que cambia entre plantillas es qué columnas vienen
+// vacías/con nota en la fila de ejemplo, para guiar al usuario.
+function descargarPlantillaRemitentePorModalidad(modalidad){
+  const esPublico = modalidad === 'publico';
+  const f = formatosMasivo.remitente;
+  const headers = [...f.cabeceraCols, ...f.itemCols];
+
+  const filaEjemplo = [
+    '1','2026-07-20','COMITÉ DE GESTION DE CONTRATACIONES AYACUCHO 6','20600052111','JIRON LIMA S/N - PINCOCALLA',
+    '050110','JR. JOSE CARLOS MARIATEGUI NRO. 417 AYACUCHO - HUAMANGA - SAN JUAN BAUTISTA','051009','AA.HH. COVADONGA MZ A2 LOTE 10',
+    '01', esPublico ? 'Publico' : 'Privado',
+    '2026-07-20', esPublico ? '2026-07-20' : '', // FechaEntregaTransportista: solo obligatoria en Público
+    '2.000','1','C5T760','','44276849','OCHOA TACCSI','ANDERSON QUNAR','S44276849',
+    esPublico ? 'SI' : 'NO', // RegistrarVehConductor: solo aplica en Público
+    esPublico ? '10442768493' : '', // RUCTransportista: NO llenar en Privado — SUNAT lo rechaza (error 3347)
+    esPublico ? 'OCHOA TACCSI ANDERSON QUNAR' : '',
+    '', // MTC
+    '','', // ProveedorRUC, ProveedorNombre (solo si Motivo=Compra)
+    '', // DocRef
+    'ARROZ FORTIFICADO DE 1000 GR MARCA DOÑA TIMO','250002','1.00','KGM'
+  ];
+
+  const filas = [headers, filaEjemplo];
+  const ws = XLSX.utils.aoa_to_sheet(filas);
+  ws['!cols'] = headers.map(()=>({wch:22}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, esPublico ? 'Remitente Público' : 'Remitente Privado');
+  XLSX.writeFile(wb, `plantilla_guia_remitente_${modalidad}.xlsx`);
+}
+
 function cargarExcelMasivo(input){
-  if(!esAdmin){
-    alert('Solo el administrador puede subir archivos Excel con datos.');
-    input.value = '';
-    return;
-  }
   const file = input.files[0];
   if(!file) return;
   document.getElementById('masivoFileName').textContent = file.name;
@@ -4289,6 +4320,9 @@ function cambiarDocMasivo(doc){
   document.getElementById('previewMasivo').innerHTML = '<div class="empty-state">Pega datos y presiona "Procesar" para ver cuántos comprobantes/guías se generarán</div>';
   document.getElementById('btnConfirmarMasivo').style.display = 'none';
   document.getElementById('resumenMasivo').textContent = '';
+  const esRemitenteMasivo = doc === 'remitente';
+  document.getElementById('btnPlantillaPublico').style.display = esRemitenteMasivo ? 'block' : 'none';
+  document.getElementById('btnPlantillaPrivado').style.display = esRemitenteMasivo ? 'block' : 'none';
 }
 
 function actualizarFormatoMasivo(){
