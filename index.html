@@ -1098,7 +1098,13 @@
                 <div id="msg_mc_numdoc" style="font-size:11px; margin-top:3px; display:none;"></div>
               </div>
               <div>
-                <label>Apellidos y Nombres</label>
+                <label>Apellidos <span style="color:var(--text-dim); font-weight:normal;">(obligatorio para GRE con vehículo/conductor registrado)</span></label>
+                <input type="text" id="mc_apellidos" placeholder="ESCRIBA">
+              </div>
+            </div>
+            <div class="row2">
+              <div>
+                <label>Nombres</label>
                 <input type="text" id="mc_nombres" placeholder="ESCRIBA">
               </div>
             </div>
@@ -1667,7 +1673,7 @@ function agregarSeleccionConductoresFrecuentes(){
   seleccionados.forEach(id=>{
     const c = (emp.conductoresFrecuentes||[]).find(x=>x.id===id);
     if(c){
-      conductoresGuia.push({id:'c'+Date.now()+Math.random(), tipo: conductoresGuia.length===0 ? 'principal' : 'secundario', licencia:c.licencia, tipoDoc:c.tipoDoc, numDoc:c.numDoc, nombres:c.nombres});
+      conductoresGuia.push({id:'c'+Date.now()+Math.random(), tipo: conductoresGuia.length===0 ? 'principal' : 'secundario', licencia:c.licencia, tipoDoc:c.tipoDoc, numDoc:c.numDoc, apellidos:c.apellidos||'', nombres:c.nombres});
     }
   });
   cerrarModalConductoresFrecuentes();
@@ -1743,6 +1749,7 @@ function abrirModalConductor(){
   document.getElementById('mc_licencia').value='';
   document.getElementById('mc_tipodoc').value='1';
   document.getElementById('mc_numdoc').value='';
+  document.getElementById('mc_apellidos').value='';
   document.getElementById('mc_nombres').value='';
   document.getElementById('modalConductor').style.display='flex';
 }
@@ -1750,16 +1757,17 @@ function cerrarModalConductor(){ document.getElementById('modalConductor').style
 function agregarConductorGuia(){
   const licencia = document.getElementById('mc_licencia').value.trim();
   const numdoc = document.getElementById('mc_numdoc').value.trim();
+  const apellidos = document.getElementById('mc_apellidos').value.trim();
   const nombres = document.getElementById('mc_nombres').value.trim();
-  if(!licencia || !numdoc || !nombres){ alert('Complete licencia, documento y nombres del conductor'); return; }
+  if(!licencia || !numdoc || !apellidos || !nombres){ alert('Complete licencia, documento, apellidos y nombres del conductor'); return; }
   const tipoDoc = document.getElementById('mc_tipodoc').value;
   conductoresGuia.push({
     id: 'c'+Date.now(),
     tipo: conductoresGuia.length===0 ? 'principal' : 'secundario',
-    licencia, tipoDoc, numDoc: numdoc, nombres
+    licencia, tipoDoc, numDoc: numdoc, apellidos, nombres
   });
   if(document.getElementById('mc_frecuente').checked){
-    guardarConductorFrecuente({licencia, tipoDoc, numDoc: numdoc, nombres});
+    guardarConductorFrecuente({licencia, tipoDoc, numDoc: numdoc, apellidos, nombres});
   }
   cerrarModalConductor();
   renderConductoresGuia();
@@ -1780,7 +1788,7 @@ function renderConductoresGuia(){
   box.innerHTML = conductoresGuia.map(c=>`
     <div class="item-row">
       <span class="tag">${c.tipo}</span>
-      <span style="flex:1;">LIC.: ${c.licencia} &nbsp; ${tipoDocTexto[c.tipoDoc]||''} &nbsp; ${c.numDoc} &nbsp; ${c.nombres}</span>
+      <span style="flex:1;">LIC.: ${c.licencia} &nbsp; ${tipoDocTexto[c.tipoDoc]||''} &nbsp; ${c.numDoc} &nbsp; ${c.apellidos||''} ${c.nombres}</span>
       <span class="x-remove" onclick="eliminarConductorGuia('${c.id}')">✕</span>
     </div>
   `).join('');
@@ -3940,6 +3948,108 @@ function buildGuiaJSON(emp, serie){
   }));
 
   return { cabecera, detalle };
+}
+
+// ===========================================================================
+// CONVERSIÓN al formato del PIPELINE NUEVO (XML directo + firma + REST SUNAT)
+// ===========================================================================
+// Toma el mismo {cabecera, detalle} que ya arma buildGuiaJSON() y lo convierte
+// al objeto "datos" que espera generarGuiaXML() en el bridge nuevo.
+// Confirmado funcionando en 4 escenarios reales contra SUNAT (19-20 jul 2026):
+// Venta/Compra × Público/Privado. Solo para Guía Remitente (docActualGuia==='remitente').
+//
+// Requiere que sfs-bridge-api tenga desplegados generar-guia-xml.js,
+// firmar-guia-real.js y enviar-sunat.js, y un endpoint nuevo (ej. POST
+// /generar-enviar-v2) que reciba este objeto — ver plan de integración
+// guardado. Esta función solo arma el objeto, no llama todavía al backend.
+function convertirGuiaAFormatoNuevo(jsonSFS){
+  const { cabecera, detalle } = jsonSFS;
+  const emp = empresas[empresaActual];
+  const esPublico = cabecera.modTrasladoDatosEnvio === '01';
+  const esCompra = cabecera.motTrasladoDatosEnvio === '02';
+
+  const [serie, correlativo] = cabecera.serNumDocGuia.split('-');
+
+  const datos = {
+    rucEmisor: emp.ruc,
+    razonSocialEmisor: emp.razonSocial,
+    serie: serie,
+    correlativo: correlativo,
+    fecEmision: cabecera.fecEmision,
+    horEmision: cabecera.horEmision,
+    numDocDestinatario: cabecera.numDocDestinatario,
+    tipDocDestinatario: cabecera.tipDocDestinatario,
+    rznSocialDestinatario: cabecera.rznSocialDestinatario,
+    motTraslado: cabecera.motTrasladoDatosEnvio,
+    pesoBrutoTotal: cabecera.psoBrutoTotalBienesDatosEnvio,
+    uniMedidaPeso: cabecera.uniMedidaPesoBrutoDatosEnvio,
+    numBultos: cabecera.numBultosDatosEnvio,
+    modTraslado: cabecera.modTrasladoDatosEnvio,
+    fecInicioTraslado: cabecera.fecInicioTrasladoDatosEnvio,
+    numPlacaVehiculo: cabecera.numPlacaTransPrivado,
+    // Conductores: se toman directo del array conductoresGuia (no de cabecera),
+    // porque ahora captura apellidos y nombres POR SEPARADO (obligatorio real
+    // confirmado con SUNAT — el JSON viejo de cabecera solo tenía nomConductorTransPrivado
+    // como nombre completo junto, insuficiente para el pipeline nuevo).
+    conductores: conductoresGuia.map(c => ({
+      jobTitle: c.tipo === 'principal' ? 'Principal' : 'Secundario',
+      tipoDoc: c.tipoDoc,
+      numDoc: c.numDoc,
+      nombres: c.nombres,
+      apellidos: c.apellidos || '',
+      licencia: c.licencia,
+    })),
+    ubigeoLlegada: cabecera.ubiLlegada,
+    dirLlegada: cabecera.dirLlegada,
+    ubigeoPartida: cabecera.ubiPartida,
+    dirPartida: cabecera.dirPartida,
+    items: detalle.map((it, i) => ({
+      numOrden: String(i + 1),
+      cantidad: it.canItem,
+      unidadMedida: it.uniMedidaItem,
+      descripcion: it.desItem,
+      codBien: it.codItem,
+    })),
+  };
+
+  // Proveedor (SellerSupplierParty) — solo si es Compra y hay datos de "Vendedor" cargados
+  if(esCompra && cabecera.numDocVendedor){
+    datos.numDocProveedor = cabecera.numDocVendedor;
+    datos.tipDocProveedor = cabecera.tipDocVendedor;
+    datos.rznSocialProveedor = cabecera.rznSocialVendedor;
+  }
+
+  // CarrierParty (transportista) — SOLO si es Público (en Privado SUNAT lo RECHAZA,
+  // confirmado con error real 3347 "No debe consignar los datos del transportista
+  // para una operación de Transporte Privado")
+  if(esPublico){
+    datos.numDocTransportista = cabecera.numDocTransportista;
+    datos.tipDocTransportista = cabecera.tipDocTransportista;
+    datos.nomTransportista = cabecera.nomTransportista;
+    datos.numRegistroMTC = cabecera.numRegistroMTC || '';
+    datos.fecEntregaBienesTransportista = cabecera.fecEntregaBienesTransportista;
+  }
+
+  // Indicador especial de vehículo/conductor registrado — solo Público + checkbox marcado
+  if(cabecera.indDatosTransportista === 'true'){
+    datos.indicadoresEspeciales = ['SUNAT_Envio_IndicadorVehiculoConductoresTransp'];
+  }
+
+  return datos;
+}
+
+// Envía la guía por el pipeline nuevo (XML directo + firma + REST SUNAT) en vez
+// del SFS viejo. Requiere que el endpoint /generar-enviar-v2 ya esté desplegado
+// en sfs-bridge-api — ver plan de integración. Por ahora deshabilitado por
+// defecto; activar cuando el backend esté listo.
+async function enviarGuiaPorPipelineNuevo(jsonSFS){
+  const datos = convertirGuiaAFormatoNuevo(jsonSFS);
+  const resp = await fetch('https://TU-BRIDGE-URL/generar-enviar-v2', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ empresa: empresaActual, datos })
+  });
+  return resp.json();
 }
 
 function descargarJSON(objeto, nombreArchivo){
