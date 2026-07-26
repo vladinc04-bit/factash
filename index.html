@@ -5626,6 +5626,7 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
     --verde-fondo: #eaf7ea;
     --verde-texto: #1a7a3c;
   }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   body { font-family: 'Helvetica Neue', Arial, sans-serif; color:#333; font-size:11px; margin:0; padding:0; }
   .box { border:1.5px solid var(--azul-borde); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:#fff; }
   .box.fondo { background:var(--azul-fondo); }
