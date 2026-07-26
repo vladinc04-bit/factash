@@ -1500,6 +1500,47 @@
         </div>
         <button class="btn-primary" onclick="agregarBancoEmpresa()">Agregar cuenta</button>
       </div>
+
+      <div class="card">
+        <h2>Tipos de comprobante que emite esta empresa</h2>
+        <div class="placeholder-note" style="margin-bottom:12px;">
+          Desmarca los que esta empresa no use — solo aparecerán los activados al elegir tipo de documento en Facturación.
+        </div>
+        <div id="listaTiposComprobante" style="display:grid; grid-template-columns:1fr 1fr; gap:6px 14px;"></div>
+        <button class="btn-primary" style="margin-top:14px;" onclick="guardarTiposComprobanteActivos()">Guardar tipos activos</button>
+      </div>
+
+      <div class="card">
+        <h2>Percepción — configuración por defecto</h2>
+        <label style="display:flex; align-items:center; gap:6px; font-weight:normal;">
+          <input type="checkbox" id="cfg_usa_percepcion_default" style="width:auto;">
+          Esta empresa suele emitir Facturas con percepción — marcar la casilla automáticamente al crear una nueva
+        </label>
+        <label style="margin-top:10px;">Régimen de percepción por defecto</label>
+        <select id="cfg_regimen_percepcion_default">
+          <option value="01">Venta Interna (2%)</option>
+          <option value="02">Adquisición de Combustible (1%)</option>
+        </select>
+        <button class="btn-primary" style="margin-top:14px;" onclick="guardarPercepcionDefault()">Guardar</button>
+      </div>
+
+      <div class="card">
+        <h2>Detracciones — cuentas configuradas <span class="n">(evita reescribir la cuenta cada vez)</span></h2>
+        <div id="listaDetraccionesConfig" style="margin-bottom:14px;"></div>
+
+        <h2 style="font-size:13px; margin-top:18px;">Agregar código de detracción</h2>
+        <div class="row2">
+          <div>
+            <label>Código de bien/servicio</label>
+            <select id="det_cfg_codigo"></select>
+          </div>
+          <div>
+            <label>N° cuenta Banco de la Nación</label>
+            <input type="text" id="det_cfg_cuenta" placeholder="00-000-000000">
+          </div>
+        </div>
+        <button class="btn-primary" onclick="agregarDetraccionConfig()">Agregar</button>
+      </div>
     </div>
   </section>
 
@@ -1522,6 +1563,10 @@ const empresas = {
     bancos: [],
     serieAdmin: '5',
     correlativosPorSerie: {},
+    tiposComprobanteActivos: ['factura','boleta','nc','nd','retencion','percepcion','liquidacion','ticket','notaventa','proforma','ordenpago'],
+    detraccionesConfig: [], // { codigo: '027', cuentaBN: '00-000-000000' } — uno o más códigos que esta empresa usa seguido, con su cuenta ya guardada
+    usaPercepcionDefault: false,
+    regimenPercepcionDefault: '01',
     correlativos: { factura: 1, boleta: 1, nc: 1, nd: 1, remitente: 1, transportista: 1, retencion: 1, percepcion: 1, liquidacion: 1, ticket:1, notaventa:1, proforma:1, ordenpago:1 },
     series: { factura:'F001', boleta:'B001', nc:'FC01', nd:'FD01', remitente:'T001', transportista:'V001', retencion:'R001', percepcion:'P001', liquidacion:'LC01', ticket:'TK01', notaventa:'NV01', proforma:'PR01', ordenpago:'OP01' },
     productos: [
@@ -2143,6 +2188,7 @@ function entrarComoEmpresa(id, comoAdmin, rol, caja){
   esAdmin = !!comoAdmin;
   rolSesion = rol || 'admin_empresa';
   cajaActual = caja || null;
+  aplicarDefaultsConfigComprobantes(empresas[id]);
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('adminScreen').style.display = 'none';
   document.getElementById('appScreen').style.display = 'block';
@@ -2152,7 +2198,38 @@ function entrarComoEmpresa(id, comoAdmin, rol, caja){
   else if(rolSesion === 'caja') sufijo = ` — ${cajaActual.nombre}`;
   document.getElementById('nombreEmpresaHeader').textContent = empresas[id].nombre + sufijo;
   aplicarRestriccionesCaja();
+  aplicarTiposComprobanteActivos();
   renderTodo();
+}
+
+// Rellena valores por defecto para empresas que todavía no tienen esta configuración
+// (empresas creadas antes de agregar tipos de comprobante activos / detracciones / percepción)
+function aplicarDefaultsConfigComprobantes(emp){
+  if(!emp) return;
+  if(!emp.tiposComprobanteActivos){
+    emp.tiposComprobanteActivos = ['factura','boleta','nc','nd','retencion','percepcion','liquidacion','ticket','notaventa','proforma','ordenpago'];
+  }
+  if(!emp.detraccionesConfig) emp.detraccionesConfig = [];
+  if(emp.usaPercepcionDefault === undefined) emp.usaPercepcionDefault = false;
+  if(!emp.regimenPercepcionDefault) emp.regimenPercepcionDefault = '01';
+}
+
+// Muestra/oculta los botones de tipo de documento en Facturación según lo que
+// la empresa tenga activado en Configuración → Tipos de comprobante
+function aplicarTiposComprobanteActivos(){
+  const emp = empresas[empresaActual];
+  if(!emp) return;
+  const activos = emp.tiposComprobanteActivos || [];
+  document.querySelectorAll('#tab-facturacion .doc-btn[data-doc]').forEach(btn=>{
+    const tipo = btn.getAttribute('data-doc');
+    btn.style.display = activos.includes(tipo) ? '' : 'none';
+  });
+  // Si el tipo actualmente seleccionado quedó desactivado, cambia a Factura (o el primero activo)
+  const btnActivo = document.querySelector('#tab-facturacion .doc-btn.active');
+  if(btnActivo && btnActivo.style.display === 'none'){
+    const primerActivo = activos[0] || 'factura';
+    cambiarDoc('facturacion', primerActivo);
+  }
 }
 
 function aplicarRestriccionesCaja(){
@@ -2228,6 +2305,17 @@ function cambiarDoc(grupo, doc){
         ? `⚠️ ${docLabels[doc]} — este documento NO ES un comprobante de pago válido para SUNAT, es solo para uso interno/comercial.`
         : 'Índice de trabajo — datos de prueba. Nada se envía a SUNAT ni se guarda todavía.';
       onTipoDocChange();
+
+      // Percepción por defecto configurada en la empresa — solo aplica a Factura/Boleta
+      const emp = empresas[empresaActual];
+      const chkPercep = document.getElementById('f_aplica_percepcion');
+      if(chkPercep && (doc==='factura' || doc==='boleta')){
+        chkPercep.checked = !!emp.usaPercepcionDefault;
+        if(emp.usaPercepcionDefault){
+          document.getElementById('f_regimen_percepcion').value = emp.regimenPercepcionDefault || '01';
+        }
+        toggleCamposPercepcionDetraccion();
+      }
     }
   } else {
     docActualGuia = doc;
@@ -2786,6 +2874,12 @@ function onCambioCodDetraccion(){
   if(d){
     document.getElementById('f_pct_detraccion').value = d.pct;
     calcularMontoDetraccion();
+  }
+  // Si esta empresa ya tiene guardada la cuenta del Banco de la Nación para este código, autocompletar
+  const emp = empresas[empresaActual];
+  const cuentaConfigurada = (emp.detraccionesConfig||[]).find(x=>x.codigo===cod);
+  if(cuentaConfigurada){
+    document.getElementById('f_cuenta_detraccion').value = cuentaConfigurada.cuentaBN;
   }
 }
 // Recalcula el total de la factura/boleta en curso (misma lógica que renderTotales) para poder
@@ -5031,6 +5125,83 @@ function renderConfigEmpresa(){
       <button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-size:10px; margin-top:6px;" onclick="eliminarBancoEmpresa('${b.id}')">🗑️ Eliminar</button>
     </div>
   `).join('') || `<div class="empty-state">Sin cuentas bancarias registradas</div>`;
+
+  aplicarDefaultsConfigComprobantes(emp);
+
+  // Tipos de comprobante activos
+  const TIPOS_DOC_LABEL = {
+    factura:'Factura', boleta:'Boleta', nc:'Nota de Crédito', nd:'Nota de Débito',
+    retencion:'Retención', percepcion:'Percepción', liquidacion:'Liquidación de Compra',
+    ticket:'Ticket', notaventa:'Nota de Venta', proforma:'Proforma', ordenpago:'Orden de Pago',
+  };
+  document.getElementById('listaTiposComprobante').innerHTML = Object.entries(TIPOS_DOC_LABEL).map(([key,label])=>`
+    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; font-size:13px;">
+      <input type="checkbox" class="chk-tipo-comprobante" value="${key}" ${emp.tiposComprobanteActivos.includes(key)?'checked':''} style="width:auto;">
+      ${label}
+    </label>
+  `).join('');
+
+  // Percepción por defecto
+  document.getElementById('cfg_usa_percepcion_default').checked = !!emp.usaPercepcionDefault;
+  document.getElementById('cfg_regimen_percepcion_default').value = emp.regimenPercepcionDefault;
+
+  // Select de código para agregar cuenta de detracción (catálogo completo, reutilizado)
+  const selCod = document.getElementById('det_cfg_codigo');
+  if(selCod && selCod.options.length === 0){
+    Object.entries(DETRACCION_CATALOGO).forEach(([cod,d])=>{
+      const op = document.createElement('option');
+      op.value = cod;
+      op.textContent = `${cod} - ${d.desc} (${d.pct}%)`;
+      selCod.appendChild(op);
+    });
+  }
+
+  // Lista de cuentas de detracción ya configuradas
+  document.getElementById('listaDetraccionesConfig').innerHTML = (emp.detraccionesConfig||[]).map(d=>{
+    const info = DETRACCION_CATALOGO[d.codigo];
+    return `
+    <div class="list-item">
+      <div class="top"><span class="serie">${d.codigo} — ${info?info.desc:''}${info?' ('+info.pct+'%)':''}</span></div>
+      <div class="cliente">Cuenta Banco de la Nación: ${d.cuentaBN}</div>
+      <button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-size:10px; margin-top:6px;" onclick="quitarDetraccionConfig('${d.codigo}')">🗑️ Eliminar</button>
+    </div>`;
+  }).join('') || `<div class="empty-state">Sin cuentas de detracción configuradas — se pedirá la cuenta cada vez</div>`;
+}
+
+function guardarTiposComprobanteActivos(){
+  const emp = empresas[empresaActual];
+  const seleccionados = Array.from(document.querySelectorAll('.chk-tipo-comprobante:checked')).map(c=>c.value);
+  emp.tiposComprobanteActivos = seleccionados.length ? seleccionados : ['factura'];
+  aplicarTiposComprobanteActivos();
+  const msg = document.getElementById('cfgEmpresaMsg');
+  if(msg){ msg.style.display='block'; msg.textContent='✓ Tipos de comprobante actualizados'; msg.style.color='var(--accent-2)'; }
+}
+
+function guardarPercepcionDefault(){
+  const emp = empresas[empresaActual];
+  emp.usaPercepcionDefault = document.getElementById('cfg_usa_percepcion_default').checked;
+  emp.regimenPercepcionDefault = document.getElementById('cfg_regimen_percepcion_default').value;
+  const msg = document.getElementById('cfgEmpresaMsg');
+  if(msg){ msg.style.display='block'; msg.textContent='✓ Configuración de percepción guardada'; msg.style.color='var(--accent-2)'; }
+}
+
+function agregarDetraccionConfig(){
+  const emp = empresas[empresaActual];
+  const codigo = document.getElementById('det_cfg_codigo').value;
+  const cuentaBN = document.getElementById('det_cfg_cuenta').value.trim();
+  if(!codigo || !cuentaBN){ alert('Selecciona el código y escribe la cuenta del Banco de la Nación'); return; }
+  emp.detraccionesConfig = emp.detraccionesConfig || [];
+  const existente = emp.detraccionesConfig.find(d=>d.codigo===codigo);
+  if(existente){ existente.cuentaBN = cuentaBN; }
+  else { emp.detraccionesConfig.push({ codigo, cuentaBN }); }
+  document.getElementById('det_cfg_cuenta').value = '';
+  renderConfigEmpresa();
+}
+
+function quitarDetraccionConfig(codigo){
+  const emp = empresas[empresaActual];
+  emp.detraccionesConfig = (emp.detraccionesConfig||[]).filter(d=>d.codigo!==codigo);
+  renderConfigEmpresa();
 }
 
 function renderCatalogoCompleto(){
