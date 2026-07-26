@@ -5693,8 +5693,8 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
   </div>
 
   <div class="box data-grid">
-    <div class="data-item" style="grid-column:1/-1;"><span class="data-label">Partida</span><span>: ${cab.ubiPartida ? `[${cab.ubiPartida}] ` : ''}${cab.dirPartida || '-'}</span></div>
-    <div class="data-item" style="grid-column:1/-1;"><span class="data-label">Llegada</span><span>: ${cab.ubiLlegada ? `[${cab.ubiLlegada}] ` : ''}${cab.dirLlegada || '-'}</span></div>
+    <div class="data-item" style="grid-column:1/-1;"><span class="data-label">Partida</span><span>: ${cab.dirPartida || '-'}</span></div>
+    <div class="data-item" style="grid-column:1/-1;"><span class="data-label">Llegada</span><span>: ${cab.dirLlegada || '-'}</span></div>
     ${cab.obsGuia ? `<div class="data-item" style="grid-column:1/-1;"><span class="data-label">Observaciones</span><span>: ${cab.obsGuia}</span></div>` : ''}
   </div>
 
@@ -5706,12 +5706,20 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
   </div>
 
   <div class="box verde data-grid">
-    <div class="data-item"><span class="data-label"><span class="icon verde-i">🚚</span>Transportista</span><span>: ${esPublico ? (cab.nomTransportista || '-') : (cab.nomConductorTransPrivado || '-')}</span></div>
-    <div class="data-item"><span class="data-label">Conductor</span><span>: ${cab.nomConductorTransPrivado || '-'}</span></div>
-    <div class="data-item"><span class="data-label">RUC/DNI</span><span>: ${esPublico ? (cab.numDocTransportista || '-') : (cab.numDocIdeConductorTransPrivado || '-')}</span></div>
-    <div class="data-item"><span class="data-label">Lic. Conducir</span><span>: ${cab.numDocIdeConductorTransPrivado || '-'}</span></div>
+    ${esPublico ? `
+    <div class="data-item"><span class="data-label"><span class="icon verde-i">🚚</span>Transportista</span><span>: ${cab.nomTransportista || '-'}</span></div>
+    <div class="data-item"><span class="data-label">RUC/DNI</span><span>: ${cab.numDocTransportista || '-'}</span></div>
     <div class="data-item"><span class="data-label">Nro. Inscrip.</span><span>: ${cab.numRegistroMTC || '-'}</span></div>
+    <div class="data-item"></div>
+    <div class="data-item"><span class="data-label">Conductor</span><span>: ${cab.nomConductorTransPrivado || '-'}</span></div>
+    <div class="data-item"><span class="data-label">Lic. Conducir</span><span>: ${cab.numDocIdeConductorTransPrivado || '-'}</span></div>
     <div class="data-item"><span class="data-label">Marca/Placa</span><span>: ${cab.numPlacaTransPrivado || '-'}</span></div>
+    ` : `
+    <div class="data-item"><span class="data-label"><span class="icon verde-i">🚚</span>Conductor</span><span>: ${cab.nomConductorTransPrivado || '-'}</span></div>
+    <div class="data-item"><span class="data-label">RUC/DNI</span><span>: ${cab.numDocIdeConductorTransPrivado || '-'}</span></div>
+    <div class="data-item"><span class="data-label">Lic. Conducir</span><span>: ${cab.numDocIdeConductorTransPrivado || '-'}</span></div>
+    <div class="data-item"><span class="data-label">Marca/Placa</span><span>: ${cab.numPlacaTransPrivado || '-'}</span></div>
+    `}
   </div>
 
   <div class="box">
