@@ -5695,6 +5695,7 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
   <div class="box data-grid">
     <div class="data-item" style="grid-column:1/-1;"><span class="data-label">Partida</span><span>: ${cab.ubiPartida ? `[${cab.ubiPartida}] ` : ''}${cab.dirPartida || '-'}</span></div>
     <div class="data-item" style="grid-column:1/-1;"><span class="data-label">Llegada</span><span>: ${cab.ubiLlegada ? `[${cab.ubiLlegada}] ` : ''}${cab.dirLlegada || '-'}</span></div>
+    ${cab.obsGuia ? `<div class="data-item" style="grid-column:1/-1;"><span class="data-label">Observaciones</span><span>: ${cab.obsGuia}</span></div>` : ''}
   </div>
 
   <div class="box fondo data-grid">
