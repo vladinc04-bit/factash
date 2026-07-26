@@ -644,6 +644,22 @@
           </div>
         </div>
 
+        <!-- Campos adicionales OPCIONALES, solo para uso interno / impresión (programas sociales,
+             PAE, comités de compra, etc.) — NO son parte del esquema SUNAT, NUNCA se incluyen en el
+             JSON/XML que se envía. Confirmado: el XSD de SUNAT no tiene estos campos. -->
+        <div class="row2" style="margin-top:4px;">
+          <div>
+            <label>Beneficiario <span style="color:var(--text-dim); font-weight:normal;">(opcional, solo va en el PDF)</span></label>
+            <input type="text" id="g_beneficiario" placeholder="Nombre del beneficiario final">
+          </div>
+          <div>
+            <label>Ítem <span style="color:var(--text-dim); font-weight:normal;">(opcional, solo va en el PDF)</span></label>
+            <input type="text" id="g_item_general" placeholder="ej. CANARIA">
+          </div>
+        </div>
+        <label>Código modular <span style="color:var(--text-dim); font-weight:normal;">(opcional, solo va en el PDF)</span></label>
+        <input type="text" id="g_codigo_modular" placeholder="ej. 0423624">
+
         <!-- Solo Guía Transportista: confirmado con XML real (10283170140-31-EG03-143.xml) que trae
              3 partes además del destinatario: Remitente (quien originalmente envía la mercadería),
              Pagador del servicio (quien contrata el flete, puede ser el mismo que el destinatario),
@@ -1178,12 +1194,23 @@
                 <input type="text" id="mb_cantidad" placeholder="ESCRIBA">
               </div>
             </div>
+            <div class="row2" style="margin-top:6px;">
+              <div>
+                <label>Lote <span style="color:var(--text-dim); font-weight:normal;">(opcional, solo va en el PDF)</span></label>
+                <input type="text" id="mb_lote" placeholder="ej. ML0120">
+              </div>
+              <div>
+                <label>Fecha de vencimiento <span style="color:var(--text-dim); font-weight:normal;">(opcional, solo va en el PDF)</span></label>
+                <input type="date" id="mb_fechavenc">
+              </div>
+            </div>
             <label style="margin-top:10px; display:flex; align-items:center; gap:6px; font-weight:normal;">
               <input type="checkbox" id="mb_frecuente" style="width:auto;"> Guardar como bien frecuente
             </label>
             <button class="btn-primary" style="margin-top:10px;" onclick="agregarBienGuia()">Agregar</button>
           </div>
         </div>
+
 
         <!-- Modal: Bienes frecuentes -->
         <div id="modalBienesFrecuentes" class="modal-overlay" style="display:none;">
@@ -2571,6 +2598,8 @@ function abrirModalBienGuia(){
   document.getElementById('mb_descripcion').value = '';
   document.getElementById('mb_unidad').value = 'NIU';
   document.getElementById('mb_cantidad').value = '';
+  document.getElementById('mb_lote').value = '';
+  document.getElementById('mb_fechavenc').value = '';
   document.getElementById('mb_frecuente').checked = false;
   document.getElementById('modalBienGuia').style.display='flex';
 }
@@ -2587,6 +2616,8 @@ function editarBienGuia(id){
   document.getElementById('mb_descripcion').value = it.descripcion || '';
   document.getElementById('mb_unidad').value = it.unidad || 'NIU';
   document.getElementById('mb_cantidad').value = it.cantidad || '';
+  document.getElementById('mb_lote').value = it.lote || '';
+  document.getElementById('mb_fechavenc').value = it.fechaVenc || '';
   document.getElementById('mb_frecuente').checked = false;
   document.getElementById('modalBienGuia').style.display='flex';
 }
@@ -2601,7 +2632,9 @@ function agregarBienGuia(){
     codSubpartida: document.getElementById('mb_subpartida').value.trim(),
     codProdSunat: document.getElementById('mb_codprodsunat').value.trim(),
     codGtin: document.getElementById('mb_gtin').value.trim(),
-    descripcion, unidad: document.getElementById('mb_unidad').value, cantidad
+    descripcion, unidad: document.getElementById('mb_unidad').value, cantidad,
+    lote: document.getElementById('mb_lote').value.trim(),
+    fechaVenc: document.getElementById('mb_fechavenc').value,
   };
   if(editandoBienGuiaId){
     const idx = itemsGuia.findIndex(x=>x.id===editandoBienGuiaId);
@@ -4186,7 +4219,12 @@ function generarGuia(){
     monto: null,
     fecha: document.getElementById('g_fecha').value || new Date().toISOString().slice(0,10),
     jsonSFS,
-    detalle: { items: itemsGuia.map(it=>({bienNormalizado:it.bienNormalizado, codigoBien:it.codigoBien, codSubpartida:it.codSubpartida, codProdSunat:it.codProdSunat, codGtin:it.codGtin, descripcion:it.descripcion, unidad:it.unidad, cantidad:it.cantidad})) },
+    // Campos adicionales opcionales (Beneficiario/Ítem/Código modular) — SOLO para impresión,
+    // NUNCA se incluyen en jsonSFS ni se envían a SUNAT (no existen en su esquema XSD).
+    beneficiario: document.getElementById('g_beneficiario') ? document.getElementById('g_beneficiario').value : '',
+    itemGeneral: document.getElementById('g_item_general') ? document.getElementById('g_item_general').value : '',
+    codigoModular: document.getElementById('g_codigo_modular') ? document.getElementById('g_codigo_modular').value : '',
+    detalle: { items: itemsGuia.map(it=>({bienNormalizado:it.bienNormalizado, codigoBien:it.codigoBien, codSubpartida:it.codSubpartida, codProdSunat:it.codProdSunat, codGtin:it.codGtin, descripcion:it.descripcion, unidad:it.unidad, cantidad:it.cantidad, lote:it.lote, fechaVenc:it.fechaVenc})) },
     sunatEstado: 'enviando'
   };
   emitidos.unshift(registro);
@@ -4231,6 +4269,9 @@ function generarGuia(){
   document.getElementById('g_partida').value='';
   document.getElementById('g_llegada').value='';
   document.getElementById('g_observaciones').value='';
+  if(document.getElementById('g_beneficiario')) document.getElementById('g_beneficiario').value='';
+  if(document.getElementById('g_item_general')) document.getElementById('g_item_general').value='';
+  if(document.getElementById('g_codigo_modular')) document.getElementById('g_codigo_modular').value='';
   onCambioMotivoGuia(); // si el motivo es Compra, vuelve a llenar el destinatario con los datos propios; si no, limpia normal
   if(document.getElementById('g_motivo').value !== '02'){
     document.getElementById('g_destinatario').value='';
@@ -5536,168 +5577,162 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
 
   const filasGuia = filasItems.map(it => `
     <tr>
-      <td style="text-align:center;">${it.bienNormalizado ? 'SÍ' : 'NO'}</td>
       <td>${it.codigo!=='-' ? it.codigo : ''}</td>
-      <td>${it.codProdSunat||''}</td>
-      <td>${it.codGtin||''}</td>
+      <td style="text-align:right;">${(parseFloat(it.cant)||0).toFixed(2)} ${it.unidad||'UND'}</td>
       <td>${it.desc}</td>
-      <td style="text-align:center;">${it.unidad||'UND'}</td>
-      <td style="text-align:right;">${(parseFloat(it.cant)||0).toFixed(2)}</td>
+      <td style="text-align:center;">${it.lote||''}</td>
+      <td style="text-align:center;">${it.fechaVenc||''}</td>
     </tr>
-  `).join('') || `<tr><td colspan="7" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
+  `).join('') || `<tr><td colspan="5" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
 
-  // Link oficial de consulta pública SUNAT para verificar la guía (mismo dominio que usa
-  // el propio QR una vez que SUNAT acepta el documento).
-  const urlConsultaPublica = 'https://e-factura.sunat.gob.pe/v1/contribuyente/gre/comprobantes/descargaqr';
+  const urlConsultaPublica = 'https://www.sunat.gob.pe/ol-it-wsconsvalicpe/ValidezItemFactura.htm';
   const hashMostrado = e.sunatQrUrl ? (e.sunatQrUrl.split('hashqr=')[1] || '') : '';
+
+  // Datos adicionales opcionales (Beneficiario/Ítem/Código modular) — SOLO impresión,
+  // nunca se mandan a SUNAT. Se muestran solo si se llenaron.
+  const tieneDatosAdicionales = e.beneficiario || e.itemGeneral || e.codigoModular;
 
   return `
 <!DOCTYPE html><html><head><meta charset="UTF-8"><title>${e.serie}</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <style>
   @page { size: A4; margin: 12mm; }
-  body { font-family: Arial, sans-serif; color:#111; font-size:11px; }
-  .marco { border:1px solid #333; }
-  .fila-header { display:flex; }
-  .logo-box { width:90px; padding:8px; display:flex; align-items:center; justify-content:center; border-right:1px solid #333; }
+  :root {
+    --azul: #004a99;
+    --azul-borde: #a0c4ff;
+    --azul-fondo: #f0f7ff;
+  }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color:#333; font-size:11px; margin:0; padding:0; }
+  .box { border:1.5px solid var(--azul-borde); border-radius:12px; padding:14px; margin-bottom:12px; background:#fff; }
+  .box.fondo { background:var(--azul-fondo); }
+  .seccion-titulo { font-size:12px; font-weight:bold; color:var(--azul); margin-bottom:8px; border-bottom:1px solid var(--azul-borde); padding-bottom:4px; }
+  .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:14px; }
+  .logo-box { flex:0 0 90px; }
   .logo-box img { max-width:100%; max-height:70px; object-fit:contain; }
-  .empresa-box { flex:1; padding:8px 12px; border-right:1px solid #333; }
-  .empresa-box h1 { font-size:13.5px; margin:0 0 4px; }
-  .empresa-box .dir { font-size:10px; color:#333; }
-  .doc-box { width:200px; padding:8px 12px; text-align:center; }
-  .doc-box .ruc { font-size:11px; font-weight:bold; }
-  .doc-box .tipo { font-size:12px; font-weight:bold; margin:5px 0; }
-  .doc-box .serie { font-size:13px; font-weight:bold; letter-spacing:0.5px; }
-  table.datos { width:100%; border-collapse:collapse; border-top:1px solid #333; }
-  table.datos td { padding:5px 8px; font-size:10.5px; vertical-align:top; border-bottom:1px solid #ccc; }
-  table.datos td.label { font-weight:bold; width:120px; white-space:nowrap; }
-  table.datos tr:last-child td { border-bottom:none; }
-  table.items { width:100%; border-collapse:collapse; margin-top:10px; }
-  table.items th { background:#2b2b2b; color:#fff; padding:6px 5px; font-size:10px; text-align:left; }
-  table.items td { padding:5px; font-size:10.5px; border-bottom:1px solid #eee; }
-  .pie { display:flex; margin-top:14px; gap:14px; align-items:flex-start; }
-  .qr-col { width:110px; text-align:center; }
-  #qrcode { margin:0 auto 4px; }
-  .qr-col .resumen { font-size:8.5px; color:#555; word-break:break-all; line-height:1.3; }
-  .consulta-col { flex:1; font-size:9.5px; color:#444; padding-top:4px; }
-  .consulta-col a { color:#1a54c4; word-break:break-all; }
-  .totales-box { border:1px solid #333; padding:6px 10px; font-size:10.5px; min-width:160px; }
-  .totales-box div { display:flex; justify-content:space-between; padding:2px 0; }
-  .firma-col { width:220px; text-align:center; padding-top:34px; font-size:10px; }
-  .firma-col .linea { border-top:1px solid #333; margin-bottom:4px; }
-  .aviso { margin-top:10px; padding:6px 10px; font-size:9.5px; }
+  .empresa-info { flex:1; text-align:center; }
+  .empresa-nombre { font-size:15px; font-weight:bold; color:#000; margin:0 0 4px; }
+  .empresa-detalles { font-size:9.5px; color:#333; text-transform:uppercase; }
+  .documento-box { flex:0 0 210px; background:var(--azul); color:#fff; border-radius:12px; padding:12px; text-align:center; }
+  .documento-ruc { font-size:12.5px; font-weight:bold; }
+  .documento-titulo { font-size:11px; margin:5px 0; text-transform:uppercase; }
+  .documento-numero { font-size:13px; font-weight:bold; letter-spacing:0.5px; }
+  .data-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 20px; }
+  .data-item { display:flex; align-items:flex-start; }
+  .data-label { font-weight:bold; color:#000; width:115px; flex-shrink:0; }
+  table.items { width:100%; border-collapse:collapse; margin-top:6px; }
+  table.items th { background:var(--azul); color:#fff; font-weight:bold; text-align:left; padding:7px 6px; border:1px solid var(--azul-borde); font-size:10px; }
+  table.items td { padding:6px; border:1px solid var(--azul-borde); font-size:10.5px; vertical-align:top; }
+  table.items tbody tr:nth-child(even) { background:#f9fbff; }
+  .footer-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:14px; }
+  .qr-section { display:flex; align-items:center; gap:10px; }
+  #qrcode { flex:0 0 90px; }
+  .resumen-hash { font-size:8.5px; color:#555; word-break:break-all; line-height:1.3; }
+  .totales-box { display:flex; flex-direction:column; justify-content:center; align-items:center; }
+  .total-item { text-align:center; margin:4px 0; }
+  .total-label { font-size:9.5px; color:#555; }
+  .total-value { font-size:15px; font-weight:bold; color:var(--azul); }
+  .firma-box { display:flex; flex-direction:column; justify-content:flex-end; height:90px; border:1.5px dashed var(--azul-borde); border-radius:12px; padding:10px; text-align:center; }
+  .firma-linea { border-top:1px solid #333; margin-top:8px; padding-top:5px; font-size:9.5px; }
+  .aviso { margin-top:10px; padding:6px 10px; font-size:9.5px; border-radius:8px; }
   .aviso.pendiente { background:#fff7e6; border:1px solid #e0a72c; color:#8a5a00; }
   .aviso.ok { background:#eafaf0; border:1px solid #2e9e5b; color:#1a7a3c; }
-  .footer-legal { margin-top:16px; text-align:center; font-size:9px; color:#777; border-top:1px solid #eee; padding-top:6px; }
+  .footer-legal { margin-top:14px; text-align:center; font-size:9px; color:#777; border-top:1px solid #eee; padding-top:6px; }
 </style></head>
 <body>
 
-  <div class="marco">
-    <div class="fila-header">
-      ${emp.logo ? `<div class="logo-box"><img src="${emp.logo}"></div>` : ''}
-      <div class="empresa-box">
-        <h1>${emp.nombre}</h1>
-        <div class="dir">${emp.direccion || ''}</div>
-      </div>
-      <div class="doc-box">
-        <div class="ruc">R.U.C. ${emp.ruc}</div>
-        <div class="tipo">GUÍA DE REMISIÓN<br>ELECTRÓNICA${esTransportista ? ' — TRANSPORTISTA' : ''}</div>
-        <div class="serie">${e.serie}</div>
-      </div>
+  <div class="header">
+    ${emp.logo ? `<div class="logo-box"><img src="${emp.logo}"></div>` : ''}
+    <div class="empresa-info">
+      <div class="empresa-nombre">${emp.nombre}</div>
+      <div class="empresa-detalles">${emp.direccion || ''}</div>
     </div>
-
-    <table class="datos">
-      <tr>
-        <td class="label">Destinatario</td>
-        <td>${e.cliente}</td>
-        <td class="label">Ítem</td>
-        <td style="width:160px;">${filasItems[0] ? filasItems[0].desc : ''}</td>
-      </tr>
-      <tr>
-        <td class="label">RUC/DNI</td>
-        <td>${e.clienteDoc || cab.numDocDestinatario || '-'}</td>
-        <td class="label">Dirección</td>
-        <td>${cab.dirDestinatario || '-'}</td>
-      </tr>
-      <tr>
-        <td class="label">Partida</td>
-        <td colspan="3">${cab.ubiPartida ? `[${cab.ubiPartida}] ` : ''}${cab.dirPartida || '-'}</td>
-      </tr>
-      <tr>
-        <td class="label">Llegada</td>
-        <td colspan="3">${cab.ubiLlegada ? `[${cab.ubiLlegada}] ` : ''}${cab.dirLlegada || '-'}</td>
-      </tr>
-      <tr>
-        <td class="label">Motivo</td>
-        <td>${cab.desMotivoTrasladoDatosEnvio || '-'}</td>
-        <td class="label">Modalidad</td>
-        <td>${cab.modTrasladoDatosEnvio === '01' ? 'Transporte público' : 'Transporte privado'}</td>
-      </tr>
-      <tr>
-        <td class="label">Fecha de emisión</td>
-        <td>${e.fecha}</td>
-        <td class="label">Fecha de traslado</td>
-        <td>${cab.fecInicioTrasladoDatosEnvio || e.fecha}</td>
-      </tr>
-      ${cab.modTrasladoDatosEnvio === '01' ? `
-      <tr>
-        <td class="label">N° Registro MTC</td>
-        <td colspan="3">${cab.numRegistroMTC || '-'}</td>
-      </tr>` : `
-      <tr>
-        <td class="label">Transportista</td>
-        <td>RUC ${cab.numDocTransportista || '-'}</td>
-        <td class="label">Conductor</td>
-        <td>${cab.nomConductorTransPrivado || '-'}</td>
-      </tr>
-      <tr>
-        <td class="label">Placa</td>
-        <td colspan="3">${cab.numPlacaTransPrivado || '-'}</td>
-      </tr>`}
-    </table>
-
-    <div style="padding:0 8px;">
-      <table class="items">
-        <thead>
-          <tr>
-            <th style="width:8%; text-align:center;">Bien norm.</th>
-            <th style="width:12%;">Código de Bien</th>
-            <th style="width:12%;">Cód. prod. SUNAT</th>
-            <th style="width:10%;">Cód. GTIN</th>
-            <th>Descripción Detallada</th>
-            <th style="width:9%; text-align:center;">Unid.</th>
-            <th style="width:9%; text-align:right;">Cant.</th>
-          </tr>
-        </thead>
-        <tbody>${filasGuia}</tbody>
-      </table>
-    </div>
-
-    <div style="padding:10px 8px 12px;">
-      <div class="pie">
-        <div class="qr-col">
-          <div id="qrcode"></div>
-          ${e.sunatQrUrl ? `<div class="resumen">Resumen<br>${hashMostrado}</div>` : ''}
-        </div>
-        <div class="consulta-col">
-          Representación impresa de la Guía de Remisión Electrónica. Puede consultar y descargar el documento original ingresando el RUC del emisor (${emp.ruc}), el tipo, serie y número (${e.serie}) en:<br>
-          <a href="https://www.sunat.gob.pe/ol-it-wsconsvalicpe/ValidezItemFactura.htm" target="_blank">https://www.sunat.gob.pe/ol-it-wsconsvalicpe/ValidezItemFactura.htm</a>
-          ${e.sunatQrUrl ? `<br><br>Enlace directo de verificación:<br><a href="${e.sunatQrUrl}" target="_blank">${e.sunatQrUrl}</a>` : ''}
-        </div>
-        <div class="totales-box">
-          <div><span>Total bultos</span><span>${cab.numBultosDatosEnvio || '1'}</span></div>
-          <div><span>Peso total (Kg)</span><span>${cab.psoBrutoTotalBienesDatosEnvio || '0.00'}</span></div>
-        </div>
-        <div class="firma-col">
-          <div class="linea"></div>
-          Conformidad del cliente
-        </div>
-      </div>
-
-      ${!qrDisponible ? `<div class="aviso pendiente">⚠ Pendiente de confirmación SUNAT — este QR es provisional (aún no se cargó el CDR de respuesta oficial).</div>` : ''}
-      ${qrDisponible && e.sunatQrUrl ? `<div class="aviso ok">✓ Documento aceptado por SUNAT — QR oficial verificado.</div>` : ''}
+    <div class="documento-box">
+      <div class="documento-ruc">R.U.C. ${emp.ruc}</div>
+      <div class="documento-titulo">GUÍA DE REMISIÓN<br>ELECTRÓNICA${esTransportista ? ' — TRANSPORTISTA' : ''}</div>
+      <div class="documento-numero">${e.serie}</div>
     </div>
   </div>
+
+  <div class="box fondo data-grid">
+    <div class="data-item"><span class="data-label">Destinatario</span><span>: ${e.cliente}</span></div>
+    <div class="data-item"><span class="data-label">RUC/DNI</span><span>: ${e.clienteDoc || cab.numDocDestinatario || '-'}</span></div>
+    ${tieneDatosAdicionales ? `
+    ${e.beneficiario ? `<div class="data-item"><span class="data-label">Beneficiario</span><span>: ${e.beneficiario}</span></div>` : '<div></div>'}
+    ${e.itemGeneral ? `<div class="data-item"><span class="data-label">Ítem</span><span>: ${e.itemGeneral}</span></div>` : '<div></div>'}
+    ${e.codigoModular ? `<div class="data-item"><span class="data-label">Código modular</span><span>: ${e.codigoModular}</span></div>` : ''}
+    ` : ''}
+  </div>
+
+  <div class="box data-grid">
+    <div class="data-item" style="grid-column:1/-1;"><span class="data-label">Partida</span><span>: ${cab.ubiPartida ? `[${cab.ubiPartida}] ` : ''}${cab.dirPartida || '-'}</span></div>
+    <div class="data-item" style="grid-column:1/-1;"><span class="data-label">Llegada</span><span>: ${cab.ubiLlegada ? `[${cab.ubiLlegada}] ` : ''}${cab.dirLlegada || '-'}</span></div>
+  </div>
+
+  <div class="box fondo data-grid">
+    <div class="data-item"><span class="data-label">Motivo</span><span>: ${cab.desMotivoTrasladoDatosEnvio || '-'}</span></div>
+    <div class="data-item"><span class="data-label">Modalidad</span><span>: ${cab.modTrasladoDatosEnvio === '01' ? 'Transporte público' : 'Transporte privado'}</span></div>
+    <div class="data-item"><span class="data-label">Fecha de emisión</span><span>: ${e.fecha}</span></div>
+    <div class="data-item"><span class="data-label">Fecha de traslado</span><span>: ${cab.fecInicioTrasladoDatosEnvio || e.fecha}</span></div>
+  </div>
+
+  <div class="box data-grid">
+    ${cab.modTrasladoDatosEnvio === '01' ? `
+    <div class="data-item" style="grid-column:1/-1;"><span class="data-label">N° Registro MTC</span><span>: ${cab.numRegistroMTC || '-'}</span></div>
+    ` : `
+    <div class="data-item"><span class="data-label">Transportista</span><span>: RUC ${cab.numDocTransportista || '-'}</span></div>
+    <div class="data-item"><span class="data-label">Conductor</span><span>: ${cab.nomConductorTransPrivado || '-'}</span></div>
+    <div class="data-item" style="grid-column:1/-1;"><span class="data-label">Placa</span><span>: ${cab.numPlacaTransPrivado || '-'}</span></div>
+    `}
+  </div>
+
+  <div class="box">
+    <div class="seccion-titulo">DETALLE DE LOS BIENES TRASLADADOS</div>
+    <table class="items">
+      <thead>
+        <tr>
+          <th style="width:12%;">Código</th>
+          <th style="width:14%; text-align:right;">Cant. U.M.</th>
+          <th>Descripción</th>
+          <th style="width:14%; text-align:center;">Lote</th>
+          <th style="width:14%; text-align:center;">Fecha venc.</th>
+        </tr>
+      </thead>
+      <tbody>${filasGuia}</tbody>
+    </table>
+  </div>
+
+  <div class="footer-grid">
+    <div class="box qr-section">
+      <div id="qrcode"></div>
+      <div>
+        <strong>Resumen</strong><br>
+        ${e.sunatQrUrl ? `<span class="resumen-hash">${hashMostrado}</span><br>` : ''}
+        <span style="font-size:9px;">Representación impresa de la GUÍA DE REMISIÓN ELECTRÓNICA.</span>
+      </div>
+    </div>
+    <div class="box fondo totales-box">
+      <div class="total-item">
+        <div class="total-label">Total cantidad de bultos</div>
+        <div class="total-value">${cab.numBultosDatosEnvio || '1'}</div>
+      </div>
+      <div class="total-item">
+        <div class="total-label">Total Peso (Kg)</div>
+        <div class="total-value">${cab.psoBrutoTotalBienesDatosEnvio || '0.00'}</div>
+      </div>
+    </div>
+    <div class="firma-box">
+      <div class="firma-linea">Conformidad del cliente</div>
+    </div>
+  </div>
+
+  <div style="font-size:9px; color:#555; margin-top:6px;">
+    Puede consultar y descargar el documento original ingresando el RUC del emisor (${emp.ruc}), el tipo, serie y número (${e.serie}) en:
+    <a href="${urlConsultaPublica}" target="_blank" style="color:#1a54c4;">${urlConsultaPublica}</a>
+    ${e.sunatQrUrl ? `<br>Enlace directo de verificación: <a href="${e.sunatQrUrl}" target="_blank" style="color:#1a54c4; word-break:break-all;">${e.sunatQrUrl}</a>` : ''}
+  </div>
+
+  ${!qrDisponible ? `<div class="aviso pendiente">⚠ Pendiente de confirmación SUNAT — este QR es provisional (aún no se cargó el CDR de respuesta oficial).</div>` : ''}
+  ${qrDisponible && e.sunatQrUrl ? `<div class="aviso ok">✓ Documento aceptado por SUNAT — QR oficial verificado.</div>` : ''}
 
   <div class="footer-legal">
     ${emp.textoLegal || 'Representación impresa de la Guía de Remisión Electrónica. Generado con FACTASH.'}
@@ -5734,7 +5769,9 @@ function imprimirComprobante(idx, formato){
           desc: it.descripcion || '',
           cant: it.cantidad || 0,
           unidad: it.unidad || '',
-          precio: 0
+          precio: 0,
+          lote: it.lote || '',
+          fechaVenc: it.fechaVenc || '',
         };
       }
       const nombreProd = it['Producto']||it.producto||'';
