@@ -263,7 +263,7 @@
     </div>
 
     <div class="placeholder-note" id="notaFact">
-      Índice de trabajo — datos de prueba. Nada se envía a SUNAT ni se guarda todavía.
+      Comprobante electrónico — se genera y envía a SUNAT al confirmar.
     </div>
 
     <!-- Formulario Retención / Percepción (documento independiente, no usa la tabla de ítems normal) -->
@@ -578,9 +578,7 @@
       <button class="doc-btn" data-doc="transportista" onclick="cambiarDoc('guias','transportista')">Guía Transportista</button>
     </div>
 
-    <div class="placeholder-note">Índice de trabajo — datos de prueba.</div>
 
-    <div class="grid">
       <div class="card">
         <h2 id="tituloDocGuia">Nueva Guía de Remisión Remitente</h2>
 
@@ -2381,7 +2379,7 @@ function cambiarDoc(grupo, doc){
       if(btnDatosAdic) btnDatosAdic.parentElement.style.display = esNoFiscal ? 'none' : 'block';
       document.getElementById('notaFact').textContent = esNoFiscal
         ? `⚠️ ${docLabels[doc]} — este documento NO ES un comprobante de pago válido para SUNAT, es solo para uso interno/comercial.`
-        : 'Índice de trabajo — datos de prueba. Nada se envía a SUNAT ni se guarda todavía.';
+        : 'Comprobante electrónico — se genera y envía a SUNAT al confirmar.';
       onTipoDocChange();
 
       // Percepción por defecto configurada en la empresa — solo aplica a Factura/Boleta
