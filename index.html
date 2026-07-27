@@ -87,6 +87,7 @@
   td{padding:8px 6px; border-bottom:1px solid var(--line);}
   td input{padding:6px 8px; font-size:12.5px;}
   .item-row td:last-child{text-align:center;}
+  .fila-producto td:last-child{text-align:center;}
   .rm-btn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:15px;}
   .add-item{margin-top:8px; background:var(--panel-2); border:1px dashed var(--line); color:var(--text-dim); padding:8px; border-radius:7px; width:100%; cursor:pointer; font-size:12px;}
 
@@ -550,9 +551,9 @@
           <input type="text" id="f_leyenda" placeholder="SON: ...">
         </div>
 
-        <table>
+        <table style="table-layout:fixed;">
           <thead>
-            <tr><th style="width:30%">Producto</th><th>Cant.</th><th>Unid.</th><th>P. Unit.</th><th>Afectación IGV</th><th>Total</th><th></th></tr>
+            <tr><th style="width:26%">Producto</th><th style="width:9%">Cant.</th><th style="width:10%">Unid.</th><th style="width:13%">P. Unit.</th><th style="width:22%">Afectación IGV</th><th style="width:14%">Total</th><th style="width:6%"></th></tr>
           </thead>
           <tbody id="itemsBody"></tbody>
         </table>
@@ -2475,10 +2476,26 @@ function onModalidadChange(){
 }
 
 function agregarItem(){
-  items.push({producto:'', cant:1, unidad:'UND', precio:0, afectacion:'10'});
+  items.push({producto:'', cant:1, unidad:'UND', precio:0, afectacion:'10', manual:false});
   renderItems();
 }
 function quitarItem(i){ items.splice(i,1); renderItems(); }
+
+function activarManualItem(i){
+  items[i].manual = true;
+  items[i].producto = '';
+  renderItems();
+  setTimeout(()=>{
+    const filas = document.querySelectorAll('#itemsBody tr.fila-producto');
+    const inp = filas[i] ? filas[i].querySelector('.producto-manual-input') : null;
+    if(inp) inp.focus();
+  }, 0);
+}
+function volverCatalogoItem(i){
+  items[i].manual = false;
+  items[i].producto = '';
+  renderItems();
+}
 
 // Catálogo 07 SUNAT (simplificado a los códigos de uso frecuente)
 // ---------- TASA DE IGV (según régimen de la empresa y año de emisión) ----------
@@ -2512,13 +2529,21 @@ function renderItems(){
   body.innerHTML = '';
   items.forEach((it,i)=>{
     const tr = document.createElement('tr');
-    tr.className='item-row';
+    tr.className='fila-producto';
     tr.innerHTML = `
       <td>
-        <select onchange="setItemProducto(${i}, this)">
-          <option value="">-- elegir --</option>
-          ${emp.productos.map(p=>`<option ${p.nombre===it.producto?'selected':''}>${p.nombre}</option>`).join('')}
-        </select>
+        ${it.manual ? `
+          <div style="display:flex; align-items:center; gap:6px;">
+            <input type="text" class="producto-manual-input" placeholder="Ej: Servicio de asesoría contable" value="${it.producto.replace(/"/g,'&quot;')}" oninput="items[${i}].producto=this.value;" style="flex:1;">
+            <span title="Volver a elegir del catálogo" style="cursor:pointer; color:var(--text-dim); font-size:13px;" onclick="volverCatalogoItem(${i})">📋</span>
+          </div>
+        ` : `
+          <select onchange="setItemProducto(${i}, this)">
+            <option value="">-- elegir --</option>
+            <option value="__manual__">✏️ Escribir manualmente (servicio, etc.)</option>
+            ${emp.productos.map(p=>`<option ${p.nombre===it.producto?'selected':''}>${p.nombre}</option>`).join('')}
+          </select>
+        `}
       </td>
       <td><input type="number" min="0" step="0.01" value="${it.cant}" oninput="editarCantidadItem(${i}, this.value)"></td>
       <td><input type="text" value="${it.unidad}" oninput="items[${i}].unidad=this.value;"></td>
@@ -2551,7 +2576,7 @@ function editarPrecioItem(i, val){
   renderTotales();
 }
 function actualizarTotalFilaItem(i){
-  const filas = document.querySelectorAll('#itemsBody tr.item-row');
+  const filas = document.querySelectorAll('#itemsBody tr.fila-producto');
   const totalInput = filas[i] ? filas[i].querySelector('.total-item-input') : null;
   if(totalInput) totalInput.value = (items[i].cant * items[i].precio).toFixed(2);
 }
@@ -2560,7 +2585,7 @@ function editarTotalItem(i, val){
   const precio = items[i].precio;
   if(precio > 0){
     items[i].cant = +(total / precio).toFixed(4);
-    const filas = document.querySelectorAll('#itemsBody tr.item-row');
+    const filas = document.querySelectorAll('#itemsBody tr.fila-producto');
     const cantInput = filas[i] ? filas[i].querySelectorAll('input')[0] : null;
     if(cantInput) cantInput.value = items[i].cant;
   }
@@ -2568,6 +2593,7 @@ function editarTotalItem(i, val){
 }
 
 function setItemProducto(i, sel){
+  if(sel.value === '__manual__'){ activarManualItem(i); return; }
   const emp = empresas[empresaActual];
   const p = emp.productos.find(p=>p.nombre===sel.value);
   items[i].producto = sel.value;
