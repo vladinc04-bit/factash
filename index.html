@@ -234,6 +234,7 @@
   <button class="tab-btn" data-tab="emitidos" onclick="cambiarTab('emitidos')">📋 Emitidos</button>
   <button class="tab-btn" data-tab="masivo" onclick="cambiarTab('masivo')">⚡ Emisión Masiva</button>
   <button class="tab-btn" data-tab="productos" onclick="cambiarTab('productos')">📦 Productos</button>
+  <button class="tab-btn" data-tab="reportes" onclick="cambiarTab('reportes')">📊 Reportes</button>
   <button class="tab-btn" data-tab="config" onclick="cambiarTab('config')">⚙️ Configuración</button>
 </nav>
 
@@ -1412,6 +1413,42 @@
   </section>
 
   <!-- ===================== TAB CONFIGURACIÓN ===================== -->
+  <section id="tab-reportes" style="display:none;">
+    <div class="card">
+      <h2>Registro de Ventas — por rango de fechas</h2>
+      <div class="placeholder-note" style="margin-bottom:12px;">
+        Genera el Registro de Ventas (formato SUNAT / libros electrónicos) a partir de tus Facturas, Boletas, Notas de Crédito y Débito emitidas. Puedes verlo aquí mismo o descargarlo en Excel con el mismo formato que usa tu contador.
+      </div>
+      <div class="row2">
+        <div>
+          <label>Desde</label>
+          <input type="date" id="rep_desde">
+        </div>
+        <div>
+          <label>Hasta</label>
+          <input type="date" id="rep_hasta">
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button class="btn-primary" onclick="generarReporteVentas()">Generar reporte</button>
+        <button class="doc-btn" onclick="descargarReporteVentasExcel()">⬇️ Descargar Excel</button>
+      </div>
+    </div>
+
+    <div class="card" id="cardResultadoReporte" style="display:none;">
+      <h2>Resultado <span id="repTituloRango" class="n"></span></h2>
+      <div style="overflow-x:auto;">
+        <table class="items-table" id="tablaReporteVentas" style="width:100%; font-size:11px; border-collapse:collapse;">
+          <thead>
+            <tr id="filaHeaderReporte"></tr>
+          </thead>
+          <tbody id="cuerpoReporteVentas"></tbody>
+        </table>
+      </div>
+      <div id="totalesReporte" style="margin-top:14px; font-weight:600;"></div>
+    </div>
+  </section>
+
   <section id="tab-config" style="display:none;">
     <div class="placeholder-note">
       Estos datos se usan para armar el PDF A4/Ticket de tus comprobantes (logo, contacto, bancos, texto legal) y
@@ -2311,7 +2348,7 @@ function cerrarSesion(){
 function cambiarTab(tab){
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
   document.querySelector(`nav.tabs button[data-tab="${tab}"]`).classList.add('active');
-  ['facturacion','guias','emitidos','masivo','productos','config'].forEach(t=>{
+  ['facturacion','guias','emitidos','masivo','productos','reportes','config'].forEach(t=>{
     document.getElementById('tab-'+t).style.display = (t===tab)?'block':'none';
   });
   if(tab==='masivo'){
@@ -6028,6 +6065,147 @@ function imprimirComprobante(idx, formato){
   const ventana = window.open('', '_blank', 'width=850,height=1100');
   ventana.document.write(html);
   ventana.document.close();
+}
+
+// ===========================================================================
+// REGISTRO DE VENTAS — formato SUNAT/PLE, generado a partir de los comprobantes
+// (Factura/Boleta/Nota Crédito/Nota Débito) emitidos en FACTASH.
+// Se muestra en pantalla y también se puede descargar en Excel con la misma
+// estructura de 34 columnas del Registro de Ventas oficial.
+// ===========================================================================
+const REP_TIPO_DOC_TABLA10 = { factura:'01', boleta:'03', nc:'07', nd:'08' };
+let reporteVentasFilasActual = [];
+
+function armarFilasReporteVentas(desde, hasta){
+  const emp = empresas[empresaActual];
+  const filas = [];
+  emitidos
+    .filter(e => e.empresa===empresaActual && e.grupo==='facturacion' && !e.noFiscal
+      && ['factura','boleta','nc','nd'].includes(e.tipo)
+      && e.fecha >= desde && e.fecha <= hasta && e.jsonSUNAT)
+    .sort((a,b)=> a.fecha.localeCompare(b.fecha))
+    .forEach((e, idx) => {
+      const cab = e.jsonSUNAT.cabecera || {};
+      const det = e.jsonSUNAT.detalle || [];
+      const [serieDoc, numeroDoc] = (e.serie||'-').split('-');
+      (det.length ? det : [{}]).forEach(it => {
+        const esGravado = it.tipAfeIGV === '10';
+        const esExonerado = it.tipAfeIGV === '20';
+        const esInafecto = it.tipAfeIGV === '30';
+        filas.push({
+          correlativo: idx+1,
+          fecEmision: cab.fecEmision || e.fecha,
+          fecVcmto: '',
+          tipoDoc: REP_TIPO_DOC_TABLA10[e.tipo] || '01',
+          serie: serieDoc || '',
+          numero: numeroDoc || '',
+          tipDocCliente: cab.tipDocUsuario || e.tipoDocCliente || '6',
+          numDocCliente: cab.numDocUsuario || e.numDocCliente || '',
+          rznSocialCliente: cab.rznSocialUsuario || e.cliente || '',
+          articulo: it.desItem || '',
+          cantidad: it.ctdUnidadItem || '',
+          valorExportacion: '0.00',
+          baseGravada: esGravado ? (it.mtoBaseIgvItem||'0.00') : '0.00',
+          exonerada: esExonerado ? (it.mtoValorVentaItem||'0.00') : '0.00',
+          inafecto: esInafecto ? (it.mtoValorVentaItem||'0.00') : '0.00',
+          isc: '0.00',
+          igv: it.mtoIgvItem || '0.00',
+          otrosTributos: '0.00',
+          importeTotal: cab.sumImpVenta || cab.sumPrecioVenta || e.monto || '0.00',
+          tipoCambio: '',
+          codProducto: it.codProducto || '',
+          precio: it.mtoPrecioVentaUnitario || '',
+          moneda: '1',
+          formaPago: 'CONTADO',
+          local: '001',
+        });
+      });
+    });
+  return filas;
+}
+
+const REP_HEADERS_FILA1 = ['Número Correlativo','Fecha de Emisión del Comprobante','Fecha de Vcmto.','Comprobante de Pago','','','Información del Cliente','','','Articulo','Cantidad','Valor Facturado de la Exportación','Base imponible de la Operación Gravada','Importe Total de la Operación Exonerada o Inafecta','','ISC','IGV y/o IPM','Otros Tributos','Importe Total del Comprobante de Pago','Tipo de Cambio','Código de Producto','Precio','Moneda de la Venta','Forma de pago','Local'];
+
+function generarReporteVentas(){
+  const desde = document.getElementById('rep_desde').value;
+  const hasta = document.getElementById('rep_hasta').value;
+  if(!desde || !hasta){ alert('Selecciona la fecha Desde y Hasta'); return; }
+  reporteVentasFilasActual = armarFilasReporteVentas(desde, hasta);
+
+  document.getElementById('cardResultadoReporte').style.display = 'block';
+  document.getElementById('repTituloRango').textContent = `— del ${desde} al ${hasta} (${reporteVentasFilasActual.length} líneas)`;
+
+  document.getElementById('filaHeaderReporte').innerHTML = REP_HEADERS_FILA1.map(h=>`<th style="background:var(--panel-2); padding:6px; border:1px solid var(--line); font-size:10px;">${h}</th>`).join('');
+
+  document.getElementById('cuerpoReporteVentas').innerHTML = reporteVentasFilasActual.map(f => `
+    <tr>
+      <td style="padding:5px; border:1px solid var(--line);">${f.correlativo}</td>
+      <td style="padding:5px; border:1px solid var(--line);">${f.fecEmision}</td>
+      <td style="padding:5px; border:1px solid var(--line);">${f.fecVcmto}</td>
+      <td style="padding:5px; border:1px solid var(--line);">${f.tipoDoc}-${f.serie}-${f.numero}</td>
+      <td></td><td></td>
+      <td style="padding:5px; border:1px solid var(--line);">${f.tipDocCliente} ${f.numDocCliente}</td>
+      <td></td>
+      <td style="padding:5px; border:1px solid var(--line);">${f.rznSocialCliente}</td>
+      <td style="padding:5px; border:1px solid var(--line);">${f.articulo}</td>
+      <td style="padding:5px; border:1px solid var(--line); text-align:right;">${f.cantidad}</td>
+      <td style="padding:5px; border:1px solid var(--line); text-align:right;">${f.valorExportacion}</td>
+      <td style="padding:5px; border:1px solid var(--line); text-align:right;">${f.baseGravada}</td>
+      <td style="padding:5px; border:1px solid var(--line); text-align:right;">${f.exonerada}</td>
+      <td style="padding:5px; border:1px solid var(--line); text-align:right;">${f.inafecto}</td>
+      <td style="padding:5px; border:1px solid var(--line); text-align:right;">${f.isc}</td>
+      <td style="padding:5px; border:1px solid var(--line); text-align:right;">${f.igv}</td>
+      <td style="padding:5px; border:1px solid var(--line); text-align:right;">${f.otrosTributos}</td>
+      <td style="padding:5px; border:1px solid var(--line); text-align:right; font-weight:600;">${f.importeTotal}</td>
+      <td></td>
+      <td style="padding:5px; border:1px solid var(--line);">${f.codProducto}</td>
+      <td style="padding:5px; border:1px solid var(--line); text-align:right;">${f.precio}</td>
+      <td style="padding:5px; border:1px solid var(--line); text-align:center;">${f.moneda}</td>
+      <td style="padding:5px; border:1px solid var(--line);">${f.formaPago}</td>
+      <td style="padding:5px; border:1px solid var(--line);">${f.local}</td>
+    </tr>
+  `).join('');
+
+  const totalVenta = reporteVentasFilasActual.reduce((s,f)=>s+parseFloat(f.baseGravada||0)+parseFloat(f.exonerada||0)+parseFloat(f.inafecto||0),0);
+  const totalIgv = reporteVentasFilasActual.reduce((s,f)=>s+parseFloat(f.igv||0),0);
+  document.getElementById('totalesReporte').textContent = `Total base: S/ ${totalVenta.toFixed(2)}  —  Total IGV: S/ ${totalIgv.toFixed(2)}  —  Total general: S/ ${(totalVenta+totalIgv).toFixed(2)}`;
+}
+
+function descargarReporteVentasExcel(){
+  if(!reporteVentasFilasActual.length){
+    generarReporteVentas();
+    if(!reporteVentasFilasActual.length){ alert('No hay comprobantes en ese rango de fechas'); return; }
+  }
+  const emp = empresas[empresaActual];
+  const desde = document.getElementById('rep_desde').value;
+  const hasta = document.getElementById('rep_hasta').value;
+
+  const filaTitulo = [emp.nombre];
+  const filaVacia = [];
+  const filaPeriodo = [`REGISTRO DE VENTAS DEL PERIODO DEL ${desde} AL ${hasta}`];
+  const filaHeader1 = ['Número Correlativo','Fecha de Emisión del Comprobante','Fecha de Vcmto.','Comprobante de Pago','','','Información del Cliente','','','Articulo','Cantidad','Valor Facturado de la Exportación','Base imponible de la Operación Gravada','Importe Total de la Operación Exonerada o Inafecta','','ISC','IGV y/o IPM','Otros Tributos y Cargos que no forman parte de la Base Imponible','Importe Total del Comprobante de Pago','Tipo de Cambio','Referencia del Comprobante de Pago o Doc Orig que se modifica','','','','Fecha de Trabajo','Otro Periodo','Código de Producto','Precio','Moneda de la Venta','Forma de pago','Importe Medio de Pago','Nro. de referencia','Local'];
+  const filaHeader2 = ['','','','Tipo  (Tabla 10)','Nro de Serie','Número','','Documento de Identidad','','Apellidos y Nombre, Razón Social'];
+  const filaHeader3 = ['','','','','','','','Tipo  (Tabla 2)','Número','','','','','Exonerada','Inafecto','','','','','','Fecha','Tipo  (Tabla 10)','Nro de Serie','Número'];
+
+  const filasDatos = reporteVentasFilasActual.map(f => ([
+    f.correlativo, f.fecEmision, f.fecVcmto, f.tipoDoc, f.serie, f.numero, '',
+    f.tipDocCliente, f.numDocCliente, f.rznSocialCliente,
+    f.articulo, parseFloat(f.cantidad)||0, parseFloat(f.valorExportacion)||0,
+    parseFloat(f.baseGravada)||0, parseFloat(f.exonerada)||0, parseFloat(f.inafecto)||0,
+    parseFloat(f.isc)||0, parseFloat(f.igv)||0, 0, parseFloat(f.importeTotal)||0,
+    '', '', '', '', '',
+    f.fecEmision, '', f.codProducto, parseFloat(f.precio)||0, f.moneda, f.formaPago, '', '', f.local
+  ]));
+
+  const filas = [filaTitulo, filaVacia, filaPeriodo, filaVacia, filaHeader1, filaHeader2, filaHeader3, filaVacia, ...filasDatos];
+  const ws = XLSX.utils.aoa_to_sheet(filas);
+  ws['!merges'] = [
+    {s:{r:0,c:0}, e:{r:0,c:8}},
+    {s:{r:2,c:0}, e:{r:2,c:8}},
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Registro Ventas');
+  XLSX.writeFile(wb, `Registro_Ventas_${emp.ruc}_${desde}_${hasta}.xlsx`);
 }
 
 function renderTodo(){
