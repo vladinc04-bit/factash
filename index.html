@@ -4593,27 +4593,77 @@ function procesarMasivo(){
 
   resumen.textContent = `— se generarán ${filasMasivoProcesadas.length} ${f.esGuia?'guía(s)':'comprobante(s)'}${errores?` (${errores} fila(s) ignorada(s), faltan columnas)`:''}`;
 
-  preview.innerHTML = filasMasivoProcesadas.map(g=>{
+  // Validaciones básicas por grupo, solo para ALERTAR antes de confirmar (no bloquean el envío,
+  // Vladi decide si corrige el Excel o continúa igual).
+  function validarGrupoGuia(cab){
+    const avisos = [];
+    const ruc = String(cab['RUCDestinatario']||'').trim();
+    if(ruc.length !== 11) avisos.push('RUC Destinatario no tiene 11 dígitos');
+    const ubiP = String(cab['UbigeoPartida']||'').trim();
+    const ubiL = String(cab['UbigeoLlegada']||'').trim();
+    if(ubiP.length !== 6 || !/^\d+$/.test(ubiP)) avisos.push('UbigeoPartida inválido');
+    if(ubiL.length !== 6 || !/^\d+$/.test(ubiL)) avisos.push('UbigeoLlegada inválido');
+    if(!['Publico','Privado'].includes(cab['Modalidad(Publico/Privado)'])) avisos.push('Modalidad debe ser "Publico" o "Privado"');
+    const esPublico = cab['Modalidad(Publico/Privado)'] === 'Publico';
+    if(esPublico){
+      if(!String(cab['RUCTransportista']||'').trim()) avisos.push('Falta RUCTransportista (obligatorio en modalidad Publico)');
+      if(!String(cab['MTC']||'').trim()) avisos.push('Falta N° Registro MTC (SUNAT puede rechazar sin esto)');
+      if(!String(cab['Placa']||'').trim()) avisos.push('Falta Placa');
+    } else {
+      if(!String(cab['Placa']||'').trim()) avisos.push('Falta Placa (obligatoria en modalidad Privado)');
+    }
+    const cdoc = String(cab['ConductorDoc']||'').trim();
+    if(cdoc && cdoc.length !== 8) avisos.push('ConductorDoc no tiene 8 dígitos (DNI)');
+    return avisos;
+  }
+
+  preview.innerHTML = filasMasivoProcesadas.map((g,idx)=>{
     const totalItems = g.items.length;
     let totalMonto = null;
     if(!f.esGuia){
       totalMonto = g.items.reduce((s,it)=>{
         const cant = parseFloat(it['Cantidad'])||0;
         const precio = parseFloat(it['PrecioUnit'])||0;
-        const afect = (it['Afectacion(Gravado/Exonerado/Inafecto/Exportacion)']||'gravado').toLowerCase();
-        const igv = afect==='gravado' ? tasaIGVEmpresa(empresas[empresaActual], new Date().toISOString().slice(0,10)) : 0;
         return s + cant*precio; // el precio ya incluye IGV
       },0);
     }
     const nombreCab = g.cabecera['Cliente'] || g.cabecera['Destinatario'] || '';
     const extra = f.esGuia ? (g.cabecera['DirLlegada']||'') : (g.cabecera['FormaPago(Contado/Credito)']||'');
+    const avisos = f.esGuia ? validarGrupoGuia(g.cabecera) : [];
+
+    // Detalle expandible: TODA la cabecera + tabla de items, para revisar antes de confirmar
+    const detalleId = `detalleMasivo_${idx}`;
+    const filasCabecera = Object.entries(g.cabecera)
+      .filter(([k,v]) => v !== undefined && v !== '')
+      .map(([k,v]) => `<div style="display:flex; gap:6px; font-size:11px; padding:2px 0; border-bottom:1px solid var(--line);"><span style="color:var(--text-dim); min-width:170px;">${k}</span><span>${v}</span></div>`)
+      .join('');
+    const filasItems = g.items.map(it => `
+      <tr>
+        <td>${it['Producto']||it['Descripcion']||''}</td>
+        <td>${it['CodigoProducto']||''}</td>
+        <td style="text-align:right;">${it['Cantidad']||''}</td>
+        <td>${it['Unidad']||''}</td>
+        ${f.esGuia ? `<td style="text-align:right;">${it['PesoUnitario']||''}</td>` : `<td style="text-align:right;">${it['PrecioUnit']||''}</td>`}
+      </tr>`).join('');
+
     return `
-      <div class="list-item">
-        <div class="top">
-          <span class="serie">${g.grupo}</span>
+      <div class="list-item" style="${avisos.length ? 'border:1px solid #e0a72c;' : ''}">
+        <div class="top" style="cursor:pointer;" onclick="const d=document.getElementById('${detalleId}'); d.style.display = d.style.display==='none' ? 'block' : 'none';">
+          <span class="serie">${g.grupo} ${avisos.length ? '⚠️' : '✓'}</span>
           ${totalMonto!==null ? `<span class="monto">S/ ${totalMonto.toFixed(2)}</span>` : `<span class="badge ${badgeClass(docActualMasivo)}">${totalItems} ítem(s)</span>`}
         </div>
         <div class="cliente">${nombreCab} · ${extra} — ${totalItems} producto(s)</div>
+        ${avisos.length ? `<div style="color:#e0a72c; font-size:11px; margin-top:4px;">${avisos.map(a=>`⚠️ ${a}`).join('<br>')}</div>` : ''}
+        <div style="font-size:11px; color:var(--text-dim); margin-top:4px; text-decoration:underline; cursor:pointer;" onclick="const d=document.getElementById('${detalleId}'); d.style.display = d.style.display==='none' ? 'block' : 'none';">Ver detalle completo ▾</div>
+        <div id="${detalleId}" style="display:none; margin-top:8px; padding:8px; background:rgba(0,0,0,0.2); border-radius:6px;">
+          <div style="font-weight:600; font-size:11px; margin-bottom:4px;">Cabecera</div>
+          ${filasCabecera}
+          <div style="font-weight:600; font-size:11px; margin:8px 0 4px;">Productos (${totalItems})</div>
+          <table style="width:100%; font-size:11px; border-collapse:collapse;">
+            <thead><tr style="text-align:left; color:var(--text-dim);"><th>Producto</th><th>Código</th><th style="text-align:right;">Cant.</th><th>Unidad</th><th style="text-align:right;">${f.esGuia?'Peso Unit.':'Precio'}</th></tr></thead>
+            <tbody>${filasItems}</tbody>
+          </table>
+        </div>
       </div>
     `;
   }).join('');
