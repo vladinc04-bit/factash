@@ -5855,6 +5855,8 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
   const cab = (e.jsonSFS && e.jsonSFS.cabecera) || {};
   const esTransportista = e.tipo === 'transportista';
   const esPublico = cab.modTrasladoDatosEnvio === '01';
+  const matchLicencia = (cab.obsGuia||'').match(/LICENCIA:\s*(\S+)/i);
+  const licenciaTexto = matchLicencia ? matchLicencia[1] : '-';
 
   const filasGuia = filasItems.map((it, i) => {
     const pu = parseFloat(it.peso) || 0;
@@ -5954,13 +5956,14 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
       <div class="seccion-titulo">Datos del transporte</div>
       ${esPublico ? `
       <div class="fila-dato"><span class="etq">Transportista</span><span>: RUC ${cab.numDocTransportista||'-'} - ${cab.nomTransportista || '-'}</span></div>
-      <div class="fila-dato"><span class="etq">Vehículo</span><span>: ${cab.numRegistroMTC || '-'}</span></div>
+      <div class="fila-dato"><span class="etq">Vehículo (placa)</span><span>: ${cab.numPlacaTransPrivado || '-'}</span></div>
+      <div class="fila-dato"><span class="etq">N° Registro MTC</span><span>: ${cab.numRegistroMTC || '-'}</span></div>
       <div class="fila-dato"><span class="etq">Conductor</span><span>: DNI ${cab.numDocIdeConductorTransPrivado||'-'} - ${cab.nomConductorTransPrivado || '-'}</span></div>
-      <div class="fila-dato"><span class="etq">Licencia</span><span>: ${cab.numDocIdeConductorTransPrivado || '-'}</span></div>
+      <div class="fila-dato"><span class="etq">Licencia</span><span>: ${licenciaTexto}</span></div>
       ` : `
-      <div class="fila-dato"><span class="etq">Vehículo</span><span>: ${cab.numPlacaTransPrivado || '-'}</span></div>
+      <div class="fila-dato"><span class="etq">Vehículo (placa)</span><span>: ${cab.numPlacaTransPrivado || '-'}</span></div>
       <div class="fila-dato"><span class="etq">Conductor</span><span>: DNI ${cab.numDocIdeConductorTransPrivado||'-'} - ${cab.nomConductorTransPrivado || '-'}</span></div>
-      <div class="fila-dato"><span class="etq">Licencia</span><span>: ${cab.numDocIdeConductorTransPrivado || '-'}</span></div>
+      <div class="fila-dato"><span class="etq">Licencia</span><span>: ${licenciaTexto}</span></div>
       `}
       <div class="fila-dato"><span class="etq">Modalidad</span><span>: Transporte ${esPublico?'público':'privado'}</span></div>
     </div>
