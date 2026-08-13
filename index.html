@@ -4024,7 +4024,12 @@ function buildGuiaJSON(emp, serie){
     dirLlegada: document.getElementById('g_llegada').value || "",
     ubiPartida: document.getElementById('g_ubigeo_partida').value || "",
     dirPartida: document.getElementById('g_partida').value || "",
-    obsGuia: document.getElementById('g_observaciones') ? document.getElementById('g_observaciones').value.trim() : "",
+    obsGuia: (() => {
+      const obs = document.getElementById('g_observaciones') ? document.getElementById('g_observaciones').value.trim() : "";
+      const lic = conductoresGuia.length ? conductoresGuia[0].licencia : "";
+      const licTexto = lic ? `LICENCIA: ${lic}` : "";
+      return [obs, licTexto].filter(Boolean).join(' — ');
+    })(),
     ublVersionId: "2.1",
     customizationId: "2.0"
   };
