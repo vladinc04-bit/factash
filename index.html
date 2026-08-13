@@ -5659,7 +5659,7 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
   const filasGuia = filasItems.map(it => `
     <tr>
       <td>${it.codigo!=='-' ? it.codigo : ''}</td>
-      <td style="text-align:right;">${(parseFloat(it.cant)||0).toFixed(2)} ${it.unidad||'UND'}</td>
+      <td style="text-align:right;">${(parseFloat(it.cant)||0).toFixed(2)} ${textoUnidadImpresion(it.unidad)||'UND'}</td>
       <td>${it.desc}</td>
       <td style="text-align:center;">${it.loteCant||''}</td>
       <td style="text-align:center;">${it.loteNro||''}</td>
@@ -5872,7 +5872,7 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
       <td style="text-align:center;">${i+1}</td>
       <td>${it.codigo!=='-' ? it.codigo : ''}</td>
       <td>${it.desc}${it.loteNro ? `, LOTE: ${it.loteNro}` : ''}${it.loteFV ? `, FV: ${it.loteFV}` : ''}</td>
-      <td style="text-align:center;">${it.unidad||'UNIDAD'}</td>
+      <td style="text-align:center;">${textoUnidadImpresion(it.unidad)||'UNIDAD'}</td>
       <td style="text-align:right;">${pu ? pu.toFixed(3) : ''}</td>
       <td style="text-align:right;">${cant}</td>
       <td style="text-align:right;">${pt ? pt.toFixed(2) : ''}</td>
@@ -6024,6 +6024,14 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
 </body></html>`;
 }
 
+// Traduce el código de unidad de medida SOLO para impresión — NIU se muestra como "UNIDAD"
+// (más claro de leer), cualquier otro código (KGM, GLL, LTR, ZZ, etc.) se imprime tal cual
+// viene, sin traducir, para no inventar textos que no correspondan.
+function textoUnidadImpresion(codigo){
+  if(!codigo) return '';
+  return String(codigo).trim().toUpperCase() === 'NIU' ? 'UNIDAD' : codigo;
+}
+
 function imprimirComprobante(idx, formato){
   const e = emitidos[idx];
   const emp = empresas[e.empresa];
@@ -6071,7 +6079,7 @@ function imprimirComprobante(idx, formato){
   if(anchoTicket){
     // ---------- TICKET 80mm (simplificado) ----------
     const filasTicket = filasItems.map(it => `
-      <tr><td>${it.desc}</td><td style="text-align:right;">${it.cant}</td><td style="text-align:right;">${esGuia?it.unidad:it.precio.toFixed(2)}</td></tr>
+      <tr><td>${it.desc}</td><td style="text-align:right;">${it.cant}</td><td style="text-align:right;">${esGuia?textoUnidadImpresion(it.unidad):it.precio.toFixed(2)}</td></tr>
     `).join('') || `<tr><td colspan="3" style="text-align:center; color:#999;">(ítems no disponibles)</td></tr>`;
 
     const html = `
