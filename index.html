@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FACTASH</title>
@@ -5638,13 +5639,12 @@ async function imprimirRangoPDF(){
     alert(`No hay comprobantes/guías con número entre ${desde} y ${hasta}.`);
     return;
   }
-  if(!confirm(`Se van a descargar ${candidatos.length} archivos (uno por uno, directo a tu carpeta de Descargas, sin ventanas ni confirmaciones). Cada archivo se abre en el navegador y desde ahí lo guardas como PDF cuando quieras (Ctrl+P → Guardar como PDF). ¿Continuar?`)) return;
+  if(!confirm(`Se van a descargar ${candidatos.length} archivos PDF (uno por uno, directo a tu carpeta de Descargas, sin ventanas ni confirmaciones). Puede tardar un poco por cada uno. ¿Continuar?`)) return;
   for(let k=0; k<candidatos.length; k++){
-    estadoEl.textContent = `Descargando ${k+1}/${candidatos.length}...`;
-    imprimirComprobante(candidatos[k].i, 'a4', 'descargar');
-    await new Promise(r=>setTimeout(r, 400));
+    estadoEl.textContent = `Generando PDF ${k+1}/${candidatos.length}...`;
+    await imprimirComprobante(candidatos[k].i, 'a4', 'descargar');
   }
-  estadoEl.textContent = `✓ ${candidatos.length} archivos descargados — ábrelos desde tu carpeta de Descargas para guardarlos como PDF cuando quieras.`;
+  estadoEl.textContent = `✓ ${candidatos.length} PDF descargados en tu carpeta de Descargas.`;
 }
 
 async function reintentarSeleccionados(){
@@ -6499,19 +6499,38 @@ function imprimirComprobante(idx, formato, modo){
 </body></html>`;
 
   if(modo === 'descargar'){
-    // Descarga el HTML directo como archivo — sin ventana de impresión, sin diálogo del
-    // navegador, sirve para procesar un lote grande sin tener que confirmar cada uno a mano.
-    // El html ya trae su propio QR embebido (JS), así que al abrirlo después se ve igual.
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${e.serie}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    return;
+    // Genera un PDF REAL (no solo HTML) sin pasar por el diálogo de impresión del navegador:
+    // se renderiza el mismo contenido dentro de un iframe oculto (para que el QR se dibuje bien
+    // con su propio script), y html2pdf.js convierte ese contenido a un archivo .pdf de verdad,
+    // que se descarga solo — sin ninguna ventana ni confirmación del sistema operativo.
+    return new Promise((resolve) => {
+      const htmlSinPrint = html.replace(/window\.print\(\);?/g, '');
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.left = '-9999px';
+      iframe.style.width = '850px';
+      iframe.style.height = '1200px';
+      document.body.appendChild(iframe);
+      iframe.srcdoc = htmlSinPrint;
+      iframe.onload = () => {
+        // Pequeña espera extra para que el <script> del QR (dentro del iframe) termine de dibujar
+        setTimeout(() => {
+          const contenido = iframe.contentDocument.body;
+          html2pdf().set({
+            margin: 0,
+            filename: `${e.serie}.pdf`,
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          }).from(contenido).save().then(() => {
+            document.body.removeChild(iframe);
+            resolve();
+          }).catch(() => {
+            document.body.removeChild(iframe);
+            resolve();
+          });
+        }, 700);
+      };
+    });
   }
 
   const ventana = window.open('', '_blank', 'width=850,height=1100');
