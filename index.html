@@ -2417,7 +2417,7 @@ function iniciarPollerEmitidos(){
     // 2) Guías ya Aceptadas pero a las que aún les falta el QR real (el CDR no estaba listo
     // en el momento en que se confirmó la aceptación) — buscarlo solo, sin reenviar nada.
     if(!emp || !emp.bridgeEmpresaId) return;
-    const sinQr = emitidos.find(e => e.empresa===empresaActual && e.sunatEstado==='aceptado' && e.grupo==='guias' && !e.sunatQrUrl && (e._intentosQr||0) < 5);
+    const sinQr = emitidos.find(e => e.empresa===empresaActual && e.sunatEstado==='aceptado' && e.grupo==='guias' && (!e.sunatQrUrl || !e.sunatHashCorto) && (e._intentosQr||0) < 5);
     if(sinQr){
       sinQr._intentosQr = (sinQr._intentosQr||0) + 1;
       try{
