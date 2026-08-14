@@ -2383,12 +2383,22 @@ let pollerEmitidosId = null;
 function iniciarPollerEmitidos(){
   if(pollerEmitidosId) return; // ya está corriendo
   pollerEmitidosId = setInterval(async () => {
-    const pendientes = emitidos
+    const candidatos = emitidos
       .map((e,i)=>({e,i}))
-      .filter(({e}) => e.sunatEstado === 'en_proceso');
-    if(!pendientes.length) return;
+      .filter(({e}) => {
+        if(e.sunatEstado === 'en_proceso') return true;
+        // Rechazo por TIMEOUT del bridge (el SFS no alcanzó a registrar el documento a tiempo,
+        // no es un rechazo real de SUNAT como un duplicado o error de validación) — reintentar
+        // solo, hasta 5 veces, para no insistir eternamente si el problema es de verdad.
+        const esTimeoutBridge = e.sunatEstado === 'rechazado'
+          && (e.sunatDescripcion||'').includes('no registró el documento tras');
+        if(esTimeoutBridge && (e._autoReintentos||0) < 5) return true;
+        return false;
+      });
+    if(!candidatos.length) return;
     // Reintenta de a una por vuelta (no todas a la vez) para no saturar el bridge/SFS
-    const { i } = pendientes[0];
+    const { e, i } = candidatos[0];
+    e._autoReintentos = (e._autoReintentos||0) + 1;
     await reintentarEnvio(i);
   }, 20000);
 }
