@@ -1269,6 +1269,14 @@
 
     <div class="card">
       <h2>Comprobantes y guías emitidos <span class="n">— <span id="nombreEmpresaEmit"></span></span></h2>
+      <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center; background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:8px;">
+        <span style="font-size:12px; color:var(--text-dim);">Imprimir PDF en lote — N°</span>
+        <input type="number" id="rangoImpDesde" placeholder="Desde" style="width:90px; padding:4px 6px; font-size:12px;">
+        <span style="font-size:12px; color:var(--text-dim);">hasta</span>
+        <input type="number" id="rangoImpHasta" placeholder="Hasta" style="width:90px; padding:4px 6px; font-size:12px;">
+        <button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:4px 12px; font-size:12px; font-weight:600;" onclick="imprimirRangoPDF()">🖨️ Imprimir rango</button>
+        <span id="rangoImpEstado" style="font-size:11px; color:var(--text-dim);"></span>
+      </div>
       <div id="barraReintentoMasivo" style="display:none; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
         <span style="font-size:12px; color:var(--text-dim);">Marcar:</span>
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="marcarTodosReintentables(true)">Todos</button>
@@ -5605,6 +5613,40 @@ const TIPO_DOC_CATALOGO1 = { factura:'01', boleta:'03', nc:'07', nd:'08', remite
 // usarse cuando ya corregiste el problema real (revisa el motivo de rechazo antes de reintentar).
 // Reintenta solo los comprobantes/guías que el usuario marcó con el checkbox — uno por uno,
 // esperando a que termine cada uno antes de seguir con el siguiente (no satura el bridge/SFS).
+// Imprime/descarga en PDF A4 todos los comprobantes/guías de la empresa actual cuyo número
+// correlativo (la parte numérica final de la serie, ej. 770 en "T001-00000770") caiga dentro
+// del rango Desde-Hasta indicado. Los abre de a uno, con una pequeña pausa entre cada uno,
+// para que el navegador no bloquee las ventanas por abrir demasiadas de golpe.
+async function imprimirRangoPDF(){
+  const desde = parseInt(document.getElementById('rangoImpDesde').value);
+  const hasta = parseInt(document.getElementById('rangoImpHasta').value);
+  const estadoEl = document.getElementById('rangoImpEstado');
+  if(isNaN(desde) || isNaN(hasta) || desde > hasta){
+    alert('Ingresa un rango válido (Desde ≤ Hasta).');
+    return;
+  }
+  const candidatos = emitidos
+    .map((e,i)=>({e,i}))
+    .filter(({e}) => {
+      if(e.empresa !== empresaActual) return false;
+      const match = (e.serie||'').match(/(\d+)$/);
+      if(!match) return false;
+      const num = parseInt(match[1]);
+      return num >= desde && num <= hasta;
+    });
+  if(!candidatos.length){
+    alert(`No hay comprobantes/guías con número entre ${desde} y ${hasta}.`);
+    return;
+  }
+  if(!confirm(`Se van a abrir ${candidatos.length} PDF (uno por uno). ¿Continuar?`)) return;
+  for(let k=0; k<candidatos.length; k++){
+    estadoEl.textContent = `Imprimiendo ${k+1}/${candidatos.length}...`;
+    imprimirComprobante(candidatos[k].i, 'a4');
+    await new Promise(r=>setTimeout(r, 1200)); // pausa para no saturar/bloquear popups
+  }
+  estadoEl.textContent = `✓ ${candidatos.length} PDF procesados.`;
+}
+
 async function reintentarSeleccionados(){
   const marcados = [...document.querySelectorAll('.chk-reintentar:checked')].map(c => parseInt(c.dataset.idx));
   if(!marcados.length){ alert('Marca al menos un comprobante/guía con el checkbox antes de reintentar.'); return; }
@@ -6085,6 +6127,9 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
   .recibi-box { flex:1; border:1px solid #ccc; border-radius:6px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; }
   .recibi-titulo { font-weight:bold; font-size:11px; margin-bottom:0; }
   .linea-firma-vacia { height:44px; border-bottom:1px solid #333; margin:10px 0 14px; }
+  .campo-firma { display:flex; align-items:flex-end; gap:6px; margin-top:12px; }
+  .campo-firma-label { font-size:10px; white-space:nowrap; flex-shrink:0; }
+  .campo-firma-linea { flex:1; border-bottom:1px solid #333; height:12px; }
   .firma-linea { font-size:10px; }
   .footer-legal { margin-top:6px; text-align:left; font-size:7.5px; color:#666; }
   .footer-legal a { color:#1a54c4; }
@@ -6174,8 +6219,14 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
     <div class="recibi-box">
       <div class="recibi-titulo">Recibí Conforme</div>
       <div class="linea-firma-vacia"></div>
-      <div class="firma-linea">Nombres y Apellidos: ______________________________</div>
-      <div class="firma-linea" style="text-align:right; margin-top:4px;">DNI: ____________</div>
+      <div class="campo-firma">
+        <span class="campo-firma-label">Nombres y Apellidos:</span>
+        <span class="campo-firma-linea"></span>
+      </div>
+      <div class="campo-firma">
+        <span class="campo-firma-label">DNI:</span>
+        <span class="campo-firma-linea"></span>
+      </div>
     </div>
   </div>
 
