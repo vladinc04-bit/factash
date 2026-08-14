@@ -5967,8 +5967,9 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
   #qrcode { flex:0 0 85px; }
   .qr-texto { font-size:9.5px; color:#333; }
   .recibi-box { flex:1; border:1px solid #ccc; border-radius:6px; padding:10px 14px; }
-  .recibi-titulo { font-weight:bold; font-size:11px; margin-bottom:20px; }
-  .firma-linea { border-top:1px solid #333; margin-top:26px; padding-top:4px; font-size:10px; }
+  .recibi-titulo { font-weight:bold; font-size:11px; margin-bottom:8px; }
+  .linea-firma-vacia { height:34px; border-bottom:1px solid #333; margin-bottom:6px; }
+  .firma-linea { font-size:10px; }
   .footer-legal { margin-top:6px; text-align:left; font-size:7.5px; color:#666; }
   .footer-legal a { color:#1a54c4; }
   .aviso { margin-top:6px; padding:5px 8px; font-size:8.5px; border-radius:6px; }
@@ -6055,7 +6056,9 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
     </div>
     <div class="recibi-box">
       <div class="recibi-titulo">Recibí Conforme</div>
-      <div class="firma-linea">Nombres y Apellidos: ______________________________ &nbsp; DNI: ____________</div>
+      <div class="linea-firma-vacia"></div>
+      <div class="firma-linea">Nombres y Apellidos: ______________________________</div>
+      <div class="firma-linea" style="text-align:right; margin-top:4px;">DNI: ____________</div>
     </div>
   </div>
 
