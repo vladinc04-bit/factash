@@ -2426,6 +2426,7 @@ function iniciarPollerEmitidos(){
         const data = await resp.json();
         if(data.ok && data.sunatQrUrl){
           sinQr.sunatQrUrl = data.sunatQrUrl;
+          if(data.sunatHashCorto) sinQr.sunatHashCorto = data.sunatHashCorto;
           actualizarEmitidoEnServidor(sinQr);
           renderTodo();
         }
@@ -3499,6 +3500,7 @@ async function enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonCompro
     }
     let reg = data.registro;
     let sunatQrUrl = data.sunatQrUrl || null;
+    let sunatHashCorto = data.sunatHashCorto || null;
 
     // Catálogo real de ind_situ (confirmado en tu SFS): 01 Por Generar XML, 02 XML Generado,
     // 03/11 Enviado y Aceptado, 04/12 Aceptado con Observaciones, 05/10 Rechazado, 06 Con Errores,
@@ -3517,6 +3519,7 @@ async function enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonCompro
         const dataEstado = await respEstado.json();
         if(dataEstado.ok && dataEstado.registro) reg = dataEstado.registro;
         if(dataEstado.ok && dataEstado.sunatQrUrl) sunatQrUrl = dataEstado.sunatQrUrl;
+        if(dataEstado.ok && dataEstado.sunatHashCorto) sunatHashCorto = dataEstado.sunatHashCorto;
       } catch(e){ /* si falla la reconsulta, seguimos con el registro que ya teníamos */ }
     }
 
@@ -3528,7 +3531,8 @@ async function enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonCompro
       automatico: true,
       estado: aceptado ? 'aceptado' : 'rechazado',
       descripcion: reg ? (reg.des_obse && reg.des_obse !== '-' ? reg.des_obse : (RECHAZADOS.includes(reg.ind_situ) ? 'Rechazado por SUNAT sin detalle adicional.' : '')) : 'Sin respuesta del SFS.',
-      sunatQrUrl: aceptado ? sunatQrUrl : null
+      sunatQrUrl: aceptado ? sunatQrUrl : null,
+      sunatHashCorto: aceptado ? sunatHashCorto : null
     };
   } catch(err){
     // Si el bridge no responde (servidor caído, sin internet, etc.), no se bloquea la emisión —
@@ -4437,6 +4441,7 @@ function generarGuia(){
       registro.sunatEstado = mapEstadoBridge(resultado);
       registro.sunatDescripcion = resultado.descripcion;
       if(resultado.sunatQrUrl) registro.sunatQrUrl = resultado.sunatQrUrl;
+      if(resultado.sunatHashCorto) registro.sunatHashCorto = resultado.sunatHashCorto;
       if(resultado.estado === 'error_conexion') descargarJSON(jsonSFS, `${emp.ruc}-${tipDocGuiaArchivo}-${serie}.json`);
     }
     actualizarEmitidoEnServidor(registro);
@@ -5070,6 +5075,7 @@ async function confirmarMasivo(){
         registro.sunatEstado = mapEstadoBridge(resultado);
         registro.sunatDescripcion = resultado.descripcion;
         if(resultado.sunatQrUrl) registro.sunatQrUrl = resultado.sunatQrUrl;
+        if(resultado.sunatHashCorto) registro.sunatHashCorto = resultado.sunatHashCorto;
         if(resultado.estado === 'aceptado') ok++; else rechazados++;
       } else {
         registro.sunatEstado = 'pendiente';
@@ -5653,6 +5659,7 @@ async function reintentarEnvio(idx){
     e.sunatEstado = mapEstadoBridge(resultado);
     e.sunatDescripcion = resultado.descripcion;
     if(resultado.sunatQrUrl) e.sunatQrUrl = resultado.sunatQrUrl;
+    if(resultado.sunatHashCorto) e.sunatHashCorto = resultado.sunatHashCorto;
   }
   actualizarEmitidoEnServidor(e);
   renderTodo();
@@ -5834,7 +5841,7 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
   `).join('') || `<tr><td colspan="8" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
 
   const urlConsultaPublica = 'https://www.sunat.gob.pe/ol-it-wsconsvalicpe/ValidezItemFactura.htm';
-  const hashMostrado = e.sunatQrUrl ? (e.sunatQrUrl.split('hashqr=')[1] || '') : '';
+  const hashMostrado = e.sunatHashCorto || (e.sunatQrUrl ? (e.sunatQrUrl.split('hashqr=')[1] || '') : '');
   const tieneDatosAdicionales = e.beneficiario || e.itemGeneral || e.codigoModular;
 
   return `
@@ -6026,7 +6033,7 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
   const esPublico = cab.modTrasladoDatosEnvio === '01';
   const matchLicencia = (cab.obsGuia||'').match(/LICENCIA:\s*(\S+)/i);
   const licenciaTexto = matchLicencia ? matchLicencia[1] : '-';
-  const hashMostrado = e.sunatQrUrl ? (e.sunatQrUrl.split('hashqr=')[1] || '') : '';
+  const hashMostrado = e.sunatHashCorto || (e.sunatQrUrl ? (e.sunatQrUrl.split('hashqr=')[1] || '') : '');
 
   const filasGuia = filasItems.map((it, i) => {
     const pu = parseFloat(it.peso) || 0;
@@ -6072,7 +6079,7 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
   table.items th { background:#333; color:#fff; font-weight:bold; text-align:left; padding:3px 5px; font-size:8px; text-transform:uppercase; }
   table.items td { padding:3px 5px; border-bottom:1px solid #ddd; font-size:8.5px; vertical-align:top; }
   .footer-grid { display:flex; gap:14px; margin-top:8px; align-items:stretch; }
-  .qr-box { flex:0 0 260px; border:1.5px solid #333; border-radius:6px; padding:10px; display:flex; gap:10px; align-items:center; }
+  .qr-box { flex:0 0 300px; border:1.5px solid #333; border-radius:6px; padding:10px; display:flex; gap:10px; align-items:center; }
   #qrcode { flex:0 0 130px; }
   .qr-texto { font-size:9.5px; color:#333; }
   .recibi-box { flex:1; border:1px solid #ccc; border-radius:6px; padding:10px 14px; }
