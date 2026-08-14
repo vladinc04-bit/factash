@@ -5945,7 +5945,7 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; color:#222; font-size:9.5px; margin:0; padding:0; }
   .pagina { width:100%; }
-  .header { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:8px; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #333; }
   .logo-box { flex:0 0 70px; height:55px; display:flex; align-items:center; justify-content:center; }
   .logo-box img { max-width:100%; max-height:100%; object-fit:contain; }
   .empresa-info { flex:1; padding-top:2px; }
@@ -5955,10 +5955,10 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
   .documento-ruc { font-size:11px; font-weight:bold; }
   .documento-titulo { font-size:9.5px; font-weight:bold; margin:5px 0; text-transform:uppercase; line-height:1.35; }
   .documento-numero { font-size:11px; font-weight:bold; }
-  .seccion-dos-col { display:grid; grid-template-columns:1fr 1fr; gap:0 20px; margin-bottom:5px; }
-  .seccion-titulo { font-size:9px; font-weight:bold; text-transform:uppercase; margin-bottom:3px; }
-  .fila-dato { display:flex; margin-bottom:1px; font-size:9px; }
-  .fila-dato .etq { font-weight:bold; width:95px; flex-shrink:0; }
+  .seccion-dos-col { display:grid; grid-template-columns:0.8fr 1.2fr; gap:0 12px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #333; }
+  .seccion-titulo { font-size:8.5px; font-weight:bold; text-transform:uppercase; margin-bottom:3px; }
+  .fila-dato { display:flex; margin-bottom:1px; font-size:8.5px; }
+  .fila-dato .etq { font-weight:bold; width:88px; flex-shrink:0; }
   table.items { width:100%; border-collapse:collapse; margin:6px 0; }
   table.items th { background:#333; color:#fff; font-weight:bold; text-align:left; padding:3px 5px; font-size:8px; text-transform:uppercase; }
   table.items td { padding:3px 5px; border-bottom:1px solid #ddd; font-size:8.5px; vertical-align:top; }
