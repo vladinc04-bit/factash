@@ -1269,6 +1269,12 @@
 
     <div class="card">
       <h2>Comprobantes y guías emitidos <span class="n">— <span id="nombreEmpresaEmit"></span></span></h2>
+      <div id="barraReintentoMasivo" style="display:none; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+        <span style="font-size:12px; color:var(--text-dim);">Marcar:</span>
+        <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="marcarTodosReintentables(true)">Todos</button>
+        <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="marcarTodosReintentables(false)">Ninguno</button>
+        <button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:4px 12px; font-size:12px; font-weight:600;" onclick="reintentarSeleccionados()">🔁 Reintentar los marcados</button>
+      </div>
       <div id="emitidosList"></div>
     </div>
   </section>
@@ -2383,23 +2389,48 @@ let pollerEmitidosId = null;
 function iniciarPollerEmitidos(){
   if(pollerEmitidosId) return; // ya está corriendo
   pollerEmitidosId = setInterval(async () => {
+    const emp = empresas[empresaActual];
+
+    // 1) Reintentar envíos pendientes/en proceso/rechazados por timeout (como ya estaba)
     const candidatos = emitidos
       .map((e,i)=>({e,i}))
       .filter(({e}) => {
+        if(e.empresa !== empresaActual) return false;
+        if((e._autoReintentos||0) >= 5) return false; // tope: no insistir para siempre
         if(e.sunatEstado === 'en_proceso') return true;
-        // Rechazo por TIMEOUT del bridge (el SFS no alcanzó a registrar el documento a tiempo,
-        // no es un rechazo real de SUNAT como un duplicado o error de validación) — reintentar
-        // solo, hasta 5 veces, para no insistir eternamente si el problema es de verdad.
         const esTimeoutBridge = e.sunatEstado === 'rechazado'
           && (e.sunatDescripcion||'').includes('no registró el documento tras');
-        if(esTimeoutBridge && (e._autoReintentos||0) < 5) return true;
-        return false;
+        return esTimeoutBridge;
       });
-    if(!candidatos.length) return;
-    // Reintenta de a una por vuelta (no todas a la vez) para no saturar el bridge/SFS
-    const { e, i } = candidatos[0];
-    e._autoReintentos = (e._autoReintentos||0) + 1;
-    await reintentarEnvio(i);
+    if(candidatos.length){
+      // Reintenta de a una por vuelta (no todas a la vez) para no saturar el bridge/SFS
+      const { e, i } = candidatos[0];
+      e._autoReintentos = (e._autoReintentos||0) + 1;
+      await reintentarEnvio(i);
+      if(e._autoReintentos >= 5 && e.sunatEstado === 'en_proceso'){
+        e.sunatDescripcion = 'SUNAT sigue procesando este documento tras varios intentos automáticos — el reintento automático se detuvo. Revisa manualmente en la bandeja del SFS o dale "Reintentar" a mano más tarde.';
+        renderTodo();
+      }
+      return; // una cosa a la vez por vuelta del poller
+    }
+
+    // 2) Guías ya Aceptadas pero a las que aún les falta el QR real (el CDR no estaba listo
+    // en el momento en que se confirmó la aceptación) — buscarlo solo, sin reenviar nada.
+    if(!emp || !emp.bridgeEmpresaId) return;
+    const sinQr = emitidos.find(e => e.empresa===empresaActual && e.sunatEstado==='aceptado' && e.grupo==='guias' && !e.sunatQrUrl && (e._intentosQr||0) < 5);
+    if(sinQr){
+      sinQr._intentosQr = (sinQr._intentosQr||0) + 1;
+      try{
+        const tipDocArchivo = TIPO_DOC_CATALOGO1[sinQr.tipo];
+        const resp = await fetch(`${BRIDGE_API_URL}/estado/${emp.bridgeEmpresaId}/${emp.ruc}/${tipDocArchivo}/${sinQr.serie}`);
+        const data = await resp.json();
+        if(data.ok && data.sunatQrUrl){
+          sinQr.sunatQrUrl = data.sunatQrUrl;
+          actualizarEmitidoEnServidor(sinQr);
+          renderTodo();
+        }
+      } catch(err){ /* se reintenta solo en la próxima vuelta */ }
+    }
   }, 20000);
 }
 function detenerPollerEmitidos(){
@@ -5519,12 +5550,16 @@ function renderEmitidos(){
   const emp = empresas[empresaActual];
   document.getElementById('nombreEmpresaEmit').textContent = emp.nombre;
   const lista = emitidos.filter(e=>e.empresa===empresaActual);
+  const hayReintentables = lista.some(e => !e.anulado && (e.sunatEstado==='rechazado'||e.sunatEstado==='pendiente'||e.sunatEstado==='en_proceso'));
+  document.getElementById('barraReintentoMasivo').style.display = hayReintentables ? 'flex' : 'none';
   document.getElementById('emitidosList').innerHTML = lista.length ? lista.map(e=>{
     const idx = emitidos.indexOf(e);
+    const esReintentable = !e.anulado && (e.sunatEstado==='rechazado'||e.sunatEstado==='pendiente'||e.sunatEstado==='en_proceso');
     return `
     <div class="list-item">
       <div class="top">
-        <div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${esReintentable ? `<input type="checkbox" class="chk-reintentar" data-idx="${idx}" style="width:auto;">` : ''}
           <span class="badge ${badgeClass(e.tipo)}">${badgeLabel(e.tipo)}</span>
           <span class="serie" style="margin-left:8px;">${e.serie}</span>
         </div>
@@ -5562,6 +5597,43 @@ const TIPO_DOC_CATALOGO1 = { factura:'01', boleta:'03', nc:'07', nd:'08', remite
 // (no genera uno nuevo) — porque un documento rechazado por SUNAT nunca llegó a ser válido, así
 // que ese número no está "quemado" y sí se puede corregir/reenviar con el mismo número. Solo debe
 // usarse cuando ya corregiste el problema real (revisa el motivo de rechazo antes de reintentar).
+// Reintenta solo los comprobantes/guías que el usuario marcó con el checkbox — uno por uno,
+// esperando a que termine cada uno antes de seguir con el siguiente (no satura el bridge/SFS).
+async function reintentarSeleccionados(){
+  const marcados = [...document.querySelectorAll('.chk-reintentar:checked')].map(c => parseInt(c.dataset.idx));
+  if(!marcados.length){ alert('Marca al menos un comprobante/guía con el checkbox antes de reintentar.'); return; }
+  for(const idx of marcados){
+    await reintentarEnvio(idx);
+  }
+}
+function marcarTodosReintentables(marcar){
+  document.querySelectorAll('.chk-reintentar').forEach(c => c.checked = marcar);
+}
+
+// Vuelve a consultar el estado (sin reenviar nada) solo para intentar sacar el QR real del CDR —
+// usado cuando el documento YA está Aceptado pero el CDR todavía no estaba listo en el servidor
+// en el momento en que se confirmó la aceptación (quedó con el QR provisional pegado para siempre).
+async function actualizarQrDesdeCDR(idx){
+  const e = emitidos[idx];
+  const emp = empresas[e.empresa];
+  if(!emp.bridgeEmpresaId){ alert('Esta empresa no tiene envío automático configurado.'); return; }
+  const tipDocArchivo = TIPO_DOC_CATALOGO1[e.tipo];
+  try{
+    const resp = await fetch(`${BRIDGE_API_URL}/estado/${emp.bridgeEmpresaId}/${emp.ruc}/${tipDocArchivo}/${e.serie}`);
+    const data = await resp.json();
+    if(data.ok && data.sunatQrUrl){
+      e.sunatQrUrl = data.sunatQrUrl;
+      actualizarEmitidoEnServidor(e);
+      renderTodo();
+      alert('✓ QR actualizado con el CDR real de SUNAT.');
+    } else {
+      alert('El CDR todavía no está disponible en el servidor — intenta de nuevo en un rato.');
+    }
+  } catch(err){
+    alert('No se pudo conectar con el servidor para actualizar el QR.');
+  }
+}
+
 async function reintentarEnvio(idx){
   const e = emitidos[idx];
   const emp = empresas[e.empresa];
@@ -6601,8 +6673,15 @@ function borrarIntentoRechazado(idx){
     alert('No se puede borrar un comprobante ya aceptado por SUNAT — usa "Anular" si necesitas darlo de baja.');
     return;
   }
-  if(e.sunatEstado === 'en_proceso'){
+  if(e.sunatEstado === 'en_proceso' && (e._autoReintentos||0) < 5){
     alert('SUNAT todavía está procesando este documento — espera a que quede Aceptado o Rechazado antes de borrarlo (podría llegar a ser válido).');
+    return;
+  }
+  if(e.sunatEstado === 'en_proceso'){
+    if(!confirm(`Este documento sigue "en proceso" tras varios reintentos automáticos y no se sabe si SUNAT lo aceptará o no. Si sabes por otro medio (ej. el portal de SUNAT) que este número YA fue rechazado antes, puedes borrarlo aquí con seguridad. ¿Borrar ${e.serie} de todas formas?`)) return;
+    if(e.idServidor) eliminarEmitidoDelServidor(e.idServidor);
+    emitidos.splice(idx, 1);
+    renderTodo();
     return;
   }
   if(!confirm(`¿Borrar este intento rechazado de ${e.serie}? Esto solo lo quita de tu lista en FACTASH, no afecta nada en SUNAT (nunca llegó a ser válido).`)) return;
