@@ -3431,6 +3431,7 @@ async function enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonCompro
       return { automatico: true, estado: 'rechazado', descripcion: (data.mensaje || 'Error al procesar en el SFS.') };
     }
     let reg = data.registro;
+    let sunatQrUrl = data.sunatQrUrl || null;
 
     // Catálogo real de ind_situ (confirmado en tu SFS): 01 Por Generar XML, 02 XML Generado,
     // 03/11 Enviado y Aceptado, 04/12 Aceptado con Observaciones, 05/10 Rechazado, 06 Con Errores,
@@ -3448,6 +3449,7 @@ async function enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonCompro
         const respEstado = await fetch(`${BRIDGE_API_URL}/estado/${emp.bridgeEmpresaId}/${emp.ruc}/${tipDocArchivo}/${serie}`);
         const dataEstado = await respEstado.json();
         if(dataEstado.ok && dataEstado.registro) reg = dataEstado.registro;
+        if(dataEstado.ok && dataEstado.sunatQrUrl) sunatQrUrl = dataEstado.sunatQrUrl;
       } catch(e){ /* si falla la reconsulta, seguimos con el registro que ya teníamos */ }
     }
 
@@ -3458,7 +3460,8 @@ async function enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonCompro
     return {
       automatico: true,
       estado: aceptado ? 'aceptado' : 'rechazado',
-      descripcion: reg ? (reg.des_obse && reg.des_obse !== '-' ? reg.des_obse : (RECHAZADOS.includes(reg.ind_situ) ? 'Rechazado por SUNAT sin detalle adicional.' : '')) : 'Sin respuesta del SFS.'
+      descripcion: reg ? (reg.des_obse && reg.des_obse !== '-' ? reg.des_obse : (RECHAZADOS.includes(reg.ind_situ) ? 'Rechazado por SUNAT sin detalle adicional.' : '')) : 'Sin respuesta del SFS.',
+      sunatQrUrl: aceptado ? sunatQrUrl : null
     };
   } catch(err){
     // Si el bridge no responde (servidor caído, sin internet, etc.), no se bloquea la emisión —
@@ -4366,6 +4369,7 @@ function generarGuia(){
     } else {
       registro.sunatEstado = mapEstadoBridge(resultado);
       registro.sunatDescripcion = resultado.descripcion;
+      if(resultado.sunatQrUrl) registro.sunatQrUrl = resultado.sunatQrUrl;
       if(resultado.estado === 'error_conexion') descargarJSON(jsonSFS, `${emp.ruc}-${tipDocGuiaArchivo}-${serie}.json`);
     }
     actualizarEmitidoEnServidor(registro);
@@ -4998,6 +5002,7 @@ async function confirmarMasivo(){
       if(resultado.automatico){
         registro.sunatEstado = mapEstadoBridge(resultado);
         registro.sunatDescripcion = resultado.descripcion;
+        if(resultado.sunatQrUrl) registro.sunatQrUrl = resultado.sunatQrUrl;
         if(resultado.estado === 'aceptado') ok++; else rechazados++;
       } else {
         registro.sunatEstado = 'pendiente';
@@ -5539,6 +5544,7 @@ async function reintentarEnvio(idx){
   } else {
     e.sunatEstado = mapEstadoBridge(resultado);
     e.sunatDescripcion = resultado.descripcion;
+    if(resultado.sunatQrUrl) e.sunatQrUrl = resultado.sunatQrUrl;
   }
   actualizarEmitidoEnServidor(e);
   renderTodo();
