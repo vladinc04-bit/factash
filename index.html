@@ -5638,13 +5638,13 @@ async function imprimirRangoPDF(){
     alert(`No hay comprobantes/guías con número entre ${desde} y ${hasta}.`);
     return;
   }
-  if(!confirm(`Se van a abrir ${candidatos.length} PDF (uno por uno). ¿Continuar?`)) return;
+  if(!confirm(`Se van a descargar ${candidatos.length} archivos (uno por uno, directo a tu carpeta de Descargas, sin ventanas ni confirmaciones). Cada archivo se abre en el navegador y desde ahí lo guardas como PDF cuando quieras (Ctrl+P → Guardar como PDF). ¿Continuar?`)) return;
   for(let k=0; k<candidatos.length; k++){
-    estadoEl.textContent = `Imprimiendo ${k+1}/${candidatos.length}...`;
-    imprimirComprobante(candidatos[k].i, 'a4');
-    await new Promise(r=>setTimeout(r, 1200)); // pausa para no saturar/bloquear popups
+    estadoEl.textContent = `Descargando ${k+1}/${candidatos.length}...`;
+    imprimirComprobante(candidatos[k].i, 'a4', 'descargar');
+    await new Promise(r=>setTimeout(r, 400));
   }
-  estadoEl.textContent = `✓ ${candidatos.length} PDF procesados.`;
+  estadoEl.textContent = `✓ ${candidatos.length} archivos descargados — ábrelos desde tu carpeta de Descargas para guardarlos como PDF cuando quieras.`;
 }
 
 async function reintentarSeleccionados(){
@@ -6259,7 +6259,7 @@ function textoUnidadImpresion(codigo){
   return String(codigo).trim().toUpperCase() === 'NIU' ? 'UNIDAD' : codigo;
 }
 
-function imprimirComprobante(idx, formato){
+function imprimirComprobante(idx, formato, modo){
   const e = emitidos[idx];
   const emp = empresas[e.empresa];
   const esGuia = e.grupo === 'guias';
@@ -6497,6 +6497,22 @@ function imprimirComprobante(idx, formato){
   <\/script>
 
 </body></html>`;
+
+  if(modo === 'descargar'){
+    // Descarga el HTML directo como archivo — sin ventana de impresión, sin diálogo del
+    // navegador, sirve para procesar un lote grande sin tener que confirmar cada uno a mano.
+    // El html ya trae su propio QR embebido (JS), así que al abrirlo después se ve igual.
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${e.serie}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return;
+  }
 
   const ventana = window.open('', '_blank', 'width=850,height=1100');
   ventana.document.write(html);
