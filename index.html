@@ -2367,7 +2367,33 @@ function cambiarTab(tab){
   if(tab==='masivo'){
     document.getElementById('btnSubirExcelWrap').style.display = 'block';
   }
+  if(tab==='emitidos'){
+    iniciarPollerEmitidos();
+  } else {
+    detenerPollerEmitidos();
+  }
   renderTodo();
+}
+
+// ---------- Reintento automático en segundo plano ----------
+// Mientras la pestaña Emitidos esté abierta, revisa cada 20s los documentos que quedaron
+// "en_proceso" (SUNAT los está procesando, con ticket) y los reintenta solo — así no hay que
+// darle clic a "Reintentar" a mano una y otra vez esperando a que SUNAT termine.
+let pollerEmitidosId = null;
+function iniciarPollerEmitidos(){
+  if(pollerEmitidosId) return; // ya está corriendo
+  pollerEmitidosId = setInterval(async () => {
+    const pendientes = emitidos
+      .map((e,i)=>({e,i}))
+      .filter(({e}) => e.sunatEstado === 'en_proceso');
+    if(!pendientes.length) return;
+    // Reintenta de a una por vuelta (no todas a la vez) para no saturar el bridge/SFS
+    const { i } = pendientes[0];
+    await reintentarEnvio(i);
+  }, 20000);
+}
+function detenerPollerEmitidos(){
+  if(pollerEmitidosId){ clearInterval(pollerEmitidosId); pollerEmitidosId = null; }
 }
 
 function cambiarDoc(grupo, doc){
