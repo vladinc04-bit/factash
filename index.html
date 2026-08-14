@@ -2,7 +2,6 @@
 <html lang="es">
 <head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FACTASH</title>
@@ -5614,10 +5613,10 @@ const TIPO_DOC_CATALOGO1 = { factura:'01', boleta:'03', nc:'07', nd:'08', remite
 // usarse cuando ya corregiste el problema real (revisa el motivo de rechazo antes de reintentar).
 // Reintenta solo los comprobantes/guías que el usuario marcó con el checkbox — uno por uno,
 // esperando a que termine cada uno antes de seguir con el siguiente (no satura el bridge/SFS).
-// Imprime/descarga en PDF A4 todos los comprobantes/guías de la empresa actual cuyo número
-// correlativo (la parte numérica final de la serie, ej. 770 en "T001-00000770") caiga dentro
-// del rango Desde-Hasta indicado. Los abre de a uno, con una pequeña pausa entre cada uno,
-// para que el navegador no bloquee las ventanas por abrir demasiadas de golpe.
+// Combina todas las guías/comprobantes del rango en UN SOLO documento imprimible (una página
+// por documento, con salto de página automático entre cada una) — así con un solo Ctrl+P →
+// "Guardar como PDF" se guardan TODAS de una vez en un único archivo PDF de varias páginas,
+// en vez de tener que confirmar documento por documento.
 async function imprimirRangoPDF(){
   const desde = parseInt(document.getElementById('rangoImpDesde').value);
   const hasta = parseInt(document.getElementById('rangoImpHasta').value);
@@ -5639,12 +5638,62 @@ async function imprimirRangoPDF(){
     alert(`No hay comprobantes/guías con número entre ${desde} y ${hasta}.`);
     return;
   }
-  if(!confirm(`Se van a descargar ${candidatos.length} archivos PDF (uno por uno, directo a tu carpeta de Descargas, sin ventanas ni confirmaciones). Puede tardar un poco por cada uno. ¿Continuar?`)) return;
-  for(let k=0; k<candidatos.length; k++){
-    estadoEl.textContent = `Generando PDF ${k+1}/${candidatos.length}...`;
-    await imprimirComprobante(candidatos[k].i, 'a4', 'descargar');
-  }
-  estadoEl.textContent = `✓ ${candidatos.length} PDF descargados en tu carpeta de Descargas.`;
+  if(!confirm(`Se combinarán ${candidatos.length} documentos en UNA sola ventana (una página por documento). Al final, un solo Ctrl+P → "Guardar como PDF" guarda todo junto. ¿Continuar?`)) return;
+
+  estadoEl.textContent = `Armando ${candidatos.length} documentos...`;
+
+  let estilosCombinados = '';
+  let paginasCombinadas = '';
+  let scriptsCombinados = '';
+
+  candidatos.forEach(({i}, k) => {
+    const htmlDoc = imprimirComprobante(i, 'a4', 'html');
+    if(!htmlDoc) return;
+
+    // Estilos: se toman de todos los documentos (por si hay Formato A y B mezclados)
+    const estilos = [...htmlDoc.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
+    if(k === 0 || !estilosCombinados.includes(estilos.slice(0,200))) estilosCombinados += estilos + '\n';
+
+    // Cuerpo: todo lo de dentro de <body>...</body>, sin el <script> del QR (se separa aparte)
+    const bodyMatch = htmlDoc.match(/<body[^>]*>([\s\S]*?)<\/body>/);
+    let cuerpo = bodyMatch ? bodyMatch[1] : '';
+
+    // Extraer el script del QR de este documento (para renderizarlo aparte, con id único)
+    const scriptMatch = cuerpo.match(/<script>([\s\S]*?)<\/script>/);
+    let scriptQR = scriptMatch ? scriptMatch[1] : '';
+    cuerpo = cuerpo.replace(/<script>[\s\S]*?<\/script>/, '');
+
+    // IDs únicos por página para que los QR no choquen entre sí al estar todos en un solo documento
+    const idUnico = `qrcode_${k}`;
+    cuerpo = cuerpo.replace(/id="qrcode"/, `id="${idUnico}"`);
+    scriptQR = scriptQR
+      .replace(/document\.getElementById\('qrcode'\)/g, `document.getElementById('${idUnico}')`)
+      .replace(/window\.print\(\);?/g, ''); // el print va UNA sola vez al final, no por página
+
+    // Salto de página entre cada documento (menos antes del primero)
+    paginasCombinadas += `${k>0 ? '<div style="page-break-before:always;"></div>' : ''}<div class="pagina-lote">${cuerpo}</div>\n`;
+    scriptsCombinados += scriptQR + '\n';
+  });
+
+  const htmlFinal = `
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Lote ${desde}-${hasta}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+<style>${estilosCombinados}
+  .pagina-lote { }
+</style></head>
+<body>
+${paginasCombinadas}
+<script>
+${scriptsCombinados}
+window.print();
+<\/script>
+</body></html>`;
+
+  const ventana = window.open('', '_blank', 'width=850,height=1100');
+  ventana.document.write(htmlFinal);
+  ventana.document.close();
+
+  estadoEl.textContent = `✓ ${candidatos.length} documentos combinados en una ventana — usa Ctrl+P → Guardar como PDF para guardarlos todos juntos.`;
 }
 
 async function reintentarSeleccionados(){
@@ -6263,6 +6312,7 @@ function imprimirComprobante(idx, formato, modo){
   const e = emitidos[idx];
   const emp = empresas[e.empresa];
   const esGuia = e.grupo === 'guias';
+  const soloDevolverHTML = modo === 'html';
 
   // ítems: vienen de "detalle" (masivo o individual) o quedan vacíos si no se guardó snapshot
   let filasItems = [];
@@ -6339,6 +6389,7 @@ function imprimirComprobante(idx, formato, modo){
   ${e.monto!==null ? `<div class="total">TOTAL: S/ ${e.monto.toFixed(2)}</div>` : ''}
   <div class="sub" style="margin-top:8px;">¡Gracias por su compra!</div>
 </body></html>`;
+    if(soloDevolverHTML) return html;
     const ventana = window.open('', '_blank', 'width=400,height=700');
     ventana.document.write(html);
     ventana.document.close();
@@ -6498,40 +6549,7 @@ function imprimirComprobante(idx, formato, modo){
 
 </body></html>`;
 
-  if(modo === 'descargar'){
-    // Genera un PDF REAL (no solo HTML) sin pasar por el diálogo de impresión del navegador:
-    // se renderiza el mismo contenido dentro de un iframe oculto (para que el QR se dibuje bien
-    // con su propio script), y html2pdf.js convierte ese contenido a un archivo .pdf de verdad,
-    // que se descarga solo — sin ninguna ventana ni confirmación del sistema operativo.
-    return new Promise((resolve) => {
-      const htmlSinPrint = html.replace(/window\.print\(\);?/g, '');
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.left = '-9999px';
-      iframe.style.width = '850px';
-      iframe.style.height = '1200px';
-      document.body.appendChild(iframe);
-      iframe.srcdoc = htmlSinPrint;
-      iframe.onload = () => {
-        // Pequeña espera extra para que el <script> del QR (dentro del iframe) termine de dibujar
-        setTimeout(() => {
-          const contenido = iframe.contentDocument.body;
-          html2pdf().set({
-            margin: 0,
-            filename: `${e.serie}.pdf`,
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-          }).from(contenido).save().then(() => {
-            document.body.removeChild(iframe);
-            resolve();
-          }).catch(() => {
-            document.body.removeChild(iframe);
-            resolve();
-          });
-        }, 700);
-      };
-    });
-  }
+  if(soloDevolverHTML) return html;
 
   const ventana = window.open('', '_blank', 'width=850,height=1100');
   ventana.document.write(html);
