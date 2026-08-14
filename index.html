@@ -5879,7 +5879,7 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
   table.items tbody tr:nth-child(even) { background:#f9fbff; }
   .footer-grid { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:10px; margin-top:12px; }
   .qr-section { display:flex; align-items:center; gap:10px; }
-  #qrcode { flex:0 0 85px; }
+  #qrcode { flex:0 0 130px; }
   .resumen-hash { font-size:8.5px; color:#555; word-break:break-all; line-height:1.3; }
   .totales-box { display:flex; flex-direction:column; justify-content:center; align-items:center; }
   .total-item { text-align:center; margin:4px 0; }
@@ -6008,7 +6008,7 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
   <script>
     new QRCode(document.getElementById('qrcode'), {
       text: ${JSON.stringify(contenidoQR)},
-      width: 90, height: 90, correctLevel: QRCode.CorrectLevel.M
+      width: 130, height: 130, correctLevel: QRCode.CorrectLevel.L
     });
     window.print();
   <\/script>
@@ -6072,7 +6072,7 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
   table.items td { padding:3px 5px; border-bottom:1px solid #ddd; font-size:8.5px; vertical-align:top; }
   .footer-grid { display:flex; gap:14px; margin-top:8px; align-items:stretch; }
   .qr-box { flex:0 0 260px; border:1.5px solid #333; border-radius:6px; padding:10px; display:flex; gap:10px; align-items:center; }
-  #qrcode { flex:0 0 85px; }
+  #qrcode { flex:0 0 130px; }
   .qr-texto { font-size:9.5px; color:#333; }
   .recibi-box { flex:1; border:1px solid #ccc; border-radius:6px; padding:10px 14px; }
   .recibi-titulo { font-weight:bold; font-size:11px; margin-bottom:8px; }
@@ -6182,7 +6182,7 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
   <script>
     new QRCode(document.getElementById('qrcode'), {
       text: ${JSON.stringify(contenidoQR)},
-      width: 80, height: 80, correctLevel: QRCode.CorrectLevel.M
+      width: 130, height: 130, correctLevel: QRCode.CorrectLevel.L
     });
     window.print();
   <\/script>
@@ -6431,7 +6431,7 @@ function imprimirComprobante(idx, formato){
   <script>
     new QRCode(document.getElementById('qrcode'), {
       text: ${JSON.stringify(contenidoQR)},
-      width: 80, height: 80, correctLevel: QRCode.CorrectLevel.M
+      width: 130, height: 130, correctLevel: QRCode.CorrectLevel.L
     });
     window.print();
   <\/script>
