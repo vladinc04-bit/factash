@@ -1282,6 +1282,7 @@
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="marcarTodosReintentables(true)">Todos</button>
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="marcarTodosReintentables(false)">Ninguno</button>
         <button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:4px 12px; font-size:12px; font-weight:600;" onclick="reintentarSeleccionados()">🔁 Reintentar los marcados</button>
+        <button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:4px 12px; font-size:12px; font-weight:600;" onclick="borrarSeleccionados()">🗑️ Borrar los marcados</button>
       </div>
       <div id="emitidosList"></div>
     </div>
@@ -5012,6 +5013,14 @@ function buildFacturaJSONMasivo(g, serie, docTipo){
   return { cabecera, detalle };
 }
 
+let detenerEnvioMasivo = false;
+
+function pararEnvioMasivo(){
+  detenerEnvioMasivo = true;
+  const btn = document.getElementById('btnDetenerMasivo');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Deteniendo (termina el actual)...'; }
+}
+
 async function confirmarMasivo(){
   const emp = empresas[empresaActual];
   const f = formatosMasivo[docActualMasivo];
@@ -5039,11 +5048,14 @@ async function confirmarMasivo(){
 
   const total = filasMasivoProcesadas.length;
   const conBridge = !!emp.bridgeEmpresaId;
-  document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">⏳ Enviando 0/${total}...</div>`;
+  detenerEnvioMasivo = false;
+  document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">⏳ Enviando 0/${total}...<br><button id="btnDetenerMasivo" class="btn-primary" style="background:#c0392b; margin-top:10px;" onclick="pararEnvioMasivo()">⛔ Detener envío</button></div>`;
 
   let ok = 0, rechazados = 0, sinConexion = 0;
+  let detenidoEn = 0;
 
   for(const g of filasMasivoProcesadas){
+    if(detenerEnvioMasivo){ detenidoEn = ok+rechazados+sinConexion; break; }
     const correlativo = emp.correlativos[docActualMasivo]++;
     const serie = `${emp.series[docActualMasivo]}-${String(correlativo).padStart(8,'0')}`;
     let monto = null;
@@ -5095,15 +5107,16 @@ async function confirmarMasivo(){
       sinConexion++;
     }
 
-    document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">⏳ Enviando ${ok+rechazados+sinConexion}/${total}...</div>`;
+    document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">⏳ Enviando ${ok+rechazados+sinConexion}/${total}...<br><button id="btnDetenerMasivo" class="btn-primary" style="background:#c0392b; margin-top:10px;" onclick="pararEnvioMasivo()">⛔ Detener envío</button></div>`;
   }
 
-  guardarEmpresaEnServidor(empresaActual); // avanzó el correlativo de la empresa
+  guardarEmpresaEnServidor(empresaActual); // avanzó el correlativo de la empresa (solo lo ya procesado)
 
   filasMasivoProcesadas = [];
   document.getElementById('masivoInput').value = '';
+  const avisoDetenido = detenerEnvioMasivo ? `<br><span style="color:#e67e22;">⛔ Envío detenido manualmente en ${detenidoEn}/${total} — el resto no se procesó.</span>` : '';
   if(conBridge){
-    document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">✅ ${ok} aceptado(s) · ✕ ${rechazados} rechazado(s) · ⚠ ${sinConexion} sin conexión (de ${total})</div>`;
+    document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">✅ ${ok} aceptado(s) · ✕ ${rechazados} rechazado(s) · ⚠ ${sinConexion} sin conexión (de ${total})${avisoDetenido}</div>`;
   } else {
     document.getElementById('previewMasivo').innerHTML = `<div class="empty-state">✅ ${total} documento(s) generado(s). Esta empresa no tiene "Envío automático a SUNAT" configurado en Configuración — actívalo para que el masivo se mande directo a tu servidor sin descargar nada.</div>`;
   }
@@ -5705,6 +5718,40 @@ async function reintentarSeleccionados(){
 }
 function marcarTodosReintentables(marcar){
   document.querySelectorAll('.chk-reintentar').forEach(c => c.checked = marcar);
+}
+
+async function borrarSeleccionados(){
+  const marcados = [...document.querySelectorAll('.chk-reintentar:checked')].map(c => parseInt(c.dataset.idx));
+  if(!marcados.length){ alert('Marca al menos un comprobante/guía con el checkbox antes de borrar.'); return; }
+
+  // Separa los que sí se pueden borrar de los que no (aceptados, o en_proceso con pocos reintentos)
+  const borrables = [];
+  const saltados = [];
+  marcados.forEach(idx=>{
+    const e = emitidos[idx];
+    if(!e) return;
+    if(e.sunatEstado === 'aceptado'){ saltados.push(e.serie + ' (ya aceptado)'); return; }
+    if(e.sunatEstado === 'en_proceso' && (e._autoReintentos||0) < 5){ saltados.push(e.serie + ' (aún en proceso)'); return; }
+    borrables.push(idx);
+  });
+
+  if(!borrables.length){
+    alert('Ninguno de los marcados se puede borrar todavía:\n\n' + saltados.join('\n'));
+    return;
+  }
+
+  let msg = `¿Borrar ${borrables.length} intento(s) rechazado(s)/pendiente(s)? Esto solo los quita de tu lista en FACTASH, no afecta nada en SUNAT (ninguno llegó a ser válido).`;
+  if(saltados.length) msg += `\n\nSe van a saltar ${saltados.length} que no se pueden borrar:\n` + saltados.join('\n');
+  if(!confirm(msg)) return;
+
+  // Borra de mayor a menor índice para no desordenar los índices restantes al hacer splice
+  borrables.sort((a,b)=>b-a).forEach(idx=>{
+    const e = emitidos[idx];
+    if(e.idServidor) eliminarEmitidoDelServidor(e.idServidor);
+    emitidos.splice(idx, 1);
+  });
+  renderTodo();
+  alert(`✓ ${borrables.length} intento(s) borrado(s).`);
 }
 
 // Vuelve a consultar el estado (sin reenviar nada) solo para intentar sacar el QR real del CDR —
