@@ -1283,7 +1283,9 @@
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="marcarTodosReintentables(false)">Ninguno</button>
         <button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:4px 12px; font-size:12px; font-weight:600;" onclick="reintentarSeleccionados()">🔁 Reintentar los marcados</button>
         <button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:4px 12px; font-size:12px; font-weight:600;" onclick="borrarSeleccionados()">🗑️ Borrar los marcados</button>
+        <button class="rm-btn" style="color:#fff; background:var(--danger); border:1px solid var(--danger); border-radius:6px; padding:4px 12px; font-size:12px; font-weight:700;" onclick="forzarBorrarSeleccionados()">💣 Forzar borrado (todo, sin bloqueos)</button>
       </div>
+      <div id="barraPausaPoller" style="margin-bottom:10px;"></div>
       <div id="emitidosList"></div>
     </div>
   </section>
@@ -1720,6 +1722,27 @@ const empresas = {
       { id:'p2', nombre:'GASOHOL PREMIUM', unidad:'GLL', precio: 19.90, codigo:'', codigoSunat:'15101506', afectacion:'10', codDetraccion:'026' },
       { id:'p3', nombre:'DIESEL B5 S-50', unidad:'GLL', precio: 16.80, codigo:'', codigoSunat:'15101505', afectacion:'10', codDetraccion:'026' },
     ],
+  },
+  'inti sac': {
+    nombre: 'MULTISERVICIOS Y AGROINDUSTRIAS INTI S.A.C.',
+    nombreComercial: 'MULTISERVICIOS Y AGROINDUSTRIAS INTI S.A.C.',
+    razonSocial: 'MULTISERVICIOS Y AGROINDUSTRIAS INTI S.A.C.',
+    ruc: '20602575803',
+    usuario: 'inti sac',
+    clave: '300416',
+    direccion: 'AV. LAS MALVINAS MZA. J LOTE. 11 COO. LAS AMERICAS  AYACUCHO - HUAMANGA - SAN JUAN BAUTISTA',
+    regimenIGV: 'general',
+    cajas: [],
+    logo: '', telefono: '', email: '', web: '',
+    textoLegal: '',
+    bancos: [],
+    serieAdmin: '5',
+    correlativosPorSerie: {},
+    bridgeEmpresaId: 'multi',
+    formatoImpresionGuia: 'B',
+    correlativos: { factura: 1, boleta: 1, nc: 1, nd: 1, remitente: 7838, transportista: 1, retencion: 1, percepcion: 1, liquidacion: 1, ticket:1, notaventa:1, proforma:1, ordenpago:1 },
+    series: { factura:'F001', boleta:'B001', nc:'FC01', nd:'FD01', remitente:'T001', transportista:'V001', retencion:'R001', percepcion:'P001', liquidacion:'LC01', ticket:'TK01', notaventa:'NV01', proforma:'PR01', ordenpago:'OP01' },
+    productos: [],
   }
 };
 
@@ -2394,10 +2417,24 @@ function cambiarTab(tab){
 // Mientras la pestaña Emitidos esté abierta, revisa cada 20s los documentos que quedaron
 // "en_proceso" (SUNAT los está procesando, con ticket) y los reintenta solo — así no hay que
 // darle clic a "Reintentar" a mano una y otra vez esperando a que SUNAT termine.
+//
+// PAUSA PERSISTENTE: si el usuario prende el candado "⏸️ Pausar reintentos automáticos",
+// queda guardado en localStorage — sigue pausado aunque cierre y vuelva a abrir FACTASH,
+// hasta que él mismo lo desactive. Es la forma real de "detener todo" sin depender de
+// mantener una pestaña cerrada.
+function pollerPausado(){
+  return localStorage.getItem('factash_poller_pausado') === '1';
+}
+function togglePollerPausado(){
+  const nuevoEstado = !pollerPausado();
+  localStorage.setItem('factash_poller_pausado', nuevoEstado ? '1' : '0');
+  renderTodo();
+}
 let pollerEmitidosId = null;
 function iniciarPollerEmitidos(){
   if(pollerEmitidosId) return; // ya está corriendo
   pollerEmitidosId = setInterval(async () => {
+    if(pollerPausado()) return; // candado activo — no hace nada hasta que se desactive
     const emp = empresas[empresaActual];
 
     // 1) Reintentar envíos pendientes/en proceso/rechazados por timeout (como ya estaba)
@@ -5579,6 +5616,10 @@ function renderEmitidos(){
   const lista = emitidos.filter(e=>e.empresa===empresaActual);
   const hayReintentables = lista.some(e => !e.anulado && (e.sunatEstado==='rechazado'||e.sunatEstado==='pendiente'||e.sunatEstado==='en_proceso'));
   document.getElementById('barraReintentoMasivo').style.display = hayReintentables ? 'flex' : 'none';
+  const pausado = pollerPausado();
+  document.getElementById('barraPausaPoller').innerHTML = pausado
+    ? `<button class="rm-btn" style="color:#f59e0b; border:1px solid #f59e0b; border-radius:6px; padding:6px 14px; font-size:12px; font-weight:700; background:rgba(245,158,11,.12);" onclick="togglePollerPausado()">⏸️ PAUSADO — nada se reintenta ni consulta solo. Clic para reactivar.</button>`
+    : `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="togglePollerPausado()">⏸️ Pausar reintentos automáticos</button>`;
   document.getElementById('emitidosList').innerHTML = lista.length ? lista.map(e=>{
     const idx = emitidos.indexOf(e);
     const esReintentable = !e.anulado && (e.sunatEstado==='rechazado'||e.sunatEstado==='pendiente'||e.sunatEstado==='en_proceso');
@@ -5610,6 +5651,7 @@ function renderEmitidos(){
         <input type="file" id="cdrInput_${idx}" accept=".xml" style="display:none;" onchange="cargarCDR(${idx}, this.files[0])">` : ''}
         ${!e.anulado && (e.sunatEstado==='rechazado'||e.sunatEstado==='pendiente'||e.sunatEstado==='en_proceso') ? `<button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="reintentarEnvio(${idx})">🔁 Reintentar (mismo N°)</button>
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="borrarIntentoRechazado(${idx})">🗑️ Borrar intento</button>` : ''}
+        ${!e.anulado && e.sunatEstado==='enviando' ? `<button class="rm-btn" style="color:#f7c266; border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="desatascarEnviando(${idx})">⚠️ Quedó atascado — desbloquear</button>` : ''}
         ${e.anulado ? `<span class="badge nc">ANULADO</span>` : `<button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="anularComprobante(${idx})">🗑️ Anular</button>`}
       </div>
     </div>
@@ -5752,6 +5794,30 @@ async function borrarSeleccionados(){
   });
   renderTodo();
   alert(`✓ ${borrables.length} intento(s) borrado(s).`);
+}
+
+// Borrado FORZADO — ignora todas las protecciones de estado (incluso "en proceso" o "aceptado").
+// Solo quita los registros de la lista LOCAL de FACTASH; nunca cancela ni afecta nada dentro de
+// SUNAT — si algún número ya fue aceptado allá, sigue existiendo y válido en el portal de SUNAT
+// aunque aquí lo borres. Pensado para vaciar todo un lote de golpe y volver a generarlo limpio.
+async function forzarBorrarSeleccionados(){
+  const marcados = [...document.querySelectorAll('.chk-reintentar:checked')].map(c => parseInt(c.dataset.idx));
+  const todosEnEmpresa = emitidos.map((e,i)=>({e,i})).filter(({e})=>e.empresa===empresaActual).map(({i})=>i);
+  const objetivo = marcados.length ? marcados : todosEnEmpresa;
+  if(!objetivo.length){ alert('No hay nada que borrar en esta empresa.'); return; }
+
+  const msg = `⚠️ BORRADO FORZADO — vas a borrar ${objetivo.length} registro(s) de tu lista en FACTASH, SIN IMPORTAR su estado (incluso los que dicen "Aceptado" o "SUNAT procesando").\n\nEsto NO cancela nada en SUNAT — si algún número ya fue aceptado allá, sigue existiendo y válido en su portal aunque aquí lo borres; solo pierdes el registro/QR/PDF guardado en FACTASH.\n\nEscribe BORRAR (en mayúsculas) para confirmar:`;
+  const respuesta = prompt(msg);
+  if(respuesta !== 'BORRAR') { alert('Cancelado — no se borró nada.'); return; }
+
+  objetivo.sort((a,b)=>b-a).forEach(idx=>{
+    const e = emitidos[idx];
+    if(!e) return;
+    if(e.idServidor) eliminarEmitidoDelServidor(e.idServidor);
+    emitidos.splice(idx, 1);
+  });
+  renderTodo();
+  alert(`✓ ${objetivo.length} registro(s) borrado(s) por completo de tu lista.`);
 }
 
 // Vuelve a consultar el estado (sin reenviar nada) solo para intentar sacar el QR real del CDR —
@@ -6827,6 +6893,16 @@ async function eliminarEmitidoDelServidor(idServidor){
 
 // Borra un registro rechazado/pendiente del listado — solo para intentos que nunca llegaron a
 // aceptarse (no se puede borrar uno ya aceptado por SUNAT, ese queda como historial real).
+function desatascarEnviando(idx){
+  const e = emitidos[idx];
+  if(e.sunatEstado !== 'enviando'){ return; }
+  if(!confirm(`Este documento (${e.serie}) se quedó pegado en "Enviando a SUNAT..." — normalmente pasa si se cerró/recargó la pestaña a mitad del envío.\n\nNo se sabe con certeza si SUNAT lo llegó a aceptar o no. Al desbloquearlo vas a poder "Reintentar (mismo N°)" para confirmar su estado real, o borrarlo si prefieres usar otro número.\n\n¿Desbloquear ${e.serie}?`)) return;
+  e.sunatEstado = 'pendiente';
+  e.sunatDescripcion = 'Se quedó "enviando" (probable cierre de pestaña a mitad del envío) — usa "Reintentar" para confirmar su estado real con SUNAT antes de decidir si lo borras.';
+  actualizarEmitidoEnServidor(e);
+  renderTodo();
+}
+
 function borrarIntentoRechazado(idx){
   const e = emitidos[idx];
   if(e.sunatEstado === 'aceptado'){
