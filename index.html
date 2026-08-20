@@ -6884,7 +6884,7 @@ function abrirBandejaSfs(){
     alert('Escribe primero el nombre (ej. "nutri") en el campo de arriba.');
     return;
   }
-  window.open(`${ALTA_EMPRESA_API_URL}/bandeja/${encodeURIComponent(nombreCorto)}`, '_blank');
+  window.open(`${ALTA_EMPRESA_API_URL}/sfs/${encodeURIComponent(nombreCorto)}/`, '_blank');
 }
 
 async function verificarEstadoSfs(){
