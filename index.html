@@ -86,7 +86,7 @@
   th{text-align:left; color:var(--text-dim); font-weight:600; padding:8px 6px; border-bottom:1px solid var(--line); font-size:11px; text-transform:uppercase;}
   td{padding:8px 6px; border-bottom:1px solid var(--line);}
   td input{padding:6px 8px; font-size:12.5px;}
-  .item-row td:last-child{text-align:center;}
+  .fila-producto td:last-child{text-align:center;}
   .rm-btn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:15px;}
   .add-item{margin-top:8px; background:var(--panel-2); border:1px dashed var(--line); color:var(--text-dim); padding:8px; border-radius:7px; width:100%; cursor:pointer; font-size:12px;}
 
@@ -2659,7 +2659,7 @@ function renderItems(){
   body.innerHTML = '';
   items.forEach((it,i)=>{
     const tr = document.createElement('tr');
-    tr.className='item-row';
+    tr.className='fila-producto';
     tr.innerHTML = `
       <td>
         <select onchange="setItemProducto(${i}, this)">
@@ -2698,7 +2698,7 @@ function editarPrecioItem(i, val){
   renderTotales();
 }
 function actualizarTotalFilaItem(i){
-  const filas = document.querySelectorAll('#itemsBody tr.item-row');
+  const filas = document.querySelectorAll('#itemsBody tr.fila-producto');
   const totalInput = filas[i] ? filas[i].querySelector('.total-item-input') : null;
   if(totalInput) totalInput.value = (items[i].cant * items[i].precio).toFixed(2);
 }
@@ -2707,7 +2707,7 @@ function editarTotalItem(i, val){
   const precio = items[i].precio;
   if(precio > 0){
     items[i].cant = +(total / precio).toFixed(4);
-    const filas = document.querySelectorAll('#itemsBody tr.item-row');
+    const filas = document.querySelectorAll('#itemsBody tr.fila-producto');
     const cantInput = filas[i] ? filas[i].querySelectorAll('input')[0] : null;
     if(cantInput) cantInput.value = items[i].cant;
   }
