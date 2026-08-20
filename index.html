@@ -208,6 +208,15 @@
       </div>
       <button class="btn-primary" onclick="crearEmpresa()">Crear empresa</button>
       <div id="adminMsg" style="font-size:12px; margin-top:10px; display:none;"></div>
+
+      <h2 style="font-size:13px; margin:24px 0 4px; padding-top:16px; border-top:1px solid var(--line);">Conectar su SFS (automático)</h2>
+      <p style="font-size:11px; color:var(--text-dim); margin:0 0 10px;">Después de crear la empresa arriba, sube aquí el .zip de su carpeta SFS_v-2.4 (comprime el CONTENIDO de la carpeta, no la carpeta misma) — el sistema elige puerto libre, corrige rutas, crea el servicio y lo conecta solo. Sin SSH, sin comandos.</p>
+      <label>Empresa (usuario ya creado arriba)</label>
+      <input type="text" id="sfs_nombreCarpeta" placeholder="ej. tours-real  (usa el mismo usuario + &quot;-real&quot;)">
+      <label>Archivo .zip del SFS</label>
+      <input type="file" id="sfs_archivo" accept=".zip">
+      <button class="btn-primary" style="margin-top:8px; background:var(--accent-2);" onclick="subirSfsAutomatico()">🚀 Crear y conectar automáticamente</button>
+      <div id="sfsMsg" style="font-size:12px; margin-top:10px; white-space:pre-wrap; font-family:var(--mono);"></div>
     </div>
   </div>
 </div>
@@ -6864,7 +6873,40 @@ function actualizarSeriesVisibles(){
 // se entre. Se mantiene localStorage como respaldo local instantáneo (por si el backend
 // tarda en responder o hay un corte momentáneo de internet), pero la fuente de verdad real
 // es el servidor.
+async function subirSfsAutomatico(){
+  const nombreCarpeta = document.getElementById('sfs_nombreCarpeta').value.trim();
+  const inputArchivo = document.getElementById('sfs_archivo');
+  const msg = document.getElementById('sfsMsg');
+  const archivo = inputArchivo.files[0];
+
+  if(!nombreCarpeta){ msg.style.color='var(--danger)'; msg.textContent = 'Escribe el nombre de carpeta (ej. tours-real).'; return; }
+  if(!archivo){ msg.style.color='var(--danger)'; msg.textContent = 'Selecciona el archivo .zip del SFS.'; return; }
+
+  msg.style.color='var(--text-dim)';
+  msg.textContent = '⏳ Subiendo y configurando... esto puede tardar un minuto (el jar pesa ~100MB).';
+
+  const formData = new FormData();
+  formData.append('archivo', archivo);
+  formData.append('nombreCarpeta', nombreCarpeta);
+
+  try{
+    const resp = await fetch(`${ALTA_EMPRESA_API_URL}/api/alta-empresa`, { method: 'POST', body: formData });
+    const data = await resp.json();
+    if(data.ok){
+      msg.style.color='var(--accent-2)';
+      msg.textContent = `✅ Listo!\n\n` + data.pasos.join('\n') + `\n\n${data.siguientePaso}`;
+    } else {
+      msg.style.color='var(--danger)';
+      msg.textContent = `✕ Error:\n\n` + (data.pasos ? data.pasos.join('\n') : data.error);
+    }
+  } catch(err){
+    msg.style.color='var(--danger)';
+    msg.textContent = `✕ No se pudo conectar con el servicio de alta automática (${ALTA_EMPRESA_API_URL}). Revisa que esté corriendo en el servidor.`;
+  }
+}
+
 const FACTASH_API_URL = 'https://factash-api.vmshgroup.com';
+const ALTA_EMPRESA_API_URL = 'https://alta-empresa.vmshgroup.com'; // requiere exponerlo con HTTPS (ver instrucciones de despliegue)
 const STORAGE_KEY_EMPRESAS = 'factash_empresas_v1';
 const STORAGE_KEY_EMITIDOS = 'factash_emitidos_v1';
 
