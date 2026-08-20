@@ -2946,7 +2946,17 @@ function toggleDatosAdicionales(){
 function toggleCamposPercepcionDetraccion(){
   document.getElementById('camposPercepcionFact').style.display = document.getElementById('f_aplica_percepcion').checked ? 'block' : 'none';
   document.getElementById('camposDetraccionFact').style.display = document.getElementById('f_aplica_detraccion').checked ? 'block' : 'none';
-  if(document.getElementById('f_aplica_detraccion').checked) poblarSelectDetraccion();
+  if(document.getElementById('f_aplica_detraccion').checked){
+    poblarSelectDetraccion();
+    // Si la empresa tiene UNA sola cuenta de detracción configurada, la elegimos automáticamente
+    // (código + cuenta) para no obligar a Vladi a seleccionarla cada vez.
+    const emp = empresas[empresaActual];
+    const cfg = emp.detraccionesConfig || [];
+    if(cfg.length === 1){
+      document.getElementById('f_cod_detraccion').value = cfg[0].codigo;
+    }
+    onCambioCodDetraccion();
+  }
 }
 
 function toggleCamposSectorPublico(){
