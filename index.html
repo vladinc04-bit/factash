@@ -1531,7 +1531,11 @@
         <div style="font-size:11px; color:var(--text-dim); margin-top:4px;">Elige cómo se ve el PDF A4 cuando imprimas o descargues una Guía de Remisión de esta empresa.</div>
 
         <label style="margin-top:10px;">Envío automático a SUNAT <span style="color:var(--text-dim); font-weight:normal;">(opcional — solo si esta empresa tiene su SFS conectado al servidor)</span></label>
-        <input type="text" id="cfg_bridge_id" placeholder="ej. nutri — déjalo vacío si aún se genera el JSON manualmente">
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+          <input type="text" id="cfg_bridge_id" placeholder="ej. nutri — déjalo vacío si aún se genera el JSON manualmente" style="flex:1;">
+          <button class="rm-btn" style="color:var(--accent); border:1px solid var(--line); border-radius:6px; padding:8px 12px; font-size:12px; white-space:nowrap;" onclick="verificarEstadoSfs()">🔍 Verificar estado</button>
+        </div>
+        <div id="cfg_estado_sfs_msg" style="font-size:11px; margin-top:6px; white-space:pre-wrap; font-family:var(--mono); display:none;"></div>
 
         <label style="margin-top:14px; display:block; border-top:1px solid var(--line); padding-top:12px;">Ajustar próximo número de correlativo <span style="color:var(--text-dim); font-weight:normal;">(usar solo si ya emitiste comprobantes fuera de FACTASH y necesitas continuar la numeración sin repetir)</span></label>
         <div class="row2">
@@ -6873,6 +6877,39 @@ function actualizarSeriesVisibles(){
 // se entre. Se mantiene localStorage como respaldo local instantáneo (por si el backend
 // tarda en responder o hay un corte momentáneo de internet), pero la fuente de verdad real
 // es el servidor.
+async function verificarEstadoSfs(){
+  const nombreCorto = document.getElementById('cfg_bridge_id').value.trim();
+  const msg = document.getElementById('cfg_estado_sfs_msg');
+  msg.style.display = 'block';
+
+  if(!nombreCorto){
+    msg.style.color = 'var(--danger)';
+    msg.textContent = 'Escribe primero el nombre (ej. "nutri") en el campo de arriba.';
+    return;
+  }
+
+  msg.style.color = 'var(--text-dim)';
+  msg.textContent = '⏳ Consultando...';
+
+  try{
+    const resp = await fetch(`${ALTA_EMPRESA_API_URL}/api/estado-empresa/${encodeURIComponent(nombreCorto)}`);
+    const data = await resp.json();
+    if(data.ok && data.activo){
+      msg.style.color = 'var(--accent-2)';
+      msg.textContent = `✅ El SFS de "${nombreCorto}" está activo y corriendo (puerto ${data.puerto || '?'}).`;
+    } else if(data.ok){
+      msg.style.color = 'var(--danger)';
+      msg.textContent = `✕ El SFS de "${nombreCorto}" NO está activo (estado: ${data.estado}).\n\n` + (data.detalle || '');
+    } else {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = `✕ ${data.error}`;
+    }
+  } catch(err){
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '✕ No se pudo conectar con el servicio de verificación.';
+  }
+}
+
 async function subirSfsAutomatico(){
   const nombreCarpeta = document.getElementById('sfs_nombreCarpeta').value.trim();
   const inputArchivo = document.getElementById('sfs_archivo');
