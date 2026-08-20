@@ -2769,6 +2769,11 @@ function renderTotales(){
   const financEl = document.getElementById('f_montofinanciado');
   if(financEl) financEl.value = total.toFixed(2);
   if(document.getElementById('f_formapago') && document.getElementById('f_formapago').value==='credito') renderCuotas();
+  // Si la detracción está marcada, el monto se recalcula solo cada vez que cambian los ítems
+  // (antes solo se recalculaba al tocar el campo de porcentaje, y quedaba en 0 si se marcó el
+  // checkbox antes de cargar productos).
+  const chkDetraccion = document.getElementById('f_aplica_detraccion');
+  if(chkDetraccion && chkDetraccion.checked) calcularMontoDetraccion();
   if(document.getElementById('msg_f_doc')) validarCampoDoc();
 }
 
@@ -6611,9 +6616,10 @@ function imprimirComprobante(idx, formato, modo){
     tributosGuardados.forEach(t=>{
       const base = parseFloat(t.mtoBaseIgvItem)||0;
       const tIgv = parseFloat(t.mtoIgvItem)||0;
-      if(t.codTriIGV==='1000'){ gravado+=base; igv+=tIgv; }
-      else if(t.codTriIGV==='9995'){ exportacion+=base; }
-      else if(t.codTriIGV==='9998'){ inafecto+=base; }
+      const codTri = String(t.codTriIGV); // tolerante a registros viejos donde codTriIGV se guardó como número
+      if(codTri==='1000'){ gravado+=base; igv+=tIgv; }
+      else if(codTri==='9995'){ exportacion+=base; }
+      else if(codTri==='9998'){ inafecto+=base; }
       else { exonerado+=base; } // 9996/9997 y cualquier otro código de exoneración
     });
   } else {
