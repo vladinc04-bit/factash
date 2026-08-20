@@ -2105,7 +2105,10 @@ function renderListaEmpresasAdmin(){
     <div class="list-item">
       <div class="top">
         <span class="serie">${e.nombre}</span>
-        <button class="rm-btn" style="color:var(--accent); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="entrarComoEmpresa('${id}', true)">Entrar</button>
+        <div style="display:flex; gap:6px;">
+          <button class="rm-btn" style="color:var(--accent); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="entrarComoEmpresa('${id}', true)">Entrar</button>
+          <button class="rm-btn" style="color:#fff; background:var(--danger); border:1px solid var(--danger); border-radius:6px; padding:4px 10px; font-size:11px; font-weight:700;" onclick="eliminarEmpresaAdmin('${id}')">🗑️ Eliminar</button>
+        </div>
       </div>
       <div class="cliente">${e.usuario} · RUC ${e.ruc}</div>
       <div style="margin-top:8px;">
@@ -6871,6 +6874,20 @@ function autoguardarLocal(){
 
 // Guarda la configuración de UNA empresa en el servidor (se llama tras Guardar configuración,
 // o después de generar un comprobante porque cambia el correlativo).
+async function eliminarEmpresaAdmin(id){
+  const e = empresas[id];
+  if(!e) return;
+  const nombreConfirmacion = prompt(`⚠️ Vas a ELIMINAR la empresa "${e.nombre}" (usuario: ${e.usuario}) de FACTASH.\n\nEsto no cancela ni borra nada en SUNAT — solo quita esta empresa de FACTASH.\n\nPara confirmar, escribe exactamente el nombre de usuario: ${e.usuario}`);
+  if(nombreConfirmacion !== e.usuario){ alert('Cancelado — no se borró nada.'); return; }
+  try{
+    await fetch(`${FACTASH_API_URL}/api/empresas/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  } catch(err){ /* si el servidor no tiene ese endpoint o no hay conexión, igual la quitamos localmente abajo */ }
+  delete empresas[id];
+  autoguardarLocal();
+  renderListaEmpresasAdmin();
+  alert(`✓ "${e.nombre}" fue eliminada de la lista.`);
+}
+
 async function guardarEmpresaEnServidor(idEmpresa){
   try{
     await fetch(`${FACTASH_API_URL}/api/empresas/${encodeURIComponent(idEmpresa)}`, {
