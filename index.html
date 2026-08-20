@@ -1534,10 +1534,9 @@
         <div style="display:flex; gap:8px; align-items:flex-start;">
           <input type="text" id="cfg_bridge_id" placeholder="ej. nutri — déjalo vacío si aún se genera el JSON manualmente" style="flex:1;">
           <button class="rm-btn" style="color:var(--accent); border:1px solid var(--line); border-radius:6px; padding:8px 12px; font-size:12px; white-space:nowrap;" onclick="verificarEstadoSfs()">🔍 Verificar estado</button>
-          <button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:8px 12px; font-size:12px; white-space:nowrap;" onclick="verBandejaSfs()">📋 Ver bandeja</button>
+          <button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:8px 12px; font-size:12px; white-space:nowrap;" onclick="abrirBandejaSfs()">📋 Ver bandeja</button>
         </div>
         <div id="cfg_estado_sfs_msg" style="font-size:11px; margin-top:6px; white-space:pre-wrap; font-family:var(--mono); display:none;"></div>
-        <div id="cfg_bandeja_sfs" style="margin-top:10px; display:none; max-height:400px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:10px;"></div>
 
         <label style="margin-top:14px; display:block; border-top:1px solid var(--line); padding-top:12px;">Ajustar próximo número de correlativo <span style="color:var(--text-dim); font-weight:normal;">(usar solo si ya emitiste comprobantes fuera de FACTASH y necesitas continuar la numeración sin repetir)</span></label>
         <div class="row2">
@@ -6879,44 +6878,13 @@ function actualizarSeriesVisibles(){
 // se entre. Se mantiene localStorage como respaldo local instantáneo (por si el backend
 // tarda en responder o hay un corte momentáneo de internet), pero la fuente de verdad real
 // es el servidor.
-async function verBandejaSfs(){
+function abrirBandejaSfs(){
   const nombreCorto = document.getElementById('cfg_bridge_id').value.trim();
-  const cont = document.getElementById('cfg_bandeja_sfs');
-  cont.style.display = 'block';
-
   if(!nombreCorto){
-    cont.innerHTML = `<span style="color:var(--danger); font-size:12px;">Escribe primero el nombre (ej. "nutri") en el campo de arriba.</span>`;
+    alert('Escribe primero el nombre (ej. "nutri") en el campo de arriba.');
     return;
   }
-
-  cont.innerHTML = `<span style="color:var(--text-dim); font-size:12px;">⏳ Consultando la bandeja de "${nombreCorto}"...</span>`;
-
-  try{
-    const resp = await fetch(`${ALTA_EMPRESA_API_URL}/api/bandeja-empresa/${encodeURIComponent(nombreCorto)}`);
-    const data = await resp.json();
-    if(!data.ok){
-      cont.innerHTML = `<span style="color:var(--danger); font-size:12px;">✕ ${data.error}</span>`;
-      return;
-    }
-    if(!data.lista.length){
-      cont.innerHTML = `<span style="color:var(--text-dim); font-size:12px;">Bandeja vacía (puerto ${data.puerto}) — todavía no se emitió nada con esta empresa.</span>`;
-      return;
-    }
-    const filas = data.lista.map(r => {
-      const doc = `${r.tip_docu || r.tipDocu || ''} ${r.num_docu || r.numDocu || ''}`.trim();
-      const situ = r.ind_situ_desc || r.indSituDesc || r.ind_situ || r.indSitu || '';
-      const err = r.des_erro || r.desErro || r.observaciones || '';
-      return `
-      <div style="padding:6px 0; border-bottom:1px solid var(--line); font-size:11px;">
-        <b>${doc || '(sin identificar)'}</b> — ${situ}
-        ${err ? `<br><span style="color:var(--danger);">${err}</span>` : ''}
-      </div>
-    `;
-    }).join('');
-    cont.innerHTML = `<div style="font-size:11px; color:var(--text-dim); margin-bottom:6px;">Mostrando ${data.lista.length} de ${data.total} (puerto ${data.puerto}):</div>${filas}`;
-  } catch(err){
-    cont.innerHTML = `<span style="color:var(--danger); font-size:12px;">✕ No se pudo conectar con el servicio de verificación.</span>`;
-  }
+  window.open(`${ALTA_EMPRESA_API_URL}/bandeja/${encodeURIComponent(nombreCorto)}`, '_blank');
 }
 
 async function verificarEstadoSfs(){
