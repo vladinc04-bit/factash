@@ -3181,7 +3181,7 @@ function buildFacturaJSON(emp, serie, docTipo){
       desItem: it.producto,
       mtoValorUnitario: valorUnitario.toFixed(2),
       sumTotTributosItem: igvItem.toFixed(2),
-      codTriIGV: esGravado ? 1000 : (it.afectacion==='20'?9997:it.afectacion==='30'?9998:it.afectacion==='17'?9995:9996),
+      codTriIGV: esGravado ? "1000" : (it.afectacion==="20"?"9997":it.afectacion==="30"?"9998":it.afectacion==="17"?"9995":"9996"),
       mtoIgvItem: igvItem.toFixed(2),
       mtoBaseIgvItem: valorVentaItem.toFixed(2),
       nomTributoIgvItem: "IGV",
@@ -3974,7 +3974,7 @@ function buildLiquidacionJSON(emp, serie){
       desItem: it.producto,
       mtoValorUnitario: valorUnitario.toFixed(2),
       sumTotTributosItem: igvItem.toFixed(2),
-      codTriIGV: esGravado ? 1000 : (it.afectacion==='20'?9997:it.afectacion==='30'?9998:it.afectacion==='17'?9995:9996),
+      codTriIGV: esGravado ? "1000" : (it.afectacion==="20"?"9997":it.afectacion==="30"?"9998":it.afectacion==="17"?"9995":"9996"),
       mtoIgvItem: igvItem.toFixed(2),
       mtoBaseIgvItem: valorVentaItem.toFixed(2),
       nomTributoIgvItem: "IGV",
@@ -5031,7 +5031,7 @@ function buildFacturaJSONMasivo(g, serie, docTipo){
       desItem: it['Producto']||"",
       mtoValorUnitario: valorUnitario.toFixed(2),
       sumTotTributosItem: igvItem.toFixed(2),
-      codTriIGV: esGravado ? 1000 : (afeCode==='20'?9997:afeCode==='30'?9998:afeCode==='17'?9995:9996),
+      codTriIGV: esGravado ? "1000" : (afeCode==="20"?"9997":afeCode==="30"?"9998":afeCode==="17"?"9995":"9996"),
       mtoIgvItem: igvItem.toFixed(2),
       mtoBaseIgvItem: valorVentaItem.toFixed(2),
       nomTributoIgvItem: "IGV",
@@ -6554,10 +6554,10 @@ function imprimirComprobante(idx, formato, modo){
     return;
   }
 
-  // ---------- A4 (formato profesional completo) ----------
+  // ---------- A4 (formato profesional completo — estilo "Korbos", con desglose real por tipo de afectación) ----------
   const filasA4 = filasItems.map(it => `
     <tr>
-      <td>${it.cant}</td>
+      <td>${it.cant.toFixed ? it.cant.toFixed(2) : it.cant}</td>
       <td>${it.unidad}</td>
       <td>${it.codigo}</td>
       <td>${it.desc}</td>
@@ -6567,9 +6567,59 @@ function imprimirComprobante(idx, formato, modo){
     </tr>
   `).join('') || `<tr><td colspan="7" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
 
+  // Cuotas de crédito — se insertan como una fila extra de la tabla de ítems, anidadas debajo
+  // de la columna Descripción (mismo lugar donde va el detalle del producto), no como bloque aparte.
+  const dpCredito = e.jsonSUNAT && e.jsonSUNAT.cabecera && e.jsonSUNAT.cabecera.datoPago;
+  const cuotasCredito = e.jsonSUNAT && e.jsonSUNAT.cabecera && e.jsonSUNAT.cabecera.detallePago;
+  const filaCuotasA4 = (dpCredito && dpCredito.formaPago === 'Credito' && cuotasCredito && cuotasCredito.length) ? `
+    <tr>
+      <td colspan="4" style="border-bottom:none; padding-top:2px;">
+        <table style="width:70%; border-collapse:collapse; font-size:9.5px; margin-top:4px;">
+          <thead>
+            <tr>
+              <th style="border:1px solid #999; padding:3px 6px; background:#f0f0f0;">N° Cuota</th>
+              <th style="border:1px solid #999; padding:3px 6px; background:#f0f0f0;">Fecha de Pago</th>
+              <th style="border:1px solid #999; padding:3px 6px; background:#f0f0f0;">Monto de la Cuota</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${cuotasCredito.map((c,i)=>`
+              <tr>
+                <td style="border:1px solid #999; padding:3px 6px;">Cuota ${i+1}</td>
+                <td style="border:1px solid #999; padding:3px 6px;">${c.fecCuotaPago||'-'}</td>
+                <td style="border:1px solid #999; padding:3px 6px;">S/ ${c.mtoCuotaPago}</td>
+              </tr>
+            `).join('')}
+            <tr>
+              <td colspan="2" style="border:1px solid #999; padding:3px 6px; font-weight:bold;">Monto Neto Pendiente de Pago</td>
+              <td style="border:1px solid #999; padding:3px 6px; font-weight:bold;">S/ ${dpCredito.mtoNetoPendientePago}</td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+      <td colspan="3"></td>
+    </tr>` : '';
+
   const total = e.monto || 0;
-  const gravado = total / 1.18;
-  const igv = total - gravado;
+
+  // Desglose real por tipo de operación (Gravada/Exonerada/Inafecta/Exportación) a partir de los
+  // tributos que se guardaron con el comprobante — mismos códigos que arma buildFacturaJSON().
+  // Si el registro es viejo y no tiene ese detalle guardado, se cae al cálculo aproximado de siempre.
+  let gravado=0, exonerado=0, inafecto=0, exportacion=0, igv=0;
+  const tributosGuardados = (e.jsonSUNAT && e.jsonSUNAT.cabecera && e.jsonSUNAT.cabecera.tributos) || null;
+  if(tributosGuardados && tributosGuardados.length){
+    tributosGuardados.forEach(t=>{
+      const base = parseFloat(t.mtoBaseIgvItem)||0;
+      const tIgv = parseFloat(t.mtoIgvItem)||0;
+      if(t.codTriIGV==='1000'){ gravado+=base; igv+=tIgv; }
+      else if(t.codTriIGV==='9995'){ exportacion+=base; }
+      else if(t.codTriIGV==='9998'){ inafecto+=base; }
+      else { exonerado+=base; } // 9996/9997 y cualquier otro código de exoneración
+    });
+  } else {
+    gravado = total / 1.18;
+    igv = total - gravado;
+  }
   const montoLetras = e.monto!==null ? numeroALetras(total) : '';
 
   // Catálogo N°1 SUNAT (tipo de documento) para el código QR
@@ -6589,7 +6639,12 @@ function imprimirComprobante(idx, formato, modo){
   const qrDisponible = !esGuia || !!e.sunatQrUrl;
   const contenidoQR = (esGuia && e.sunatQrUrl) ? e.sunatQrUrl : textoQR;
 
+  // Color de acento de la caja de comprobante y totales — usa el color de marca de la empresa
+  // si lo configuraste en Personalización, si no cae a un naranja por defecto (estilo Korbos).
+  const COLOR_ACENTO_PDF = emp.colorMarca || '#e8720c';
+
   const html = esGuia
+
     ? ((emp.formatoImpresionGuia === 'B')
         ? buildGuiaPrintHTMLFormatoB({...e, jsonSFS: e.jsonSFS || e.jsonSUNAT}, emp, filasItems, contenidoQR, qrDisponible)
         : buildGuiaPrintHTML({...e, jsonSFS: e.jsonSFS || e.jsonSUNAT}, emp, filasItems, contenidoQR, qrDisponible))
@@ -6597,104 +6652,134 @@ function imprimirComprobante(idx, formato, modo){
 <!DOCTYPE html><html><head><meta charset="UTF-8"><title>${e.serie}</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <style>
-  @page { size: A4; margin: 15mm; }
-  body { font-family: Arial, sans-serif; color:#111; font-size:12px; }
-  .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #333; padding-bottom:10px; margin-bottom:14px; }
-  .empresa h1 { font-size:16px; margin:0 0 4px; }
-  .empresa .datos { font-size:11px; color:#333; line-height:1.5; }
-  .caja-comprobante { border:1.5px solid #333; border-radius:4px; padding:10px 16px; text-align:center; min-width:220px; }
-  .caja-comprobante .ruc { font-weight:bold; font-size:12px; }
-  .caja-comprobante .tipo { font-weight:bold; font-size:13px; margin:4px 0; }
-  .caja-comprobante .serie { font-size:14px; font-weight:bold; letter-spacing:1px; }
-  .datos-cliente { border:1px solid #ccc; border-radius:4px; padding:10px 14px; margin-bottom:14px; font-size:11.5px; }
-  .datos-cliente div { margin-bottom:3px; }
-  .datos-cliente b { display:inline-block; width:90px; }
-  table.items { width:100%; border-collapse:collapse; margin-bottom:14px; }
-  table.items th { background:#2b2b2b; color:#fff; padding:6px 5px; font-size:10.5px; text-align:left; }
-  table.items td { padding:5px; font-size:11px; border-bottom:1px solid #eee; }
-  .footer-totales { display:flex; justify-content:space-between; align-items:flex-start; margin-top:10px; }
-  .son-letras { border:1px solid #ccc; border-radius:4px; padding:8px 12px; font-size:11px; flex:1; margin-right:16px; }
-  .tabla-impuestos { font-size:11.5px; min-width:220px; }
+  @page { size: A4; margin: 12mm 14mm; }
+  body { font-family: Arial, sans-serif; color:#222; font-size:11.5px; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:10px; margin-bottom:12px; }
+  .empresa { display:flex; gap:12px; align-items:flex-start; }
+  .empresa .logo-wrap { width:60px; height:60px; border-radius:50%; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:#f2f2f2; }
+  .empresa .logo-wrap img { width:100%; height:100%; object-fit:contain; }
+  .empresa h1 { font-size:15px; margin:0 0 5px; color:#111; letter-spacing:0.3px; }
+  .empresa .datos { font-size:10.5px; color:#444; line-height:1.6; }
+  .empresa .datos b { color:${COLOR_ACENTO_PDF}; }
+  .caja-comprobante { border:1.5px solid ${COLOR_ACENTO_PDF}; border-radius:4px; padding:10px 18px; text-align:center; min-width:230px; }
+  .caja-comprobante .ruc { font-weight:bold; font-size:12px; color:#111; }
+  .caja-comprobante .tipo { font-weight:bold; font-size:13.5px; margin:5px 0; color:#111; }
+  .caja-comprobante .serie { font-size:15px; font-weight:bold; letter-spacing:1px; color:${COLOR_ACENTO_PDF}; }
+  .datos-cliente { border:1px solid #ccc; border-radius:4px; padding:9px 14px; margin-bottom:4px; font-size:11px; }
+  .datos-cliente div { margin-bottom:3px; display:flex; }
+  .datos-cliente b { display:inline-block; width:75px; color:#555; text-transform:uppercase; font-size:9.5px; }
+  .obs-label { font-size:10px; font-weight:bold; color:#555; text-transform:uppercase; margin:10px 0 3px 2px; }
+  table.items { width:100%; border-collapse:collapse; margin-bottom:12px; }
+  table.items th { background:#2b2b2b; color:#fff; padding:6px 5px; font-size:10px; text-align:left; text-transform:uppercase; }
+  table.items td { padding:5px; font-size:10.5px; border-bottom:1px solid #eee; }
+  .footer-totales { display:flex; justify-content:space-between; align-items:flex-start; margin-top:8px; gap:16px; }
+  .col-izq { flex:1; display:flex; flex-direction:column; gap:12px; }
+  .son-letras { border:1px solid #ccc; border-radius:4px; padding:8px 12px; font-size:11px; }
+  .tabla-impuestos { font-size:11px; min-width:230px; }
   .tabla-impuestos div { display:flex; justify-content:space-between; padding:2px 0; }
-  .tabla-impuestos .final { border-top:1.5px solid #333; margin-top:4px; padding-top:5px; font-weight:bold; font-size:13px; }
-  .qr-box { display:flex; gap:16px; align-items:center; margin-top:18px; }
-  #qrcode { width:80px; height:80px; }
-  .footer-legal { margin-top:20px; text-align:center; font-size:9.5px; color:#777; border-top:1px solid #eee; padding-top:8px; }
+  .tabla-impuestos .final { border-top:1.5px solid #333; margin-top:4px; padding-top:5px; font-weight:bold; font-size:13px; color:${COLOR_ACENTO_PDF}; }
+  .qr-box { display:flex; gap:14px; align-items:center; }
+  #qrcode { width:75px; height:75px; }
+  .footer-legal { margin-top:18px; text-align:center; font-size:9.5px; color:#777; border-top:1px solid #eee; padding-top:8px; }
 </style></head>
 <body>
 
   <div class="header">
-    <div class="empresa" style="display:flex; gap:12px; align-items:flex-start;">
-      ${emp.logo ? `<img src="${emp.logo}" style="width:64px; height:64px; object-fit:contain;">` : ''}
+    <div class="empresa">
+      <div class="logo-wrap">${emp.logo ? `<img src="${emp.logo}">` : `<span style="font-size:22px; color:#bbb;">🏢</span>`}</div>
       <div>
         <h1>${emp.nombreComercial || emp.nombre}</h1>
         <div class="datos">
-          ${emp.direccion || ''}<br>
-          ${emp.nombre !== (emp.nombreComercial||emp.nombre) ? 'Razón Social: '+emp.nombre+'<br>' : ''}
-          ${emp.telefono ? 'Telf: '+emp.telefono+'<br>' : ''}
-          ${emp.email ? 'Email: '+emp.email+'<br>' : ''}
-          ${emp.web ? 'Web: '+emp.web : ''}
+          ${emp.direccion ? '<b>Dir.</b> '+emp.direccion+'<br>' : ''}
+          ${emp.telefono ? '<b>Telf:</b> '+emp.telefono+' &nbsp; ' : ''}${emp.email ? '<b>Email:</b> '+emp.email+'<br>' : '<br>'}
+          ${emp.web ? '<b>Web:</b> '+emp.web : ''}
         </div>
       </div>
     </div>
     <div class="caja-comprobante">
       <div class="ruc">R.U.C. N° ${emp.ruc}</div>
       <div class="tipo">${badgeLabel(e.tipo).toUpperCase()}${e.noFiscal ? '' : ' ELECTRÓNICA'}</div>
-      <div class="serie">${e.serie}</div>
+      <div class="serie">N° ${e.serie}</div>
     </div>
   </div>
 
   <div class="datos-cliente">
-    <div><b>Emisión</b>: ${e.fecha}</div>
-    <div><b>Cliente</b>: ${e.cliente}</div>
+    <div><b>Emisión</b> ${e.fecha}</div>
+    <div><b>Cliente</b> ${e.cliente}</div>
+    <div><b>RUC/DNI</b> ${numDocClienteQR}</div>
+    ${e.direccionCliente ? `<div><b>Dirección</b> ${e.direccionCliente}</div>` : ''}
     ${e.noFiscal ? '<div style="color:#b45309; font-weight:bold;">⚠ Este documento NO es un comprobante de pago válido para SUNAT</div>' : ''}
   </div>
+
+  <div class="obs-label">Observaciones</div>
 
   <table class="items">
     <thead>
       <tr>
-        <th style="width:8%;">Cant.</th>
-        <th style="width:10%;">Unidad</th>
-        <th style="width:12%;">Código</th>
+        <th style="width:8%;">Cantidad</th>
+        <th style="width:9%;">Unidad</th>
+        <th style="width:13%;">Código producto</th>
         <th>Descripción</th>
-        <th style="width:11%; text-align:right;">Valor Unit.</th>
-        <th style="width:11%; text-align:right;">Precio Unit.</th>
-        <th style="width:11%; text-align:right;">Total</th>
+        <th style="width:11%; text-align:right;">Precio unit.</th>
+        <th style="width:11%; text-align:right;">Valor unit.</th>
+        <th style="width:11%; text-align:right;">Total S/</th>
       </tr>
     </thead>
-    <tbody>${filasA4}</tbody>
+    <tbody>${filasA4}${filaCuotasA4}</tbody>
   </table>
 
+  ${(e.jsonSUNAT && e.jsonSUNAT.cabecera && e.jsonSUNAT.cabecera.adicionalCabecera && e.jsonSUNAT.cabecera.adicionalCabecera.ctaBancoNacionDetraccion) ? `
+  <div style="font-size:10px; margin-bottom:8px;">
+    Operación sujeta a detracción. N° de Cuenta: ${e.jsonSUNAT.cabecera.adicionalCabecera.ctaBancoNacionDetraccion}. Monto Detracción: S/ ${e.jsonSUNAT.cabecera.adicionalCabecera.mtoDetraccion}
+  </div>` : ''}
+
   <div class="footer-totales">
-    ${montoLetras ? `<div class="son-letras"><b>SON:</b> ${montoLetras}</div>` : '<div style="flex:1;"></div>'}
+    <div class="col-izq">
+      ${montoLetras ? `<div class="son-letras"><b>SON:</b> ${montoLetras}</div>` : ''}
+      <div class="qr-box">
+        <div id="qrcode"></div>
+        <div style="font-size:9.5px; color:#777;">
+          RUC: ${emp.ruc} | Tipo: ${badgeLabel(e.tipo)} | Serie: ${e.serie}<br>
+          Fecha: ${e.fecha} | Total: S/ ${(e.monto||0).toFixed(2)}
+        </div>
+      </div>
+    </div>
     ${e.monto!==null ? `
     <div class="tabla-impuestos">
-      <div><span>Op. Gravada</span><span>S/ ${gravado.toFixed(2)}</span></div>
-      <div><span>IGV</span><span>S/ ${igv.toFixed(2)}</span></div>
-      <div class="final"><span>Importe Total</span><span>S/ ${total.toFixed(2)}</span></div>
+      ${gravado>0?`<div><span>Op. Gravada (S/)</span><span>${gravado.toFixed(2)}</span></div>`:''}
+      ${inafecto>0?`<div><span>Op. Inafecta (S/)</span><span>${inafecto.toFixed(2)}</span></div>`:''}
+      ${exonerado>0?`<div><span>Op. Exonerada (S/)</span><span>${exonerado.toFixed(2)}</span></div>`:''}
+      ${exportacion>0?`<div><span>Op. Exportación (S/)</span><span>${exportacion.toFixed(2)}</span></div>`:''}
+      <div><span>Total IGV 18% (S/)</span><span>${igv.toFixed(2)}</span></div>
+      <div class="final"><span>IMPORTE TOTAL (S/)</span><span>${total.toFixed(2)}</span></div>
     </div>` : ''}
   </div>
 
   ${(emp.bancos||[]).filter(b=>b.activo).length ? `
-  <table style="width:100%; border-collapse:collapse; margin-top:8px; font-size:10px;">
-    ${(emp.bancos||[]).filter(b=>b.activo).map(b=>`
+  <div style="font-size:9.5px; font-weight:bold; margin-top:14px; margin-bottom:3px;">Sírvase abonar a las siguientes cuentas</div>
+  <table style="width:100%; border-collapse:collapse; font-size:9.5px;">
+    <thead>
       <tr>
-        <td style="padding:3px 6px; font-weight:bold; width:110px;">${b.banco}</td>
-        <td style="padding:3px 6px;">(${b.moneda}) ${b.cuenta}${b.cci?' — CCI: '+b.cci:''}</td>
+        <th style="border:1px solid #ccc; padding:4px 6px; background:#f5f5f5;">Banco</th>
+        <th style="border:1px solid #ccc; padding:4px 6px; background:#f5f5f5;">Moneda</th>
+        <th style="border:1px solid #ccc; padding:4px 6px; background:#f5f5f5;">Código de cuenta</th>
+        <th style="border:1px solid #ccc; padding:4px 6px; background:#f5f5f5;">Código de cuenta interbancario</th>
       </tr>
-    `).join('')}
+    </thead>
+    <tbody>
+      ${(emp.bancos||[]).filter(b=>b.activo).map(b=>`
+        <tr>
+          <td style="border:1px solid #ccc; padding:4px 6px;">${b.banco}</td>
+          <td style="border:1px solid #ccc; padding:4px 6px;">${b.moneda}</td>
+          <td style="border:1px solid #ccc; padding:4px 6px;">${b.cuenta}</td>
+          <td style="border:1px solid #ccc; padding:4px 6px;">${b.cci || '-'}</td>
+        </tr>
+      `).join('')}
+    </tbody>
   </table>` : ''}
 
-  <div class="qr-box">
-    <div id="qrcode"></div>
-    <div style="font-size:10px; color:#777;">
-      RUC: ${emp.ruc} | Tipo: ${badgeLabel(e.tipo)} | Serie: ${e.serie}<br>
-      Fecha: ${e.fecha} | Total: S/ ${(e.monto||0).toFixed(2)}
-    </div>
-  </div>
-
   <div class="footer-legal">
-    ${emp.textoLegal || `Representación impresa de ${badgeLabel(e.tipo)}${e.noFiscal?'':' Electrónica'}. Generado con FACTASH.`}
+    ${emp.textoLegal || `Representación impresa de ${badgeLabel(e.tipo)}${e.noFiscal?'':' Electrónica'}, autorizado mediante Resolución. Puede ser consultado en: www.factash.pe`}
   </div>
 
   <script>
