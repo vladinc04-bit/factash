@@ -6562,48 +6562,22 @@ function imprimirComprobante(idx, formato, modo){
   // ---------- A4 (formato profesional completo — estilo "Korbos", con desglose real por tipo de afectación) ----------
   const filasA4 = filasItems.map(it => `
     <tr>
-      <td>${it.cant.toFixed ? it.cant.toFixed(2) : it.cant}</td>
-      <td>${it.unidad}</td>
       <td>${it.codigo}</td>
       <td>${it.desc}</td>
+      <td>${it.unidad}</td>
+      <td style="text-align:right;">${it.cant.toFixed ? it.cant.toFixed(2) : it.cant}</td>
       <td style="text-align:right;">${esGuia ? '-' : it.precio.toFixed(2)}</td>
       <td style="text-align:right;">${esGuia ? '-' : it.precio.toFixed(2)}</td>
+      <td style="text-align:right;">0.00</td>
       <td style="text-align:right;">${esGuia ? '-' : (it.cant*it.precio).toFixed(2)}</td>
     </tr>
-  `).join('') || `<tr><td colspan="7" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
+  `).join('') || `<tr><td colspan="8" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
 
-  // Cuotas de crédito — se insertan como una fila extra de la tabla de ítems, anidadas debajo
-  // de la columna Descripción (mismo lugar donde va el detalle del producto), no como bloque aparte.
+  // Datos de crédito — se usan para el panel "Cronograma de Pagos (Crédito)" que aparece
+  // debajo de los totales (no anidado en la tabla de ítems).
   const dpCredito = e.jsonSUNAT && e.jsonSUNAT.cabecera && e.jsonSUNAT.cabecera.datoPago;
   const cuotasCredito = e.jsonSUNAT && e.jsonSUNAT.cabecera && e.jsonSUNAT.cabecera.detallePago;
-  const filaCuotasA4 = (dpCredito && dpCredito.formaPago === 'Credito' && cuotasCredito && cuotasCredito.length) ? `
-    <tr>
-      <td colspan="4" style="border-bottom:none; padding-top:2px;">
-        <table style="width:70%; border-collapse:collapse; font-size:9.5px; margin-top:4px;">
-          <thead>
-            <tr>
-              <th style="border:1px solid #999; padding:3px 6px; background:#f0f0f0;">N° Cuota</th>
-              <th style="border:1px solid #999; padding:3px 6px; background:#f0f0f0;">Fecha de Pago</th>
-              <th style="border:1px solid #999; padding:3px 6px; background:#f0f0f0;">Monto de la Cuota</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${cuotasCredito.map((c,i)=>`
-              <tr>
-                <td style="border:1px solid #999; padding:3px 6px;">Cuota ${i+1}</td>
-                <td style="border:1px solid #999; padding:3px 6px;">${c.fecCuotaPago||'-'}</td>
-                <td style="border:1px solid #999; padding:3px 6px;">S/ ${c.mtoCuotaPago}</td>
-              </tr>
-            `).join('')}
-            <tr>
-              <td colspan="2" style="border:1px solid #999; padding:3px 6px; font-weight:bold;">Monto Neto Pendiente de Pago</td>
-              <td style="border:1px solid #999; padding:3px 6px; font-weight:bold;">S/ ${dpCredito.mtoNetoPendientePago}</td>
-            </tr>
-          </tbody>
-        </table>
-      </td>
-      <td colspan="3"></td>
-    </tr>` : '';
+  const filaCuotasA4 = '';
 
   const total = e.monto || 0;
 
@@ -6645,9 +6619,36 @@ function imprimirComprobante(idx, formato, modo){
   const qrDisponible = !esGuia || !!e.sunatQrUrl;
   const contenidoQR = (esGuia && e.sunatQrUrl) ? e.sunatQrUrl : textoQR;
 
-  // Color de acento de la caja de comprobante y totales — usa el color de marca de la empresa
-  // si lo configuraste en Personalización, si no cae a un naranja por defecto (estilo Korbos).
-  const COLOR_ACENTO_PDF = emp.colorMarca || '#e8720c';
+  // Color de acento — usa el color de marca de la empresa si lo configuraste en Personalización,
+  // si no cae a un azul por defecto (estilo referencia "SYS LINK").
+  const COLOR_ACENTO_PDF = emp.colorMarca || '#0d5aa7';
+  const COLOR_ACENTO_CLARO_PDF = emp.colorMarcaClaro || '#eaf2fb';
+
+  // Condición de pago / cronograma de crédito / detracción — se leen del JSON real ya guardado
+  // con el comprobante para que la representación impresa muestre exactamente lo que se envió a SUNAT.
+  const cabG = (e.jsonSUNAT && e.jsonSUNAT.cabecera) || {};
+  const esCreditoG = dpCredito && dpCredito.formaPago === 'Credito';
+  const condPagoTexto = esCreditoG ? `CRÉDITO${cuotasCredito && cuotasCredito.length>1 ? ' A '+cuotasCredito.length+' CUOTAS' : ''}` : 'CONTADO';
+  const detraccionG = cabG.adicionalCabecera && cabG.adicionalCabecera.ctaBancoNacionDetraccion ? cabG.adicionalCabecera : null;
+  const guiaRelacionadaG = cabG.documentoRelacionado ? cabG.documentoRelacionado.numDocRelacionado : (e.guiaRelacionada || '');
+
+  // Insignias de bancos — texto con el color de marca de cada banco (no se usa el logo oficial
+  // en sí, por temas de derechos de marca, pero se identifican igual de rápido a simple vista).
+  const COLORES_BANCO = {
+    'bcp':'#0033a0','banco de crédito':'#0033a0','banco de credito':'#0033a0',
+    'bbva':'#072146',
+    'interbank':'#00953b',
+    'scotiabank':'#e2231a',
+    'banco de la nación':'#7a1f2b','banco de la nacion':'#7a1f2b',
+    'bif':'#f7941d','interamericano':'#f7941d',
+    'pichincha':'#ffce00',
+    'mibanco':'#00a651',
+  };
+  function colorBanco(nombre){
+    const key = (nombre||'').toLowerCase().trim();
+    for(const k in COLORES_BANCO){ if(key.includes(k)) return COLORES_BANCO[k]; }
+    return '#555';
+  }
 
   const html = esGuia
 
@@ -6658,93 +6659,128 @@ function imprimirComprobante(idx, formato, modo){
 <!DOCTYPE html><html><head><meta charset="UTF-8"><title>${e.serie}</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <style>
-  @page { size: A4; margin: 12mm 14mm; }
-  body { font-family: Arial, sans-serif; color:#222; font-size:11.5px; }
-  .header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:10px; margin-bottom:12px; }
+  @page { size: A4; margin: 10mm 12mm; }
+  body { font-family: Arial, sans-serif; color:#222; font-size:10.5px; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid #ddd; }
   .empresa { display:flex; gap:12px; align-items:flex-start; }
-  .empresa .logo-wrap { width:60px; height:60px; border-radius:50%; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:#f2f2f2; }
+  .empresa .logo-wrap { width:58px; height:58px; border-radius:50%; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:#f2f2f2; }
   .empresa .logo-wrap img { width:100%; height:100%; object-fit:contain; }
-  .empresa h1 { font-size:15px; margin:0 0 5px; color:#111; letter-spacing:0.3px; }
-  .empresa .datos { font-size:10.5px; color:#444; line-height:1.6; }
+  .empresa h1 { font-size:14px; margin:0 0 4px; color:${COLOR_ACENTO_PDF}; letter-spacing:0.3px; }
+  .empresa .datos { font-size:9.5px; color:#333; line-height:1.55; }
   .empresa .datos b { color:${COLOR_ACENTO_PDF}; }
-  .caja-comprobante { border:1.5px solid ${COLOR_ACENTO_PDF}; border-radius:4px; padding:10px 18px; text-align:center; min-width:230px; }
-  .caja-comprobante .ruc { font-weight:bold; font-size:12px; color:#111; }
-  .caja-comprobante .tipo { font-weight:bold; font-size:13.5px; margin:5px 0; color:#111; }
-  .caja-comprobante .serie { font-size:15px; font-weight:bold; letter-spacing:1px; color:${COLOR_ACENTO_PDF}; }
-  .datos-cliente { border:1px solid #ccc; border-radius:4px; padding:9px 14px; margin-bottom:4px; font-size:11px; }
+  .caja-comprobante { border:1.5px solid ${COLOR_ACENTO_PDF}; border-radius:4px; padding:8px 16px; text-align:center; min-width:220px; }
+  .caja-comprobante .ruc { font-weight:bold; font-size:11px; color:#111; }
+  .caja-comprobante .tipo { display:inline-block; background:${COLOR_ACENTO_CLARO_PDF}; color:${COLOR_ACENTO_PDF}; font-weight:bold; font-size:11.5px; padding:3px 10px; border-radius:3px; margin:5px 0; }
+  .caja-comprobante .serie { font-size:15px; font-weight:bold; letter-spacing:0.5px; color:#111; margin-top:3px; }
+  .fecha-emision { text-align:right; font-size:9.5px; color:#555; margin-bottom:6px; }
+  .datos-cliente { border:1px solid #ccc; border-radius:4px; padding:8px 12px; margin-bottom:8px; font-size:10px; display:flex; }
+  .datos-cliente .col { flex:1; }
   .datos-cliente div { margin-bottom:3px; display:flex; }
-  .datos-cliente b { display:inline-block; width:75px; color:#555; text-transform:uppercase; font-size:9.5px; }
-  .obs-label { font-size:10px; font-weight:bold; color:#555; text-transform:uppercase; margin:10px 0 3px 2px; }
-  table.items { width:100%; border-collapse:collapse; margin-bottom:12px; }
-  table.items th { background:#2b2b2b; color:#fff; padding:6px 5px; font-size:10px; text-align:left; text-transform:uppercase; }
-  table.items td { padding:5px; font-size:10.5px; border-bottom:1px solid #eee; }
-  .footer-totales { display:flex; justify-content:space-between; align-items:flex-start; margin-top:8px; gap:16px; }
-  .col-izq { flex:1; display:flex; flex-direction:column; gap:12px; }
-  .son-letras { border:1px solid #ccc; border-radius:4px; padding:8px 12px; font-size:11px; }
-  .tabla-impuestos { font-size:11px; min-width:230px; }
-  .tabla-impuestos div { display:flex; justify-content:space-between; padding:2px 0; }
-  .tabla-impuestos .final { border-top:1.5px solid #333; margin-top:4px; padding-top:5px; font-weight:bold; font-size:13px; color:${COLOR_ACENTO_PDF}; }
-  .qr-box { display:flex; gap:14px; align-items:center; }
-  #qrcode { width:75px; height:75px; }
-  .footer-legal { margin-top:18px; text-align:center; font-size:9.5px; color:#777; border-top:1px solid #eee; padding-top:8px; }
+  .datos-cliente b { display:inline-block; width:80px; color:#555; }
+  .obs-label { font-size:9.5px; font-weight:bold; color:#555; text-transform:uppercase; margin:6px 0 3px 2px; }
+  table.items { width:100%; border-collapse:collapse; margin-bottom:8px; }
+  table.items th { background:${COLOR_ACENTO_PDF}; color:#fff; padding:5px; font-size:9px; text-align:left; text-transform:uppercase; }
+  table.items td { padding:4px 5px; font-size:9.5px; border-bottom:1px solid #eee; vertical-align:top; }
+  .panel-bajo { border:1px solid #ccc; border-radius:4px; overflow:hidden; flex:1; }
+  .panel-bajo .panel-head { background:${COLOR_ACENTO_PDF}; color:#fff; font-size:9px; font-weight:bold; text-transform:uppercase; padding:4px 8px; }
+  .panel-bajo .panel-body { padding:6px 8px; font-size:9px; }
+  .panel-bajo table { width:100%; border-collapse:collapse; font-size:8.5px; }
+  .panel-bajo table th, .panel-bajo table td { border:1px solid #ddd; padding:2px 5px; text-align:left; }
+  .footer-totales { display:flex; justify-content:space-between; align-items:flex-start; margin-top:8px; gap:14px; }
+  .col-izq { flex:1.4; display:flex; flex-direction:column; gap:8px; }
+  .son-letras { border:1px solid #ccc; border-radius:4px; padding:7px 10px; font-size:10px; }
+  .paneles-bajos { display:flex; gap:8px; }
+  .tabla-impuestos { font-size:10px; min-width:210px; border:1px solid #ccc; border-radius:4px; overflow:hidden; }
+  .tabla-impuestos div { display:flex; justify-content:space-between; padding:3px 8px; border-bottom:1px solid #eee; }
+  .tabla-impuestos .final { background:${COLOR_ACENTO_CLARO_PDF}; margin-top:0; padding:5px 8px; font-weight:bold; font-size:12px; color:${COLOR_ACENTO_PDF}; border-bottom:none; }
+  .qr-box { display:flex; gap:12px; align-items:center; }
+  #qrcode { width:65px; height:65px; }
+  .banco-badge { display:inline-block; color:#fff; font-size:8.5px; font-weight:bold; padding:3px 7px; border-radius:3px; text-transform:uppercase; white-space:nowrap; }
+  .footer-legal { margin-top:12px; text-align:center; font-size:8.5px; color:#777; border-top:1px solid #eee; padding-top:6px; }
 </style></head>
 <body>
 
   <div class="header">
     <div class="empresa">
-      <div class="logo-wrap">${emp.logo ? `<img src="${emp.logo}">` : `<span style="font-size:22px; color:#bbb;">🏢</span>`}</div>
+      <div class="logo-wrap">${emp.logo ? `<img src="${emp.logo}">` : `<span style="font-size:20px; color:#bbb;">🏢</span>`}</div>
       <div>
         <h1>${emp.nombreComercial || emp.nombre}</h1>
         <div class="datos">
           ${emp.direccion ? '<b>Dir.</b> '+emp.direccion+'<br>' : ''}
-          ${emp.telefono ? '<b>Telf:</b> '+emp.telefono+' &nbsp; ' : ''}${emp.email ? '<b>Email:</b> '+emp.email+'<br>' : '<br>'}
+          ${emp.telefono ? '<b>Central Telefónica:</b> '+emp.telefono+' &nbsp; ' : ''}${emp.email ? '<b>Email:</b> '+emp.email+'<br>' : '<br>'}
           ${emp.web ? '<b>Web:</b> '+emp.web : ''}
         </div>
       </div>
     </div>
     <div class="caja-comprobante">
-      <div class="ruc">R.U.C. N° ${emp.ruc}</div>
+      <div class="ruc">R.U.C. ${emp.ruc}</div>
       <div class="tipo">${badgeLabel(e.tipo).toUpperCase()}${e.noFiscal ? '' : ' ELECTRÓNICA'}</div>
-      <div class="serie">N° ${e.serie}</div>
+      <div class="serie">${e.serie}</div>
     </div>
   </div>
 
+  <div class="fecha-emision">Fecha Emisión : ${e.fecha}</div>
+
   <div class="datos-cliente">
-    <div><b>Emisión</b> ${e.fecha}</div>
-    <div><b>Cliente</b> ${e.cliente}</div>
-    <div><b>RUC/DNI</b> ${numDocClienteQR}</div>
-    ${e.direccionCliente ? `<div><b>Dirección</b> ${e.direccionCliente}</div>` : ''}
-    ${e.noFiscal ? '<div style="color:#b45309; font-weight:bold;">⚠ Este documento NO es un comprobante de pago válido para SUNAT</div>' : ''}
+    <div class="col">
+      <div><b>Señor(es)</b> ${e.cliente}</div>
+      ${e.direccionCliente ? `<div><b>Dirección</b> ${e.direccionCliente}</div>` : ''}
+      <div><b>RUC</b> ${numDocClienteQR}</div>
+    </div>
+    <div class="col">
+      <div><b>Cond. de Pago</b> ${condPagoTexto}</div>
+      ${guiaRelacionadaG ? `<div><b>Guías</b> ${guiaRelacionadaG}</div>` : ''}
+    </div>
   </div>
 
-  <div class="obs-label">Observaciones</div>
+  ${e.noFiscal ? '<div style="color:#b45309; font-weight:bold; font-size:9.5px; margin-bottom:6px;">⚠ Este documento NO es un comprobante de pago válido para SUNAT</div>' : ''}
 
   <table class="items">
     <thead>
       <tr>
-        <th style="width:8%;">Cantidad</th>
-        <th style="width:9%;">Unidad</th>
-        <th style="width:13%;">Código producto</th>
+        <th style="width:11%;">Código</th>
         <th>Descripción</th>
-        <th style="width:11%; text-align:right;">Precio unit.</th>
-        <th style="width:11%; text-align:right;">Valor unit.</th>
-        <th style="width:11%; text-align:right;">Total S/</th>
+        <th style="width:9%;">Unidad medida</th>
+        <th style="width:7%; text-align:right;">Cant.</th>
+        <th style="width:10%; text-align:right;">V. unitario</th>
+        <th style="width:10%; text-align:right;">V. de venta</th>
+        <th style="width:8%; text-align:right;">Dscto</th>
+        <th style="width:10%; text-align:right;">Total</th>
       </tr>
     </thead>
     <tbody>${filasA4}${filaCuotasA4}</tbody>
   </table>
 
-  ${(e.jsonSUNAT && e.jsonSUNAT.cabecera && e.jsonSUNAT.cabecera.adicionalCabecera && e.jsonSUNAT.cabecera.adicionalCabecera.ctaBancoNacionDetraccion) ? `
-  <div style="font-size:10px; margin-bottom:8px;">
-    Operación sujeta a detracción. N° de Cuenta: ${e.jsonSUNAT.cabecera.adicionalCabecera.ctaBancoNacionDetraccion}. Monto Detracción: S/ ${e.jsonSUNAT.cabecera.adicionalCabecera.mtoDetraccion}
-  </div>` : ''}
-
   <div class="footer-totales">
     <div class="col-izq">
       ${montoLetras ? `<div class="son-letras"><b>SON:</b> ${montoLetras}</div>` : ''}
+      ${(detraccionG || esCreditoG) ? `
+      <div class="paneles-bajos">
+        ${detraccionG ? `
+        <div class="panel-bajo">
+          <div class="panel-head">Información de Detracción</div>
+          <div class="panel-body">
+            Operación sujeta al Sistema de Pago de Obligaciones Tributarias<br>
+            Tasa de Detracción: <b>${detraccionG.porDetraccion}%</b> &nbsp; Monto: <b>S/ ${detraccionG.mtoDetraccion}</b><br>
+            Cta. Banco de la Nación: <b>${detraccionG.ctaBancoNacionDetraccion}</b>
+          </div>
+        </div>` : ''}
+        ${esCreditoG ? `
+        <div class="panel-bajo">
+          <div class="panel-head">Cronograma de Pagos (Crédito)</div>
+          <div class="panel-body">
+            <table>
+              <thead><tr><th>N° Cuota</th><th>Fecha Venc.</th><th>Monto</th></tr></thead>
+              <tbody>
+                ${cuotasCredito.map((c,i)=>`<tr><td>Cuota ${String(i+1).padStart(3,'0')}</td><td>${c.fecCuotaPago||'-'}</td><td>S/ ${c.mtoCuotaPago}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>` : ''}
+      </div>` : ''}
       <div class="qr-box">
         <div id="qrcode"></div>
-        <div style="font-size:9.5px; color:#777;">
+        <div style="font-size:8.5px; color:#777;">
           RUC: ${emp.ruc} | Tipo: ${badgeLabel(e.tipo)} | Serie: ${e.serie}<br>
           Fecha: ${e.fecha} | Total: S/ ${(e.monto||0).toFixed(2)}
         </div>
@@ -6752,40 +6788,34 @@ function imprimirComprobante(idx, formato, modo){
     </div>
     ${e.monto!==null ? `
     <div class="tabla-impuestos">
-      ${gravado>0?`<div><span>Op. Gravada (S/)</span><span>${gravado.toFixed(2)}</span></div>`:''}
-      ${inafecto>0?`<div><span>Op. Inafecta (S/)</span><span>${inafecto.toFixed(2)}</span></div>`:''}
-      ${exonerado>0?`<div><span>Op. Exonerada (S/)</span><span>${exonerado.toFixed(2)}</span></div>`:''}
-      ${exportacion>0?`<div><span>Op. Exportación (S/)</span><span>${exportacion.toFixed(2)}</span></div>`:''}
-      <div><span>Total IGV 18% (S/)</span><span>${igv.toFixed(2)}</span></div>
+      <div><span>Op. Gravadas</span><span>${gravado.toFixed(2)}</span></div>
+      <div><span>Op. Exoneradas</span><span>${exonerado.toFixed(2)}</span></div>
+      <div><span>Op. Inafectas</span><span>${inafecto.toFixed(2)}</span></div>
+      ${exportacion>0?`<div><span>Op. Exportación</span><span>${exportacion.toFixed(2)}</span></div>`:''}
+      <div><span>I.G.V. 18.00%</span><span>${igv.toFixed(2)}</span></div>
       <div class="final"><span>IMPORTE TOTAL (S/)</span><span>${total.toFixed(2)}</span></div>
     </div>` : ''}
   </div>
 
-  ${(emp.bancos||[]).filter(b=>b.activo).length ? `
-  <div style="font-size:9.5px; font-weight:bold; margin-top:14px; margin-bottom:3px;">Sírvase abonar a las siguientes cuentas</div>
-  <table style="width:100%; border-collapse:collapse; font-size:9.5px;">
-    <thead>
-      <tr>
-        <th style="border:1px solid #ccc; padding:4px 6px; background:#f5f5f5;">Banco</th>
-        <th style="border:1px solid #ccc; padding:4px 6px; background:#f5f5f5;">Moneda</th>
-        <th style="border:1px solid #ccc; padding:4px 6px; background:#f5f5f5;">Código de cuenta</th>
-        <th style="border:1px solid #ccc; padding:4px 6px; background:#f5f5f5;">Código de cuenta interbancario</th>
-      </tr>
-    </thead>
+  ${(emp.bancos||[]).filter(b=>b.activo).length || detraccionG ? `
+  <table style="width:100%; border-collapse:collapse; font-size:9px; margin-top:10px;">
     <tbody>
       ${(emp.bancos||[]).filter(b=>b.activo).map(b=>`
         <tr>
-          <td style="border:1px solid #ccc; padding:4px 6px;">${b.banco}</td>
-          <td style="border:1px solid #ccc; padding:4px 6px;">${b.moneda}</td>
-          <td style="border:1px solid #ccc; padding:4px 6px;">${b.cuenta}</td>
-          <td style="border:1px solid #ccc; padding:4px 6px;">${b.cci || '-'}</td>
+          <td style="border:1px solid #ccc; padding:4px 8px; width:120px;"><span class="banco-badge" style="background:${colorBanco(b.banco)};">${b.banco}</span></td>
+          <td style="border:1px solid #ccc; padding:4px 8px;">(${b.moneda}) ${b.cuenta}${b.cci?' &nbsp;&nbsp; CCI: '+b.cci:''}</td>
         </tr>
       `).join('')}
+      ${detraccionG ? `
+      <tr>
+        <td style="border:1px solid #ccc; padding:4px 8px;"><span class="banco-badge" style="background:${colorBanco('banco de la nación')};">Banco de la Nación</span></td>
+        <td style="border:1px solid #ccc; padding:4px 8px;">(DETRACCIÓN) ${detraccionG.ctaBancoNacionDetraccion}</td>
+      </tr>` : ''}
     </tbody>
   </table>` : ''}
 
   <div class="footer-legal">
-    ${emp.textoLegal || `Representación impresa de ${badgeLabel(e.tipo)}${e.noFiscal?'':' Electrónica'}, autorizado mediante Resolución. Puede ser consultado en: www.factash.pe`}
+    ${emp.textoLegal || `No hacer pagos a cuentas personales, bajo responsabilidad única y exclusiva del cliente.<br>Representación impresa de ${badgeLabel(e.tipo)}${e.noFiscal?'':' Electrónica'}, autorizado mediante Resolución. Puede ser consultado en: www.factash.pe`}
   </div>
 
   <script>
