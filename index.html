@@ -2234,7 +2234,8 @@ function crearEmpresa(){
 
   const id = usuario;
   empresas[id] = {
-    nombre, ruc: ruc || '(pendiente)', usuario, clave, regimenIGV: 'general',
+    nombre, razonSocial: nombre, nombreComercial: nombre,
+    ruc: ruc || '(pendiente)', usuario, clave, regimenIGV: 'general',
     cajas: [],
     logo: '', telefono: '', email: '', web: '',
     textoLegal: '',
@@ -2245,6 +2246,8 @@ function crearEmpresa(){
     series: { factura:'F001', boleta:'B001', nc:'FC01', nd:'FD01', remitente:'T001', transportista:'V001', retencion:'R001', percepcion:'P001', liquidacion:'LC01', ticket:'TK01', notaventa:'NV01', proforma:'PR01', ordenpago:'OP01' },
     productos: []
   };
+  guardarEmpresaEnServidor(id);
+  autoguardarLocal();
 
   document.getElementById('na_nombre').value='';
   document.getElementById('na_ruc').value='';
@@ -6994,6 +6997,7 @@ async function cargarDesdeServidor(){
     if(dataEmp.ok){
       Object.keys(dataEmp.empresas).forEach(clave=>{
         if(empresas[clave]) Object.assign(empresas[clave], dataEmp.empresas[clave]);
+        else empresas[clave] = dataEmp.empresas[clave]; // empresa creada desde el panel de admin, aún no estaba en el código
       });
     }
     const respEmit = await fetch(`${FACTASH_API_URL}/api/emitidos`);
