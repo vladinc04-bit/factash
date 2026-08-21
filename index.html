@@ -6560,18 +6560,41 @@ function imprimirComprobante(idx, formato, modo){
   }
 
   // ---------- A4 (formato profesional completo — estilo "Korbos", con desglose real por tipo de afectación) ----------
-  const filasA4 = filasItems.map(it => `
+  // Preferimos el detalle REAL ya calculado y guardado con el comprobante (mtoValorUnitario y
+  // mtoValorVentaItem, ambos SIN IGV — tal cual se mandó a SUNAT) en vez de recalcular a partir
+  // de it.precio, que es el Precio de Venta Unitario (CON IGV incluido) tal como se escribió en
+  // el formulario. Antes se repetía it.precio (con IGV) en las columnas "V. Unitario" y "V. de
+  // Venta", que es incorrecto: V. Unitario va sin IGV, y V. de Venta = V. Unitario × Cantidad.
+  const detalleRealA4 = (e.jsonSUNAT && e.jsonSUNAT.detalle) || null;
+  const filasA4 = (detalleRealA4 && detalleRealA4.length) ? detalleRealA4.map((d,i) => {
+    const itOriginal = filasItems[i] || {};
+    return `
+    <tr>
+      <td>${d.codProducto && d.codProducto!=='-' ? d.codProducto : (itOriginal.codigo||'-')}</td>
+      <td>${d.desItem || itOriginal.desc || ''}</td>
+      <td>${d.codUnidadMedida || itOriginal.unidad || ''}</td>
+      <td style="text-align:right;">${parseFloat(d.ctdUnidadItem).toFixed(2)}</td>
+      <td style="text-align:right;">${d.mtoValorUnitario}</td>
+      <td style="text-align:right;">${d.mtoValorVentaItem}</td>
+      <td style="text-align:right;">0.00</td>
+      <td style="text-align:right;">${d.mtoValorVentaItem}</td>
+    </tr>`;
+  }).join('') : filasItems.map(it => {
+    // Sin JSON guardado (vista previa o registro muy viejo): se aproxima asumiendo Gravado 18%.
+    const valorUnitAprox = esGuia ? 0 : it.precio/1.18;
+    const valorVentaAprox = valorUnitAprox * it.cant;
+    return `
     <tr>
       <td>${it.codigo}</td>
       <td>${it.desc}</td>
       <td>${it.unidad}</td>
       <td style="text-align:right;">${it.cant.toFixed ? it.cant.toFixed(2) : it.cant}</td>
-      <td style="text-align:right;">${esGuia ? '-' : it.precio.toFixed(2)}</td>
-      <td style="text-align:right;">${esGuia ? '-' : it.precio.toFixed(2)}</td>
+      <td style="text-align:right;">${esGuia ? '-' : valorUnitAprox.toFixed(2)}</td>
+      <td style="text-align:right;">${esGuia ? '-' : valorVentaAprox.toFixed(2)}</td>
       <td style="text-align:right;">0.00</td>
-      <td style="text-align:right;">${esGuia ? '-' : (it.cant*it.precio).toFixed(2)}</td>
-    </tr>
-  `).join('') || `<tr><td colspan="8" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
+      <td style="text-align:right;">${esGuia ? '-' : valorVentaAprox.toFixed(2)}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="8" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
 
   // Datos de crédito — se usan para el panel "Cronograma de Pagos (Crédito)" que aparece
   // debajo de los totales (no anidado en la tabla de ítems).
