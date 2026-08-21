@@ -4168,8 +4168,13 @@ function generarComprobante(){
   cambiarTab('emitidos');
 
   if(!esNoFiscal){
+    // El pipeline directo necesita el prefijo de serie ("F005") y el correlativo
+    // con ceros ("00000016") por separado — "serie" en esta función ya viene
+    // combinado ("F005-00000016") desde obtenerSerieYCorrelativo(), había que
+    // separarlo (mismo patrón que ya usa reintentarEnvio() correctamente).
+    const [prefijoSerieEnvio, correlativoEnvio] = serie.split('-');
     const enviarComoCorresponda = emp.envioDirectoEmpresaId
-      ? enviarPorPipelineDirectoSiCorresponde(emp, tipDocArchivo, serie, correlativo, jsonSUNAT.cabecera, jsonSUNAT.detalle)
+      ? enviarPorPipelineDirectoSiCorresponde(emp, tipDocArchivo, prefijoSerieEnvio, correlativoEnvio, jsonSUNAT.cabecera, jsonSUNAT.detalle)
       : enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonSUNAT);
     enviarComoCorresponda.then(resultado=>{
       if(!resultado.automatico){
