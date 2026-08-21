@@ -6673,10 +6673,11 @@ function imprimirComprobante(idx, formato, modo){
   .caja-comprobante .tipo { display:inline-block; background:${COLOR_ACENTO_CLARO_PDF}; color:${COLOR_ACENTO_PDF}; font-weight:bold; font-size:11.5px; padding:3px 10px; border-radius:3px; margin:5px 0; }
   .caja-comprobante .serie { font-size:15px; font-weight:bold; letter-spacing:0.5px; color:#111; margin-top:3px; }
   .fecha-emision { text-align:right; font-size:9.5px; color:#555; margin-bottom:6px; }
-  .datos-cliente { border:1px solid #ccc; border-radius:4px; padding:8px 12px; margin-bottom:8px; font-size:10px; display:flex; }
-  .datos-cliente .col { flex:1; }
-  .datos-cliente div { margin-bottom:3px; display:flex; }
-  .datos-cliente b { display:inline-block; width:80px; color:#555; }
+  .datos-cliente { width:100%; border:1px solid #ccc; border-radius:4px; border-collapse:collapse; margin-bottom:8px; font-size:9.5px; }
+  .datos-cliente td { padding:4px 8px; border-bottom:1px solid #eee; }
+  .datos-cliente tr:last-child td { border-bottom:none; }
+  .datos-cliente td.lbl { color:#555; font-weight:bold; width:90px; white-space:nowrap; }
+  .datos-cliente td.val { color:#222; }
   .obs-label { font-size:9.5px; font-weight:bold; color:#555; text-transform:uppercase; margin:6px 0 3px 2px; }
   table.items { width:100%; border-collapse:collapse; margin-bottom:8px; }
   table.items th { background:${COLOR_ACENTO_PDF}; color:#fff; padding:5px; font-size:9px; text-align:left; text-transform:uppercase; }
@@ -6687,14 +6688,16 @@ function imprimirComprobante(idx, formato, modo){
   .panel-bajo table { width:100%; border-collapse:collapse; font-size:8.5px; }
   .panel-bajo table th, .panel-bajo table td { border:1px solid #ddd; padding:2px 5px; text-align:left; }
   .footer-totales { display:flex; justify-content:space-between; align-items:flex-start; margin-top:8px; gap:14px; }
-  .col-izq { flex:1.4; display:flex; flex-direction:column; gap:8px; }
-  .son-letras { border:1px solid #ccc; border-radius:4px; padding:7px 10px; font-size:10px; }
-  .paneles-bajos { display:flex; gap:8px; }
-  .tabla-impuestos { font-size:10px; min-width:210px; border:1px solid #ccc; border-radius:4px; overflow:hidden; }
+  .footer-totales > div { flex:1; }
+  .son-letras { border:1px solid #ccc; border-radius:4px; padding:7px 10px; font-size:10px; align-self:flex-start; }
+  .paneles-bajos { display:flex; gap:8px; margin-top:8px; }
+  .tabla-impuestos { font-size:10px; max-width:230px; margin-left:auto; border:1px solid #ccc; border-radius:4px; overflow:hidden; }
   .tabla-impuestos div { display:flex; justify-content:space-between; padding:3px 8px; border-bottom:1px solid #eee; }
   .tabla-impuestos .final { background:${COLOR_ACENTO_CLARO_PDF}; margin-top:0; padding:5px 8px; font-weight:bold; font-size:12px; color:${COLOR_ACENTO_PDF}; border-bottom:none; }
-  .qr-box { display:flex; gap:12px; align-items:center; }
-  #qrcode { width:65px; height:65px; }
+  .qr-fila { display:flex; gap:12px; align-items:flex-start; margin-top:10px; }
+  #qrcode { width:65px; height:65px; flex-shrink:0; }
+  .tabla-bancos { flex:1; border-collapse:collapse; font-size:9px; }
+  .tabla-bancos td { border:1px solid #ccc; padding:4px 8px; }
   .banco-badge { display:inline-block; color:#fff; font-size:8.5px; font-weight:bold; padding:3px 7px; border-radius:3px; text-transform:uppercase; white-space:nowrap; }
   .footer-legal { margin-top:12px; text-align:center; font-size:8.5px; color:#777; border-top:1px solid #eee; padding-top:6px; }
 </style></head>
@@ -6721,17 +6724,24 @@ function imprimirComprobante(idx, formato, modo){
 
   <div class="fecha-emision">Fecha Emisión : ${e.fecha}</div>
 
-  <div class="datos-cliente">
-    <div class="col">
-      <div><b>Señor(es)</b> ${e.cliente}</div>
-      ${e.direccionCliente ? `<div><b>Dirección</b> ${e.direccionCliente}</div>` : ''}
-      <div><b>RUC</b> ${numDocClienteQR}</div>
-    </div>
-    <div class="col">
-      <div><b>Cond. de Pago</b> ${condPagoTexto}</div>
-      ${guiaRelacionadaG ? `<div><b>Guías</b> ${guiaRelacionadaG}</div>` : ''}
-    </div>
-  </div>
+  <table class="datos-cliente">
+    <tr>
+      <td class="lbl">Señor(es)</td>
+      <td class="val" colspan="3">${e.cliente}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Direccion</td>
+      <td class="val">${e.direccionCliente || '-'}</td>
+      <td class="lbl">Cond. de Pago</td>
+      <td class="val">${condPagoTexto}</td>
+    </tr>
+    <tr>
+      <td class="lbl">RUC</td>
+      <td class="val">${numDocClienteQR}</td>
+      <td class="lbl">Guias</td>
+      <td class="val">${guiaRelacionadaG || '-'}</td>
+    </tr>
+  </table>
 
   ${e.noFiscal ? '<div style="color:#b45309; font-weight:bold; font-size:9.5px; margin-bottom:6px;">⚠ Este documento NO es un comprobante de pago válido para SUNAT</div>' : ''}
 
@@ -6752,40 +6762,7 @@ function imprimirComprobante(idx, formato, modo){
   </table>
 
   <div class="footer-totales">
-    <div class="col-izq">
-      ${montoLetras ? `<div class="son-letras"><b>SON:</b> ${montoLetras}</div>` : ''}
-      ${(detraccionG || esCreditoG) ? `
-      <div class="paneles-bajos">
-        ${detraccionG ? `
-        <div class="panel-bajo">
-          <div class="panel-head">Información de Detracción</div>
-          <div class="panel-body">
-            Operación sujeta al Sistema de Pago de Obligaciones Tributarias<br>
-            Tasa de Detracción: <b>${detraccionG.porDetraccion}%</b> &nbsp; Monto: <b>S/ ${detraccionG.mtoDetraccion}</b><br>
-            Cta. Banco de la Nación: <b>${detraccionG.ctaBancoNacionDetraccion}</b>
-          </div>
-        </div>` : ''}
-        ${esCreditoG ? `
-        <div class="panel-bajo">
-          <div class="panel-head">Cronograma de Pagos (Crédito)</div>
-          <div class="panel-body">
-            <table>
-              <thead><tr><th>N° Cuota</th><th>Fecha Venc.</th><th>Monto</th></tr></thead>
-              <tbody>
-                ${cuotasCredito.map((c,i)=>`<tr><td>Cuota ${String(i+1).padStart(3,'0')}</td><td>${c.fecCuotaPago||'-'}</td><td>S/ ${c.mtoCuotaPago}</td></tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>` : ''}
-      </div>` : ''}
-      <div class="qr-box">
-        <div id="qrcode"></div>
-        <div style="font-size:8.5px; color:#777;">
-          RUC: ${emp.ruc} | Tipo: ${badgeLabel(e.tipo)} | Serie: ${e.serie}<br>
-          Fecha: ${e.fecha} | Total: S/ ${(e.monto||0).toFixed(2)}
-        </div>
-      </div>
-    </div>
+    ${montoLetras ? `<div class="son-letras"><b>SON:</b> ${montoLetras}</div>` : '<div></div>'}
     ${e.monto!==null ? `
     <div class="tabla-impuestos">
       <div><span>Op. Gravadas</span><span>${gravado.toFixed(2)}</span></div>
@@ -6797,22 +6774,50 @@ function imprimirComprobante(idx, formato, modo){
     </div>` : ''}
   </div>
 
-  ${(emp.bancos||[]).filter(b=>b.activo).length || detraccionG ? `
-  <table style="width:100%; border-collapse:collapse; font-size:9px; margin-top:10px;">
-    <tbody>
-      ${(emp.bancos||[]).filter(b=>b.activo).map(b=>`
+  ${(detraccionG || esCreditoG) ? `
+  <div class="paneles-bajos">
+    ${detraccionG ? `
+    <div class="panel-bajo">
+      <div class="panel-head">Información de Detracción</div>
+      <div class="panel-body">
+        Operación sujeta al Sistema de Pago de Obligaciones Tributarias<br>
+        Tasa de Detracción: <b>${detraccionG.porDetraccion}%</b> &nbsp; Monto: <b>S/ ${detraccionG.mtoDetraccion}</b><br>
+        Cta. Banco de la Nación: <b>${detraccionG.ctaBancoNacionDetraccion}</b>
+      </div>
+    </div>` : ''}
+    ${esCreditoG ? `
+    <div class="panel-bajo">
+      <div class="panel-head">Cronograma de Pagos (Crédito)</div>
+      <div class="panel-body">
+        <table>
+          <thead><tr><th>N° Cuota</th><th>Fecha Venc.</th><th>Monto</th></tr></thead>
+          <tbody>
+            ${cuotasCredito.map((c,i)=>`<tr><td>Cuota ${String(i+1).padStart(3,'0')}</td><td>${c.fecCuotaPago||'-'}</td><td>S/ ${c.mtoCuotaPago}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>` : ''}
+  </div>` : ''}
+
+  <div class="qr-fila">
+    <div id="qrcode"></div>
+    ${(emp.bancos||[]).filter(b=>b.activo).length || detraccionG ? `
+    <table class="tabla-bancos">
+      <tbody>
+        ${(emp.bancos||[]).filter(b=>b.activo).map(b=>`
+          <tr>
+            <td style="width:120px;"><span class="banco-badge" style="background:${colorBanco(b.banco)};">${b.banco}</span></td>
+            <td>(${b.moneda}) ${b.cuenta}${b.cci?' &nbsp;&nbsp; CCI: '+b.cci:''}</td>
+          </tr>
+        `).join('')}
+        ${detraccionG ? `
         <tr>
-          <td style="border:1px solid #ccc; padding:4px 8px; width:120px;"><span class="banco-badge" style="background:${colorBanco(b.banco)};">${b.banco}</span></td>
-          <td style="border:1px solid #ccc; padding:4px 8px;">(${b.moneda}) ${b.cuenta}${b.cci?' &nbsp;&nbsp; CCI: '+b.cci:''}</td>
-        </tr>
-      `).join('')}
-      ${detraccionG ? `
-      <tr>
-        <td style="border:1px solid #ccc; padding:4px 8px;"><span class="banco-badge" style="background:${colorBanco('banco de la nación')};">Banco de la Nación</span></td>
-        <td style="border:1px solid #ccc; padding:4px 8px;">(DETRACCIÓN) ${detraccionG.ctaBancoNacionDetraccion}</td>
-      </tr>` : ''}
-    </tbody>
-  </table>` : ''}
+          <td><span class="banco-badge" style="background:${colorBanco('banco de la nación')};">Banco de la Nación</span></td>
+          <td>(DETRACCIÓN) ${detraccionG.ctaBancoNacionDetraccion}</td>
+        </tr>` : ''}
+      </tbody>
+    </table>` : ''}
+  </div>
 
   <div class="footer-legal">
     ${emp.textoLegal || `No hacer pagos a cuentas personales, bajo responsabilidad única y exclusiva del cliente.<br>Representación impresa de ${badgeLabel(e.tipo)}${e.noFiscal?'':' Electrónica'}, autorizado mediante Resolución. Puede ser consultado en: www.factash.pe`}
