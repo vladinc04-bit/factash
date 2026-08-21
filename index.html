@@ -6695,8 +6695,8 @@ function imprimirComprobante(idx, formato, modo){
   .tabla-impuestos div { display:flex; justify-content:space-between; padding:3px 8px; border-bottom:1px solid #eee; }
   .tabla-impuestos .final { background:${COLOR_ACENTO_CLARO_PDF}; margin-top:0; padding:5px 8px; font-weight:bold; font-size:12px; color:${COLOR_ACENTO_PDF}; border-bottom:none; }
   .qr-fila { display:flex; gap:10px; align-items:flex-start; margin-top:10px; }
-  #qrcode { width:65px; height:65px; flex-shrink:0; overflow:hidden; }
-  .tabla-bancos { flex:1; border-collapse:collapse; font-size:8px; }
+  #qrcode { width:75px; height:75px; flex-shrink:0; overflow:hidden; }
+  .tabla-bancos { border-collapse:collapse; font-size:8px; width:auto; }
   .tabla-bancos td { border:1px solid #ccc; padding:2px 5px; line-height:1.3; }
   .banco-badge { display:inline-block; color:#fff; font-size:7px; font-weight:bold; padding:1.5px 5px; border-radius:2px; text-transform:uppercase; white-space:nowrap; }
   .footer-legal { margin-top:12px; text-align:center; font-size:8.5px; color:#777; border-top:1px solid #eee; padding-top:6px; }
@@ -6826,7 +6826,7 @@ function imprimirComprobante(idx, formato, modo){
   <script>
     new QRCode(document.getElementById('qrcode'), {
       text: ${JSON.stringify(contenidoQR)},
-      width: 65, height: 65, correctLevel: QRCode.CorrectLevel.L
+      width: 75, height: 75, correctLevel: QRCode.CorrectLevel.L
     });
     window.print();
   <\/script>
