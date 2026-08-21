@@ -3243,7 +3243,7 @@ function buildFacturaJSON(emp, serie, docTipo){
   const guiaRef = document.getElementById('f_guiaref').value;
   if(guiaRef){
     cabecera.relacionados = [{
-      indDocRelacionado: 1, // 1=Guía
+      indDocRelacionado: "1", // 1=Guía
       tipDocRelacionado: "09",
       numDocRelacionado: guiaRef
     }];
@@ -4087,6 +4087,7 @@ function generarComprobante(){
     detalle: { items: items.map(it=>({producto:it.producto, cant:it.cant, precio:it.precio})) },
     jsonSUNAT, noFiscal: esNoFiscal,
     tipoDocCliente: document.getElementById('f_tipodoc').value, numDocCliente: document.getElementById('f_doc').value,
+    direccionCliente: document.getElementById('f_direccion').value || '',
     sunatEstado: esNoFiscal ? null : 'enviando'
   };
   emitidos.unshift(registro);
@@ -5078,7 +5079,7 @@ function buildFacturaJSONMasivo(g, serie, docTipo){
   };
 
   if(cab['Direccion']) cabecera.dirDomicilioUsuario = cab['Direccion'];
-  if(cab['GuiaRef']) cabecera.relacionados = [{ indDocRelacionado: 1, tipDocRelacionado: "09", numDocRelacionado: cab['GuiaRef'] }];
+  if(cab['GuiaRef']) cabecera.relacionados = [{ indDocRelacionado: "1", tipDocRelacionado: "09", numDocRelacionado: cab['GuiaRef'] }];
 
   const esCredito = (cab['FormaPago(Contado/Credito)']||'').toLowerCase().startsWith('cred');
   if(esCredito){
@@ -5167,6 +5168,7 @@ async function confirmarMasivo(){
       cliente: `${nombreCab} (${g.grupo})`,
       monto,
       fecha: new Date().toISOString().slice(0,10),
+      direccionCliente: g.cabecera['Direccion'] || '',
       detalle: g, // queda guardado el detalle completo (cabecera + items) por si se necesita luego
       jsonSUNAT: jsonDoc,
       sunatEstado: conBridge ? 'enviando' : null
