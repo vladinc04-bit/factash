@@ -227,6 +227,8 @@
           <input type="text" id="sfs_claveSecundariaSol" placeholder="clave del usuario secundario">
         </div>
       </div>
+      <label>Contraseña del certificado digital (.p12)</label>
+      <input type="text" id="sfs_certPassword" placeholder="la contraseña del archivo certificado.p12 de esta empresa">
       <button class="btn-primary" style="margin-top:8px; background:var(--accent-2);" onclick="subirSfsAutomatico()">🚀 Crear y conectar automáticamente</button>
       <div id="sfsMsg" style="font-size:12px; margin-top:10px; white-space:pre-wrap; font-family:var(--mono);"></div>
     </div>
@@ -5444,11 +5446,27 @@ function guardarConfigEmpresa(){
   const formatoGuiaEl = document.querySelector('input[name="cfg_formato_guia"]:checked');
   emp.formatoImpresionGuia = formatoGuiaEl ? formatoGuiaEl.value : (emp.formatoImpresionGuia || 'A');
 
-  ['remitente','transportista','factura','boleta'].forEach(tipo=>{
+  ['remitente','transportista'].forEach(tipo=>{
     const el = document.getElementById(`cfg_correl_${tipo}`);
     if(el && el.value.trim()){
       const n = parseInt(el.value, 10);
       if(!isNaN(n) && n > 0){ emp.correlativos[tipo] = n; }
+      el.value = '';
+    }
+  });
+
+  // Factura y Boleta usan una numeración APARTE, por número de serie (correlativosPorSerie),
+  // no el mismo emp.correlativos que usan Guías/Retención/etc — antes este bloque las
+  // guardaba en el lugar equivocado y Facturación nunca leía el valor nuevo.
+  const numSerieActual = (rolSesion === 'caja' && cajaActual) ? cajaActual.numSerie : (parseInt(emp.serieAdmin) || 5);
+  ['factura','boleta'].forEach(tipo=>{
+    const el = document.getElementById(`cfg_correl_${tipo}`);
+    if(el && el.value.trim()){
+      const n = parseInt(el.value, 10);
+      if(!isNaN(n) && n > 0){
+        if(!emp.correlativosPorSerie[tipo]) emp.correlativosPorSerie[tipo] = {};
+        emp.correlativosPorSerie[tipo][numSerieActual] = n;
+      }
       el.value = '';
     }
   });
@@ -7202,8 +7220,20 @@ async function subirSfsAutomatico(){
   // esta empresa en el envío directo, y sigue funcionando solo con el SFS como siempre.
   const usuarioSecundarioSol = document.getElementById('sfs_usuarioSecundarioSol').value.trim();
   const claveSecundariaSol = document.getElementById('sfs_claveSecundariaSol').value.trim();
+  const certPassword = document.getElementById('sfs_certPassword').value.trim();
   if(usuarioSecundarioSol) formData.append('usuarioSecundarioSol', usuarioSecundarioSol);
   if(claveSecundariaSol) formData.append('claveSecundariaSol', claveSecundariaSol);
+  if(certPassword) formData.append('certPassword', certPassword);
+  // Datos de la empresa ya guardados en Configuración (si existen a esta altura), para
+  // que el servidor pueda registrarlos junto con el envío directo sin pedirlos de nuevo.
+  const idEmpresaFactashProbable = nombreCarpeta.replace(/-real$/, '');
+  if(empresas[idEmpresaFactashProbable]){
+    const e2 = empresas[idEmpresaFactashProbable];
+    formData.append('ruc', e2.ruc || '');
+    formData.append('razonSocial', e2.nombre || '');
+    formData.append('nombreComercial', e2.nombreComercial || e2.nombre || '');
+    formData.append('direccion', e2.direccion || '');
+  }
 
   try{
     const resp = await fetch(`${ALTA_EMPRESA_API_URL}/api/alta-empresa`, { method: 'POST', body: formData });
