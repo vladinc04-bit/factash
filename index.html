@@ -3627,7 +3627,7 @@ async function enviarPorPipelineDirectoSiCorresponde(emp, tipoDocArchivo, serie,
       return { automatico: true, estado: 'error_conexion', descripcion: data.error || 'Error al conectar con el envío directo.' };
     }
     if(data.aceptado){
-      return { automatico: true, estado: 'aceptado', descripcion: data.descripcion || 'Aceptado por SUNAT.' };
+      return { automatico: true, estado: 'aceptado', descripcion: data.descripcion || 'Aceptado por SUNAT.', sunatHashCorto: data.hashCorto || null };
     }
     return { automatico: true, estado: 'rechazado', descripcion: data.descripcion || `SUNAT respondió con observación (código ${data.codigoRespuesta}).` };
   } catch(e){
@@ -4183,6 +4183,8 @@ function generarComprobante(){
       } else {
         registro.sunatEstado = mapEstadoBridge(resultado);
         registro.sunatDescripcion = resultado.descripcion;
+        if(resultado.sunatQrUrl) registro.sunatQrUrl = resultado.sunatQrUrl;
+        if(resultado.sunatHashCorto) registro.sunatHashCorto = resultado.sunatHashCorto;
         if(resultado.estado === 'error_conexion') descargarJSON(jsonSUNAT, `${emp.ruc}-${tipDocArchivo}-${serie}.json`);
       }
       actualizarEmitidoEnServidor(registro);
@@ -6988,8 +6990,20 @@ function armarFilasReporteVentas(desde, hasta){
   emitidos
     .filter(e => e.empresa===empresaActual && e.grupo==='facturacion' && !e.noFiscal
       && ['factura','boleta','nc','nd'].includes(e.tipo)
-      && e.fecha >= desde && e.fecha <= hasta && e.jsonSUNAT)
-    .sort((a,b)=> a.fecha.localeCompare(b.fecha))
+      && e.fecha >= desde && e.fecha <= hasta && e.jsonSUNAT
+      // Solo comprobantes ACEPTADOS por SUNAT — un rechazado nunca fue una venta
+      // válida y no debe aparecer en el Registro de Ventas oficial.
+      && e.sunatEstado === 'aceptado')
+    .sort((a,b)=> {
+      const cmpFecha = a.fecha.localeCompare(b.fecha);
+      if(cmpFecha !== 0) return cmpFecha;
+      // Misma fecha: ordenar por serie y luego por número de comprobante (ascendente),
+      // no por el orden en que quedaron guardados internamente (que es al revés).
+      const [serieA, numA] = (a.serie||'-').split('-');
+      const [serieB, numB] = (b.serie||'-').split('-');
+      if(serieA !== serieB) return serieA.localeCompare(serieB);
+      return (parseInt(numA,10)||0) - (parseInt(numB,10)||0);
+    })
     .forEach((e, idx) => {
       const cab = e.jsonSUNAT.cabecera || {};
       const det = e.jsonSUNAT.detalle || [];
