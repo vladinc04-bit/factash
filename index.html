@@ -7103,9 +7103,13 @@ function descargarReporteVentasExcel(){
   const filaTitulo = [emp.nombre];
   const filaVacia = [];
   const filaPeriodo = [`REGISTRO DE VENTAS DEL PERIODO DEL ${desde} AL ${hasta}`];
-  const filaHeader1 = ['Número Correlativo','Fecha de Emisión del Comprobante','Fecha de Vcmto.','Comprobante de Pago','','','Información del Cliente','','','Articulo','Cantidad','Valor Facturado de la Exportación','Base imponible de la Operación Gravada','Importe Total de la Operación Exonerada o Inafecta','','ISC','IGV y/o IPM','Otros Tributos y Cargos que no forman parte de la Base Imponible','Importe Total del Comprobante de Pago','Tipo de Cambio','Referencia del Comprobante de Pago o Doc Orig que se modifica','','','','Fecha de Trabajo','Otro Periodo','Código de Producto','Precio','Moneda de la Venta','Forma de pago','Importe Medio de Pago','Nro. de referencia','Local'];
-  const filaHeader2 = ['','','','Tipo  (Tabla 10)','Nro de Serie','Número','','Documento de Identidad','','Apellidos y Nombre, Razón Social'];
-  const filaHeader3 = ['','','','','','','','Tipo  (Tabla 2)','Número','','','','','Exonerada','Inafecto','','','','','','Fecha','Tipo  (Tabla 10)','Nro de Serie','Número'];
+  // BUG CORREGIDO: "Información del Cliente" necesita 4 columnas (vacío + tipo doc +
+  // número doc + razón social), pero el header solo reservaba 3 — por eso todo lo que
+  // venía después (Articulo, Cantidad, etc.) se corría una columna respecto a los
+  // datos reales (33 columnas de header vs 34 de datos).
+  const filaHeader1 = ['Número Correlativo','Fecha de Emisión del Comprobante','Fecha de Vcmto.','Comprobante de Pago','','','Información del Cliente','','','','Articulo','Cantidad','Valor Facturado de la Exportación','Base imponible de la Operación Gravada','Importe Total de la Operación Exonerada o Inafecta','','ISC','IGV y/o IPM','Otros Tributos y Cargos que no forman parte de la Base Imponible','Importe Total del Comprobante de Pago','Tipo de Cambio','Referencia del Comprobante de Pago o Doc Orig que se modifica','','','','Fecha de Trabajo','Otro Periodo','Código de Producto','Precio','Moneda de la Venta','Forma de pago','Importe Medio de Pago','Nro. de referencia','Local'];
+  const filaHeader2 = ['','','','Tipo  (Tabla 10)','Nro de Serie','Número','','Documento de Identidad','','','Apellidos y Nombre, Razón Social'];
+  const filaHeader3 = ['','','','','','','','Tipo  (Tabla 2)','Número','','','','','','Exonerada','Inafecto','','','','','','Fecha','Tipo  (Tabla 10)','Nro de Serie','Número'];
 
   const filasDatos = reporteVentasFilasActual.map(f => ([
     f.correlativo, f.fecEmision, f.fecVcmto, f.tipoDoc, f.serie, f.numero, '',
@@ -7122,6 +7126,44 @@ function descargarReporteVentasExcel(){
   ws['!merges'] = [
     {s:{r:0,c:0}, e:{r:0,c:8}},
     {s:{r:2,c:0}, e:{r:2,c:8}},
+  ];
+  // Anchos de columna fijos, calculados a mano por columna (en "caracteres") — así el
+  // Excel se abre ya legible, sin tener que estirar cada columna a mano una por una.
+  ws['!cols'] = [
+    {wch:9},  // A Número Correlativo
+    {wch:13}, // B Fecha Emisión
+    {wch:11}, // C Fecha Vcmto.
+    {wch:6},  // D Tipo (Tabla 10)
+    {wch:8},  // E Nro de Serie
+    {wch:10}, // F Número
+    {wch:3},  // G (vacío, parte de "Información del Cliente")
+    {wch:8},  // H Tipo Doc. (Tabla 2)
+    {wch:12}, // I Número Doc.
+    {wch:38}, // J Razón Social / Apellidos y Nombres
+    {wch:32}, // K Articulo
+    {wch:9},  // L Cantidad
+    {wch:11}, // M Valor Exportación
+    {wch:12}, // N Base Imponible Gravada
+    {wch:10}, // O Exonerada
+    {wch:10}, // P Inafecto
+    {wch:8},  // Q ISC
+    {wch:10}, // R IGV
+    {wch:10}, // S Otros Tributos
+    {wch:12}, // T Importe Total
+    {wch:9},  // U Tipo de Cambio
+    {wch:6},  // V Tipo Doc Referencia
+    {wch:8},  // W Nro Serie Referencia
+    {wch:10}, // X Número Referencia
+    {wch:6},  // Y (vacío)
+    {wch:12}, // Z Fecha de Trabajo
+    {wch:10}, // AA Otro Periodo
+    {wch:14}, // AB Código de Producto
+    {wch:10}, // AC Precio
+    {wch:8},  // AD Moneda
+    {wch:10}, // AE Forma de pago
+    {wch:12}, // AF Importe Medio de Pago
+    {wch:12}, // AG Nro. de referencia
+    {wch:6},  // AH Local
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Registro Ventas');
