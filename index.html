@@ -1538,6 +1538,12 @@
         </div>
         <div id="cfg_estado_sfs_msg" style="font-size:11px; margin-top:6px; white-space:pre-wrap; font-family:var(--mono); display:none;"></div>
 
+        <label style="margin-top:10px;">Envío directo a SUNAT (Factura/Boleta) <span style="color:var(--text-dim); font-weight:normal;">(opcional, EXPERIMENTAL — sin SFS de por medio, requiere que esta empresa esté configurada en el servidor de envío directo)</span></label>
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+          <input type="text" id="cfg_envio_directo_id" placeholder="ej. tours — déjalo vacío para seguir usando el SFS" style="flex:1;">
+        </div>
+        <div style="font-size:11px; color:var(--text-dim); margin-top:4px;">⚠️ Cuando esto está lleno, Factura/Boleta/NC/ND de esta empresa se mandan por este camino en vez del SFS. Guías nunca usa esto — Guías siempre sigue por el bridge del SFS de siempre, sin cambios.</div>
+
         <label style="margin-top:14px; display:block; border-top:1px solid var(--line); padding-top:12px;">Ajustar próximo número de correlativo <span style="color:var(--text-dim); font-weight:normal;">(usar solo si ya emitiste comprobantes fuera de FACTASH y necesitas continuar la numeración sin repetir)</span></label>
         <div class="row2">
           <div>
@@ -3277,6 +3283,16 @@ function buildFacturaJSON(emp, serie, docTipo){
     });
   }
 
+  // Dirección del cliente (archivo .ACA oficial, campo desDireccionCliente) — va en el MISMO
+  // bloque adicionalCabecera que la detracción, pero es independiente: se manda siempre que el
+  // cliente tenga dirección cargada, tenga o no detracción la venta.
+  const dirClienteVal = document.getElementById('f_direccion').value;
+  if(dirClienteVal){
+    cabecera.adicionalCabecera = Object.assign({}, cabecera.adicionalCabecera, {
+      desDireccionCliente: dirClienteVal
+    });
+  }
+
   if(document.getElementById('f_venta_sector_publico').checked){
     cabecera.ventaSectorPublico = {
       numExpediente: document.getElementById('f_num_expediente').value || "-",
@@ -3568,6 +3584,42 @@ const URL_CONSULTA_DOC = 'https://docs-facturador.vmshgroup.com/consulta-doc?num
 // ver campo "Envío automático a SUNAT" en Configuración). Si la empresa no tiene ese campo
 // lleno, se mantiene el flujo manual de siempre (descargar el JSON).
 const BRIDGE_API_URL = 'https://sfs-bridge.vmshgroup.com';
+// URL de la nueva API de envío directo (Factura/Boleta/NC/ND por XML+firma+SOAP,
+// sin depender del SFS) — ajustar cuando se exponga por subdominio propio en el
+// servidor, igual que se hizo con multi-sfs.vmshgroup.com para el proxy de Guías.
+const ENVIO_DIRECTO_API_URL = 'https://factura-directo.vmshgroup.com';
+
+// Envío directo de Factura/Boleta/NC/ND — alternativa al SFS/bridge, solo se usa
+// si la empresa tiene envioDirectoEmpresaId configurado (ver Configuración de la
+// empresa). Si no está configurado, generarComprobante() sigue usando el bridge
+// del SFS exactamente como antes — este camino nuevo NO reemplaza nada por
+// defecto, hay que activarlo empresa por empresa a propósito.
+async function enviarPorPipelineDirectoSiCorresponde(emp, tipoDocArchivo, serie, correlativo, cabecera, detalle){
+  if(!emp.envioDirectoEmpresaId) return { automatico: false };
+
+  try{
+    const resp = await fetch(`${ENVIO_DIRECTO_API_URL}/api/enviar-factura`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        empresaId: emp.envioDirectoEmpresaId,
+        cabecera, detalle,
+        tipoDoc: tipoDocArchivo, serie, correlativo
+      })
+    });
+    const data = await resp.json();
+
+    if(!data.ok){
+      return { automatico: true, estado: 'error_conexion', descripcion: data.error || 'Error al conectar con el envío directo.' };
+    }
+    if(data.aceptado){
+      return { automatico: true, estado: 'aceptado', descripcion: data.descripcion || 'Aceptado por SUNAT.' };
+    }
+    return { automatico: true, estado: 'rechazado', descripcion: data.descripcion || `SUNAT respondió con observación (código ${data.codigoRespuesta}).` };
+  } catch(e){
+    return { automatico: true, estado: 'error_conexion', descripcion: 'No se pudo conectar con el servicio de envío directo: ' + e.message };
+  }
+}
 
 // Envía el comprobante directo al SFS real y espera el resultado (Aceptado/Rechazado).
 // Devuelve { automatico: true, estado, descripcion } o { automatico: false } si esta
@@ -4102,7 +4154,10 @@ function generarComprobante(){
   cambiarTab('emitidos');
 
   if(!esNoFiscal){
-    enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonSUNAT).then(resultado=>{
+    const enviarComoCorresponda = emp.envioDirectoEmpresaId
+      ? enviarPorPipelineDirectoSiCorresponde(emp, tipDocArchivo, serie, correlativo, jsonSUNAT.cabecera, jsonSUNAT.detalle)
+      : enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonSUNAT);
+    enviarComoCorresponda.then(resultado=>{
       if(!resultado.automatico){
         registro.sunatEstado = null;
         descargarJSON(jsonSUNAT, `${emp.ruc}-${tipDocArchivo}-${serie}.json`);
@@ -5078,7 +5133,10 @@ function buildFacturaJSONMasivo(g, serie, docTipo){
     tributos: agruparTributos(detalle)
   };
 
-  if(cab['Direccion']) cabecera.dirDomicilioUsuario = cab['Direccion'];
+  // Dirección del cliente — mismo campo real confirmado (.ACA: desDireccionCliente dentro de
+  // adicionalCabecera) que usa la factura individual, antes se mandaba con un nombre inventado
+  // (dirDomicilioUsuario) que nunca se confirmó contra ningún archivo real.
+  if(cab['Direccion']) cabecera.adicionalCabecera = Object.assign({}, cabecera.adicionalCabecera, { desDireccionCliente: cab['Direccion'] });
   if(cab['GuiaRef']) cabecera.relacionados = [{ indDocRelacionado: "1", tipDocRelacionado: "09", numDocRelacionado: cab['GuiaRef'] }];
 
   const esCredito = (cab['FormaPago(Contado/Credito)']||'').toLowerCase().startsWith('cred');
@@ -5367,6 +5425,7 @@ function guardarConfigEmpresa(){
   emp.web = document.getElementById('cfg_web').value.trim();
   emp.textoLegal = document.getElementById('cfg_texto_legal').value.trim();
   emp.bridgeEmpresaId = document.getElementById('cfg_bridge_id') ? document.getElementById('cfg_bridge_id').value.trim() : (emp.bridgeEmpresaId || '');
+  emp.envioDirectoEmpresaId = document.getElementById('cfg_envio_directo_id') ? document.getElementById('cfg_envio_directo_id').value.trim() : (emp.envioDirectoEmpresaId || '');
   const formatoGuiaEl = document.querySelector('input[name="cfg_formato_guia"]:checked');
   emp.formatoImpresionGuia = formatoGuiaEl ? formatoGuiaEl.value : (emp.formatoImpresionGuia || 'A');
 
@@ -5455,6 +5514,7 @@ function renderConfigEmpresa(){
   document.getElementById('cfg_web').value = emp.web || '';
   document.getElementById('cfg_texto_legal').value = emp.textoLegal || '';
   if(document.getElementById('cfg_bridge_id')) document.getElementById('cfg_bridge_id').value = emp.bridgeEmpresaId || '';
+  if(document.getElementById('cfg_envio_directo_id')) document.getElementById('cfg_envio_directo_id').value = emp.envioDirectoEmpresaId || '';
   const fg = emp.formatoImpresionGuia || 'A';
   if(document.getElementById('cfg_formato_guia_A')) document.getElementById('cfg_formato_guia_A').checked = (fg === 'A');
   if(document.getElementById('cfg_formato_guia_B')) document.getElementById('cfg_formato_guia_B').checked = (fg === 'B');
