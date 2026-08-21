@@ -215,6 +215,18 @@
       <input type="text" id="sfs_nombreCarpeta" placeholder="ej. tours-real  (usa el mismo usuario + &quot;-real&quot;)">
       <label>Archivo .zip del SFS</label>
       <input type="file" id="sfs_archivo" accept=".zip">
+      <h3 style="font-size:11px; margin:14px 0 2px; color:var(--text-dim);">Envío directo a SUNAT (Factura/Boleta) — opcional</h3>
+      <p style="font-size:10.5px; color:var(--text-dim); margin:0 0 8px;">Solo si esta empresa ya activó "SEE - Del Contribuyente" y confirmó su correo en SUNAT SOL. Déjalo vacío si esta empresa solo va a usar Guías.</p>
+      <div class="row2">
+        <div>
+          <label>Usuario secundario SOL</label>
+          <input type="text" id="sfs_usuarioSecundarioSol" placeholder="ej. VLADIMIR">
+        </div>
+        <div>
+          <label>Clave secundaria SOL</label>
+          <input type="text" id="sfs_claveSecundariaSol" placeholder="clave del usuario secundario">
+        </div>
+      </div>
       <button class="btn-primary" style="margin-top:8px; background:var(--accent-2);" onclick="subirSfsAutomatico()">🚀 Crear y conectar automáticamente</button>
       <div id="sfsMsg" style="font-size:12px; margin-top:10px; white-space:pre-wrap; font-family:var(--mono);"></div>
     </div>
@@ -7184,6 +7196,14 @@ async function subirSfsAutomatico(){
   const formData = new FormData();
   formData.append('archivo', archivo);
   formData.append('nombreCarpeta', nombreCarpeta);
+  // Opcionales — solo si esta empresa ya activó "SEE - Del Contribuyente" en SUNAT SOL
+  // (correo confirmado + permiso "Servicio de Envío de Documentos Electrónicos" en el
+  // usuario secundario). Si se dejan vacíos, alta-empresa-api simplemente no registra
+  // esta empresa en el envío directo, y sigue funcionando solo con el SFS como siempre.
+  const usuarioSecundarioSol = document.getElementById('sfs_usuarioSecundarioSol').value.trim();
+  const claveSecundariaSol = document.getElementById('sfs_claveSecundariaSol').value.trim();
+  if(usuarioSecundarioSol) formData.append('usuarioSecundarioSol', usuarioSecundarioSol);
+  if(claveSecundariaSol) formData.append('claveSecundariaSol', claveSecundariaSol);
 
   try{
     const resp = await fetch(`${ALTA_EMPRESA_API_URL}/api/alta-empresa`, { method: 'POST', body: formData });
@@ -7191,6 +7211,21 @@ async function subirSfsAutomatico(){
     if(data.ok){
       msg.style.color='var(--accent-2)';
       msg.textContent = `✅ Listo!\n\n` + data.pasos.join('\n') + `\n\n${data.siguientePaso}`;
+
+      // Si se registró el envío directo (usuario/clave secundaria de SOL llenos),
+      // completa solo el campo de Configuración de esta empresa — así queda 100%
+      // lista sin tener que ir a Configuración a escribirlo aparte. La convención
+      // es "usuario-real" para el nombre de carpeta del SFS (ver placeholder del
+      // campo de arriba), así que se recupera el id real de FACTASH quitando el
+      // sufijo "-real".
+      if(usuarioSecundarioSol){
+        const idEmpresaFactash = nombreCarpeta.replace(/-real$/, '');
+        if(empresas[idEmpresaFactash]){
+          empresas[idEmpresaFactash].envioDirectoEmpresaId = idEmpresaFactash;
+          guardarEmpresaEnServidor(idEmpresaFactash);
+          msg.textContent += `\n\n✅ Envío directo a SUNAT activado para "${idEmpresaFactash}" en Configuración.`;
+        }
+      }
     } else {
       msg.style.color='var(--danger)';
       msg.textContent = `✕ Error:\n\n` + (data.pasos ? data.pasos.join('\n') : data.error);
