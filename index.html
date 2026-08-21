@@ -6618,6 +6618,7 @@ function imprimirComprobante(idx, formato, modo){
   // ese CDR, se muestra un aviso en vez de un QR inventado.
   const qrDisponible = !esGuia || !!e.sunatQrUrl;
   const contenidoQR = (esGuia && e.sunatQrUrl) ? e.sunatQrUrl : textoQR;
+  const hashMostradoFactura = e.sunatHashCorto || (e.sunatQrUrl ? (e.sunatQrUrl.split('hashqr=')[1] || '') : '');
 
   // Color de acento — usa el color de marca de la empresa si lo configuraste en Personalización,
   // si no cae a un azul por defecto (estilo referencia "SYS LINK").
@@ -6802,7 +6803,10 @@ function imprimirComprobante(idx, formato, modo){
 
 
   <div class="qr-fila">
-    <div id="qrcode"></div>
+    <div style="flex-shrink:0;">
+      <div id="qrcode"></div>
+      ${hashMostradoFactura ? `<div style="font-size:6.5px; color:#999; text-align:center; width:75px; word-break:break-all; margin-top:2px;">${hashMostradoFactura}</div>` : ''}
+    </div>
     ${(emp.bancos||[]).filter(b=>b.activo).length || detraccionG ? `
     <table class="tabla-bancos">
       <tbody>
