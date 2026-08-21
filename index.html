@@ -5235,7 +5235,10 @@ async function confirmarMasivo(){
     guardarEmitidoEnServidor(registro);
 
     if(conBridge){
-      const resultado = await enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonDoc);
+      const usarEnvioDirectoMasivo = emp.envioDirectoEmpresaId && !f.esGuia; // Guías NUNCA usa el envío directo
+      const resultado = usarEnvioDirectoMasivo
+        ? await enviarPorPipelineDirectoSiCorresponde(emp, tipDocArchivo, emp.series[docActualMasivo], String(correlativo).padStart(8,'0'), jsonDoc.cabecera, jsonDoc.detalle)
+        : await enviarAlBridgeSiCorresponde(emp, tipDocArchivo, serie, jsonDoc);
       if(resultado.automatico){
         registro.sunatEstado = mapEstadoBridge(resultado);
         registro.sunatDescripcion = resultado.descripcion;
@@ -5967,7 +5970,11 @@ async function reintentarEnvio(idx){
   e.sunatEstado = 'enviando';
   renderTodo();
 
-  const resultado = await enviarAlBridgeSiCorresponde(emp, tipDocArchivo, e.serie, jsonDoc);
+  const [serieReintento, correlativoReintento] = (e.serie || '').split('-');
+  const usarEnvioDirecto = emp.envioDirectoEmpresaId && e.grupo === 'facturacion'; // Guías NUNCA usa el envío directo, siempre bridge
+  const resultado = usarEnvioDirecto
+    ? await enviarPorPipelineDirectoSiCorresponde(emp, tipDocArchivo, serieReintento, correlativoReintento, jsonDoc.cabecera, jsonDoc.detalle)
+    : await enviarAlBridgeSiCorresponde(emp, tipDocArchivo, e.serie, jsonDoc);
   if(!resultado.automatico){
     e.sunatEstado = null;
     descargarJSON(jsonDoc, `${emp.ruc}-${tipDocArchivo}-${e.serie}.json`);
