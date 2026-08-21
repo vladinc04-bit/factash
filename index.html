@@ -6689,8 +6689,8 @@ function imprimirComprobante(idx, formato, modo){
   .panel-bajo table th, .panel-bajo table td { border:1px solid #ddd; padding:2px 5px; text-align:left; }
   .footer-totales { display:flex; justify-content:space-between; align-items:flex-start; margin-top:8px; gap:14px; }
   .footer-totales > div { flex:1; }
-  .son-letras { border:1px solid #ccc; border-radius:4px; padding:7px 10px; font-size:10px; align-self:flex-start; }
-  .paneles-bajos { display:flex; gap:8px; margin-top:8px; max-width:62%; }
+  .son-letras { border:1px solid #ccc; border-radius:4px; padding:7px 10px; font-size:10px; }
+  .paneles-bajos { display:flex; gap:8px; margin-top:6px; }
   .tabla-impuestos { font-size:10px; max-width:230px; margin-left:auto; border:1px solid #ccc; border-radius:4px; overflow:hidden; }
   .tabla-impuestos div { display:flex; justify-content:space-between; padding:3px 8px; border-bottom:1px solid #eee; }
   .tabla-impuestos .final { background:${COLOR_ACENTO_CLARO_PDF}; margin-top:0; padding:5px 8px; font-weight:bold; font-size:12px; color:${COLOR_ACENTO_PDF}; border-bottom:none; }
@@ -6762,7 +6762,33 @@ function imprimirComprobante(idx, formato, modo){
   </table>
 
   <div class="footer-totales">
-    ${montoLetras ? `<div class="son-letras"><b>SON:</b> ${montoLetras}</div>` : '<div></div>'}
+    <div>
+      ${montoLetras ? `<div class="son-letras"><b>SON:</b> ${montoLetras}</div>` : ''}
+      ${(detraccionG || esCreditoG) ? `
+      <div class="paneles-bajos">
+        ${detraccionG ? `
+        <div class="panel-bajo">
+          <div class="panel-head">Información de Detracción</div>
+          <div class="panel-body">
+            Operación sujeta al Sistema de Pago de Obligaciones Tributarias<br>
+            Tasa de Detracción: <b>${detraccionG.porDetraccion}%</b> &nbsp; Monto: <b>S/ ${detraccionG.mtoDetraccion}</b><br>
+            Cta. Banco de la Nación: <b>${detraccionG.ctaBancoNacionDetraccion}</b>
+          </div>
+        </div>` : ''}
+        ${esCreditoG ? `
+        <div class="panel-bajo">
+          <div class="panel-head">Cronograma de Pagos (Crédito)</div>
+          <div class="panel-body">
+            <table>
+              <thead><tr><th>N° Cuota</th><th>Fecha Venc.</th><th>Monto</th></tr></thead>
+              <tbody>
+                ${cuotasCredito.map((c,i)=>`<tr><td>Cuota ${String(i+1).padStart(3,'0')}</td><td>${c.fecCuotaPago||'-'}</td><td>S/ ${c.mtoCuotaPago}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>` : ''}
+      </div>` : ''}
+    </div>
     ${e.monto!==null ? `
     <div class="tabla-impuestos">
       <div><span>Op. Gravadas</span><span>${gravado.toFixed(2)}</span></div>
@@ -6774,30 +6800,6 @@ function imprimirComprobante(idx, formato, modo){
     </div>` : ''}
   </div>
 
-  ${(detraccionG || esCreditoG) ? `
-  <div class="paneles-bajos">
-    ${detraccionG ? `
-    <div class="panel-bajo">
-      <div class="panel-head">Información de Detracción</div>
-      <div class="panel-body">
-        Operación sujeta al Sistema de Pago de Obligaciones Tributarias<br>
-        Tasa de Detracción: <b>${detraccionG.porDetraccion}%</b> &nbsp; Monto: <b>S/ ${detraccionG.mtoDetraccion}</b><br>
-        Cta. Banco de la Nación: <b>${detraccionG.ctaBancoNacionDetraccion}</b>
-      </div>
-    </div>` : ''}
-    ${esCreditoG ? `
-    <div class="panel-bajo">
-      <div class="panel-head">Cronograma de Pagos (Crédito)</div>
-      <div class="panel-body">
-        <table>
-          <thead><tr><th>N° Cuota</th><th>Fecha Venc.</th><th>Monto</th></tr></thead>
-          <tbody>
-            ${cuotasCredito.map((c,i)=>`<tr><td>Cuota ${String(i+1).padStart(3,'0')}</td><td>${c.fecCuotaPago||'-'}</td><td>S/ ${c.mtoCuotaPago}</td></tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>` : ''}
-  </div>` : ''}
 
   <div class="qr-fila">
     <div id="qrcode"></div>
