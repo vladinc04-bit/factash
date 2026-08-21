@@ -7108,7 +7108,7 @@ function descargarReporteVentasExcel(){
   // venía después (Articulo, Cantidad, etc.) se corría una columna respecto a los
   // datos reales (33 columnas de header vs 34 de datos).
   const filaHeader1 = ['Número Correlativo','Fecha de Emisión del Comprobante','Fecha de Vcmto.','Comprobante de Pago','','','Información del Cliente','','','','Articulo','Cantidad','Valor Facturado de la Exportación','Base imponible de la Operación Gravada','Importe Total de la Operación Exonerada o Inafecta','','ISC','IGV y/o IPM','Otros Tributos y Cargos que no forman parte de la Base Imponible','Importe Total del Comprobante de Pago','Tipo de Cambio','Referencia del Comprobante de Pago o Doc Orig que se modifica','','','','Fecha de Trabajo','Otro Periodo','Código de Producto','Precio','Moneda de la Venta','Forma de pago','Importe Medio de Pago','Nro. de referencia','Local'];
-  const filaHeader2 = ['','','','Tipo  (Tabla 10)','Nro de Serie','Número','','Documento de Identidad','','','Apellidos y Nombre, Razón Social'];
+  const filaHeader2 = ['','','','Tipo  (Tabla 10)','Nro de Serie','Número','','Documento de Identidad','','Apellidos y Nombre, Razón Social'];
   const filaHeader3 = ['','','','','','','','Tipo  (Tabla 2)','Número','','','','','','Exonerada','Inafecto','','','','','','Fecha','Tipo  (Tabla 10)','Nro de Serie','Número'];
 
   const filasDatos = reporteVentasFilasActual.map(f => ([
