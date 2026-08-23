@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FACTASH</title>
@@ -7230,6 +7231,11 @@ function armarFilasReporteVentas(desde, hasta){
           moneda: '1',
           formaPago: 'CONTADO',
           local: '001',
+          // Solo para Nota de Crédito/Débito: datos del comprobante que modifica, para la
+          // columna "Referencia del Comprobante de Pago o Doc Orig que se modifica".
+          refTipoDoc: (e.tipo==='nc'||e.tipo==='nd') ? (cab.tipDocAfectado==='03' ? '03' : '01') : '',
+          refSerie: (e.tipo==='nc'||e.tipo==='nd') ? (cab.numDocAfectado||'').split('-')[0] || '' : '',
+          refNumero: (e.tipo==='nc'||e.tipo==='nd') ? (cab.numDocAfectado||'').split('-')[1] || '' : '',
         });
       });
     });
@@ -7283,7 +7289,7 @@ function generarReporteVentas(){
   document.getElementById('totalesReporte').textContent = `Total base: S/ ${totalVenta.toFixed(2)}  —  Total IGV: S/ ${totalIgv.toFixed(2)}  —  Total general: S/ ${(totalVenta+totalIgv).toFixed(2)}`;
 }
 
-function descargarReporteVentasExcel(){
+async function descargarReporteVentasExcel(){
   if(!reporteVentasFilasActual.length){
     generarReporteVentas();
     if(!reporteVentasFilasActual.length){ alert('No hay comprobantes en ese rango de fechas'); return; }
@@ -7292,9 +7298,6 @@ function descargarReporteVentasExcel(){
   const desde = document.getElementById('rep_desde').value;
   const hasta = document.getElementById('rep_hasta').value;
 
-  const filaTitulo = [emp.nombre];
-  const filaVacia = [];
-  const filaPeriodo = [`REGISTRO DE VENTAS DEL PERIODO DEL ${desde} AL ${hasta}`];
   // BUG CORREGIDO: "Información del Cliente" necesita 4 columnas (vacío + tipo doc +
   // número doc + razón social), pero el header solo reservaba 3 — por eso todo lo que
   // venía después (Articulo, Cantidad, etc.) se corría una columna respecto a los
@@ -7309,57 +7312,54 @@ function descargarReporteVentasExcel(){
     f.articulo, parseFloat(f.cantidad)||0, parseFloat(f.valorExportacion)||0,
     parseFloat(f.baseGravada)||0, parseFloat(f.exonerada)||0, parseFloat(f.inafecto)||0,
     parseFloat(f.isc)||0, parseFloat(f.igv)||0, 0, parseFloat(f.importeTotal)||0,
-    '', '', '', '', '',
+    '', '', f.refTipoDoc || '', f.refSerie || '', f.refNumero || '',
     f.fecEmision, '', f.codProducto, parseFloat(f.precio)||0, f.moneda, f.formaPago, '', '', f.local
   ]));
 
-  const filas = [filaTitulo, filaVacia, filaPeriodo, filaVacia, filaHeader1, filaHeader2, filaHeader3, filaVacia, ...filasDatos];
-  const ws = XLSX.utils.aoa_to_sheet(filas);
-  ws['!merges'] = [
-    {s:{r:0,c:0}, e:{r:0,c:8}},
-    {s:{r:2,c:0}, e:{r:2,c:8}},
-  ];
-  // Anchos de columna fijos, calculados a mano por columna (en "caracteres") — así el
-  // Excel se abre ya legible, sin tener que estirar cada columna a mano una por una.
-  ws['!cols'] = [
-    {wch:9},  // A Número Correlativo
-    {wch:13}, // B Fecha Emisión
-    {wch:11}, // C Fecha Vcmto.
-    {wch:6},  // D Tipo (Tabla 10)
-    {wch:8},  // E Nro de Serie
-    {wch:10}, // F Número
-    {wch:3},  // G (vacío, parte de "Información del Cliente")
-    {wch:8},  // H Tipo Doc. (Tabla 2)
-    {wch:12}, // I Número Doc.
-    {wch:38}, // J Razón Social / Apellidos y Nombres
-    {wch:32}, // K Articulo
-    {wch:9},  // L Cantidad
-    {wch:11}, // M Valor Exportación
-    {wch:12}, // N Base Imponible Gravada
-    {wch:10}, // O Exonerada
-    {wch:10}, // P Inafecto
-    {wch:8},  // Q ISC
-    {wch:10}, // R IGV
-    {wch:10}, // S Otros Tributos
-    {wch:12}, // T Importe Total
-    {wch:9},  // U Tipo de Cambio
-    {wch:6},  // V Tipo Doc Referencia
-    {wch:8},  // W Nro Serie Referencia
-    {wch:10}, // X Número Referencia
-    {wch:6},  // Y (vacío)
-    {wch:12}, // Z Fecha de Trabajo
-    {wch:10}, // AA Otro Periodo
-    {wch:14}, // AB Código de Producto
-    {wch:10}, // AC Precio
-    {wch:8},  // AD Moneda
-    {wch:10}, // AE Forma de pago
-    {wch:12}, // AF Importe Medio de Pago
-    {wch:12}, // AG Nro. de referencia
-    {wch:6},  // AH Local
-  ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Registro Ventas');
-  XLSX.writeFile(wb, `Registro_Ventas_${emp.ruc}_${desde}_${hasta}.xlsx`);
+  const ANCHOS_COLUMNAS = [9,13,11,6,8,10,3,8,12,38,32,9,11,12,10,10,8,10,10,12,9,6,8,10,6,12,10,14,10,8,10,12,12,6];
+  const TOTAL_COLUMNAS = ANCHOS_COLUMNAS.length; // 34, A hasta AH
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Registro Ventas');
+  ws.columns = ANCHOS_COLUMNAS.map(w => ({ width: w }));
+
+  ws.addRow([emp.nombre]);
+  ws.mergeCells(1, 1, 1, 9);
+  ws.addRow([]);
+  ws.addRow([`REGISTRO DE VENTAS DEL PERIODO DEL ${desde} AL ${hasta}`]);
+  ws.mergeCells(3, 1, 3, 9);
+  ws.addRow([]);
+
+  const filaBordeInicio = 5; // fila donde empieza filaHeader1
+  ws.addRow(filaHeader1);
+  ws.addRow(filaHeader2);
+  ws.addRow(filaHeader3);
+  ws.addRow([]);
+  filasDatos.forEach(fila => ws.addRow(fila));
+
+  // Bordes + centrado + texto ajustado SOLO en las 3 filas de encabezado (filaHeader1/2/3),
+  // en las 34 columnas reales — esto es justo lo que la librería gratis anterior no podía hacer.
+  const bordeFino = { style: 'thin', color: { argb: 'FF444444' } };
+  for(let fila = filaBordeInicio; fila <= filaBordeInicio + 2; fila++){
+    for(let col = 1; col <= TOTAL_COLUMNAS; col++){
+      const celda = ws.getCell(fila, col);
+      celda.border = { top: bordeFino, left: bordeFino, bottom: bordeFino, right: bordeFino };
+      celda.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      celda.font = { bold: true, size: 9 };
+    }
+  }
+  ws.getRow(filaBordeInicio).height = 30;
+  ws.getRow(filaBordeInicio+1).height = 22;
+  ws.getRow(filaBordeInicio+2).height = 18;
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Registro_Ventas_${emp.ruc}_${desde}_${hasta}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function renderTodo(){
