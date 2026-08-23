@@ -7201,6 +7201,14 @@ function armarFilasReporteVentas(desde, hasta){
       const cab = e.jsonSUNAT.cabecera || {};
       const det = e.jsonSUNAT.detalle || [];
       const [serieDoc, numeroDoc] = (e.serie||'-').split('-');
+      // Solo para NC/ND: busca el comprobante original entre tus propios emitidos (por serie
+      // y número exactos) para sacar SU fecha de emisión — nunca se guardó aparte, pero ya
+      // está disponible ahí mismo.
+      let fechaDocAfectado = '';
+      if((e.tipo==='nc'||e.tipo==='nd') && cab.numDocAfectado){
+        const docOriginal = emitidos.find(e2 => e2.empresa===empresaActual && e2.serie===cab.numDocAfectado);
+        if(docOriginal) fechaDocAfectado = docOriginal.fecha || '';
+      }
       (det.length ? det : [{}]).forEach(it => {
         const esGravado = it.tipAfeIGV === '10';
         const esExonerado = it.tipAfeIGV === '20';
@@ -7236,6 +7244,7 @@ function armarFilasReporteVentas(desde, hasta){
           refTipoDoc: (e.tipo==='nc'||e.tipo==='nd') ? (cab.tipDocAfectado==='03' ? '03' : '01') : '',
           refSerie: (e.tipo==='nc'||e.tipo==='nd') ? (cab.numDocAfectado||'').split('-')[0] || '' : '',
           refNumero: (e.tipo==='nc'||e.tipo==='nd') ? (cab.numDocAfectado||'').split('-')[1] || '' : '',
+          refFecha: fechaDocAfectado,
         });
       });
     });
@@ -7312,7 +7321,7 @@ async function descargarReporteVentasExcel(){
     f.articulo, parseFloat(f.cantidad)||0, parseFloat(f.valorExportacion)||0,
     parseFloat(f.baseGravada)||0, parseFloat(f.exonerada)||0, parseFloat(f.inafecto)||0,
     parseFloat(f.isc)||0, parseFloat(f.igv)||0, 0, parseFloat(f.importeTotal)||0,
-    '', '', f.refTipoDoc || '', f.refSerie || '', f.refNumero || '',
+    '', f.refFecha || '', f.refTipoDoc || '', f.refSerie || '', f.refNumero || '',
     f.fecEmision, '', f.codProducto, parseFloat(f.precio)||0, f.moneda, f.formaPago, '', '', f.local
   ]));
 
