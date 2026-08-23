@@ -7037,15 +7037,15 @@ function imprimirComprobante(idx, formato, modo){
     <tr>
       <td class="lbl">Direccion</td>
       <td class="val">${e.direccionCliente || '-'}</td>
-      <td class="lbl">Cond. de Pago</td>
-      <td class="val">${condPagoTexto}</td>
+      ${infoNotaG ? `<td class="lbl">RUC</td><td class="val">${numDocClienteQR}</td>` : `<td class="lbl">Cond. de Pago</td><td class="val">${condPagoTexto}</td>`}
     </tr>
+    ${infoNotaG ? '' : `
     <tr>
       <td class="lbl">RUC</td>
       <td class="val">${numDocClienteQR}</td>
       <td class="lbl">Guias</td>
       <td class="val">${guiaRelacionadaG || '-'}</td>
-    </tr>
+    </tr>`}
   </table>
 
   ${e.noFiscal ? '<div style="color:#b45309; font-weight:bold; font-size:9.5px; margin-bottom:6px;">⚠ Este documento NO es un comprobante de pago válido para SUNAT</div>' : ''}
