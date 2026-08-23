@@ -473,6 +473,9 @@
               </select>
             </div>
           </div>
+          <label>Sustento (explica el motivo con tus propias palabras)</label>
+          <input type="text" id="f_sustento" placeholder="Ej: Se devolvió parte de la mercadería por defecto de fábrica" maxlength="250">
+          <div style="font-size:11px; color:var(--text-dim); margin-top:3px;">Si lo dejas vacío, se manda solo el texto del motivo elegido arriba.</div>
         </div>
 
         <div id="camposLiquidacion" style="display:none;">
@@ -498,7 +501,7 @@
           </div>
         </div>
 
-        <div style="margin:14px 0 10px;">
+        <div style="margin:14px 0 10px;" id="botonDatosAdicionalesWrap">
           <button type="button" onclick="toggleDatosAdicionales()" style="background:none; border:1px solid var(--line); color:var(--text-dim); border-radius:7px; padding:8px 12px; font-size:12px; cursor:pointer; width:100%; text-align:left;">
             ⚙️ Datos adicionales SUNAT (percepción, detracción, venta al sector público, retención) <span id="flechaDatosAdic">▾</span>
           </button>
@@ -2462,6 +2465,18 @@ function cambiarTab(tab){
   } else {
     detenerPollerEmitidos();
   }
+  if(tab==='guias'){
+    // Plazo oficial confirmado para Guía de Remisión Electrónica: 1 día calendario desde la
+    // fecha de emisión (se redujo de 7 a 1 día) — nunca fecha futura tampoco.
+    const gFechaEl = document.getElementById('g_fecha');
+    if(gFechaEl){
+      const hoyStr = new Date().toISOString().slice(0,10);
+      const ayer = new Date(); ayer.setDate(ayer.getDate()-1);
+      gFechaEl.min = ayer.toISOString().slice(0,10);
+      gFechaEl.max = hoyStr;
+      if(!gFechaEl.value) gFechaEl.value = hoyStr;
+    }
+  }
   renderTodo();
 }
 
@@ -2580,6 +2595,20 @@ function elegirComprobanteParaNota(idx){
   document.getElementById('f_doc').value = e.numDocCliente || '';
   document.getElementById('f_direccion').value = e.direccionCliente || '';
 
+  // Autocompleta también los ítems del comprobante original — lo más común es que la
+  // Nota de Crédito/Débito repita los mismos productos (para anulación total lo necesita
+  // igual, y para descuento/devolución por ítem sirve como punto de partida para editar).
+  if(e.detalle && e.detalle.items && e.detalle.items.length){
+    items = e.detalle.items.map(it => ({
+      producto: it.producto || '',
+      cant: it.cant || 1,
+      unidad: it.unidad || 'UND',
+      precio: it.precio || 0,
+      afectacion: it.afectacion || '10'
+    }));
+    renderItems();
+  }
+
   // La letra de la serie (F/B) depende de este comprobante — refrescar lo que se ve en pantalla.
   actualizarSeriesVisibles();
 }
@@ -2603,6 +2632,23 @@ function cambiarDoc(grupo, doc){
     } else {
       document.getElementById('tituloDocFact').textContent = 'Nueva ' + docLabels[doc];
       document.getElementById('camposNCND').style.display = (doc==='nc'||doc==='nd') ? 'block':'none';
+      // Percepción/Detracción/Venta sector público/Retención NO EXISTEN estructuralmente en
+      // Nota de Crédito/Débito (confirmado con los 3 anexos oficiales de SUNAT — todos esos
+      // campos viven exclusivamente bajo /Invoice/..., ninguno bajo /CreditNote o /DebitNote).
+      const botonDatosAdic = document.getElementById('botonDatosAdicionalesWrap');
+      if(botonDatosAdic) botonDatosAdic.style.display = (doc==='nc'||doc==='nd') ? 'none' : 'block';
+      if(doc==='nc'||doc==='nd'){
+        document.getElementById('datosAdicionalesBox').style.display = 'none';
+      }
+      // Fecha de emisión: hoy por defecto siempre. Plazos oficiales confirmados (RS 03-2023/SUNAT):
+      // Factura, Boleta, NC y ND tienen TODOS el mismo plazo — 3 días calendario de atraso máximo,
+      // nunca fecha futura. El calendario se limita directo para no poder ni elegir mal.
+      const fechaEl = document.getElementById('f_fecha');
+      const hoyStr = new Date().toISOString().slice(0,10);
+      const hace3Dias = new Date(); hace3Dias.setDate(hace3Dias.getDate()-3);
+      fechaEl.min = hace3Dias.toISOString().slice(0,10);
+      fechaEl.max = hoyStr;
+      if(!fechaEl.value) fechaEl.value = hoyStr;
       // Forma de pago y Guía relacionada no aplican a Nota de Crédito/Débito — el XML de
       // esas notas ni siquiera manda el bloque de forma de pago (confirmado con SUNAT real),
       // así que mostrarlas ahí solo confunde sin servir de nada.
@@ -3325,7 +3371,11 @@ function buildFacturaJSON(emp, serie, docTipo){
   if(esNota){
     const selMotivo = docActualFact === 'nd' ? document.getElementById('f_motivo_nd') : document.getElementById('f_motivo_nc');
     cabecera.codMotivo = selMotivo.value; // ya es el código real (ej. "01"), no hace falta convertir texto
-    cabecera.desMotivo = selMotivo.options[selMotivo.selectedIndex].text.replace(/^\d+\s*-\s*/, '');
+    const textoMotivoCatalogo = selMotivo.options[selMotivo.selectedIndex].text.replace(/^\d+\s*-\s*/, '');
+    const sustentoEscrito = (document.getElementById('f_sustento').value || '').trim();
+    // "Motivo o Sustento" (cbc:Description) es un solo campo de texto libre según SUNAT — si
+    // Vladi escribió su propia explicación, se usa esa; si no, se manda el texto del catálogo.
+    cabecera.desMotivo = sustentoEscrito || textoMotivoCatalogo;
     const docrefEl = document.getElementById('f_docref');
     const serieRef = (docrefEl.value || '').trim().toUpperCase();
     // Si se eligió de la lista de sugerencias, ya quedó guardado el tipo exacto (Factura/Boleta);
@@ -4049,7 +4099,7 @@ function validarCampoFecha(){
 
 function validarCampoFechaGuia(){
   const val = document.getElementById('g_fecha').value;
-  const {texto, tipo} = calcularMensajeFecha(val);
+  const {texto, tipo} = calcularMensajeFecha(val, 1); // Guías: plazo oficial de 1 día calendario
   mostrarMensajeCampo('msg_g_fecha', texto, tipo);
 
   // Las 3 fechas deben seguir un orden lógico: Emisión ≤ Entrega al transportista ≤ Inicio de traslado.
@@ -4069,13 +4119,14 @@ function validarCampoFechaGuia(){
   }
 }
 
-function calcularMensajeFecha(val){
+function calcularMensajeFecha(val, limiteDias){
+  limiteDias = limiteDias || 3;
   if(!val) return {texto:'', tipo:'error'};
   const fecha = new Date(val+'T00:00:00'); fecha.setHours(0,0,0,0);
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   const diffDias = Math.round((hoy - fecha) / 86400000);
-  if(diffDias > 3) return {texto:`Tiene ${diffDias} días de atraso — SUNAT rechaza pasado el 3er día calendario (código 2108/1079, Res. 000003-2023/SUNAT). Usa una fecha más reciente.`, tipo:'error'};
-  if(diffDias === 3) return {texto:'Justo en el límite (3 días de atraso). El plazo vence al final de hoy — genera y envía cuanto antes para no arriesgarte por diferencia de horas con el reloj de SUNAT.', tipo:'aviso'};
+  if(diffDias > limiteDias) return {texto:`Tiene ${diffDias} días de atraso — SUNAT rechaza pasado el ${limiteDias}${limiteDias===1?'er':'er'} día calendario. Usa una fecha más reciente.`, tipo:'error'};
+  if(diffDias === limiteDias) return {texto:`Justo en el límite (${limiteDias} día${limiteDias===1?'':'s'} de atraso). El plazo vence al final de hoy — genera y envía cuanto antes para no arriesgarte por diferencia de horas con el reloj de SUNAT.`, tipo:'aviso'};
   if(diffDias < 0) return {texto:'La fecha está en el futuro — corrígela.', tipo:'error'};
   return {texto:'', tipo:'error'};
 }
