@@ -444,20 +444,32 @@
 
         <div id="camposNCND" style="display:none;">
           <div class="row2">
-            <div>
+            <div style="position:relative;">
               <label>Comprobante que modifica</label>
-              <input type="text" id="f_docref" placeholder="F001-00000045">
+              <input type="text" id="f_docref" placeholder="Buscar por serie, número o cliente..." autocomplete="off" oninput="buscarComprobanteParaNota(this.value)" onfocus="buscarComprobanteParaNota(this.value)">
+              <div id="listaComprobantesNota" style="display:none; position:absolute; z-index:20; top:100%; left:0; right:0; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; margin-top:4px; max-height:220px; overflow-y:auto;"></div>
             </div>
             <div>
               <label>Motivo</label>
-              <select id="f_motivo">
-                <option>Anulación de la operación</option>
-                <option>Corrección por error en el RUC</option>
-                <option>Descuento global</option>
-                <option>Descuento por ítem</option>
-                <option>Devolución total</option>
-                <option>Devolución por ítem</option>
-                <option>Otros</option>
+              <select id="f_motivo_nc" style="display:none;">
+                <option value="01">01 - Anulación de la operación</option>
+                <option value="02">02 - Anulación por error en el RUC</option>
+                <option value="03">03 - Corrección por error en la descripción</option>
+                <option value="04">04 - Descuento global</option>
+                <option value="05">05 - Descuento por ítem</option>
+                <option value="06">06 - Devolución total</option>
+                <option value="07">07 - Devolución por ítem</option>
+                <option value="08">08 - Bonificación</option>
+                <option value="09">09 - Disminución en el valor</option>
+                <option value="10">10 - Otros conceptos</option>
+                <option value="11">11 - Ajustes de operaciones de exportación</option>
+                <option value="12">12 - Ajustes afectos al IVAP</option>
+                <option value="13">13 - Corrección del monto neto pendiente de pago y/o fechas de vencimiento</option>
+              </select>
+              <select id="f_motivo_nd" style="display:none;">
+                <option value="01">01 - Intereses por mora</option>
+                <option value="02">02 - Aumento en el valor</option>
+                <option value="03">03 - Penalidades / otros conceptos</option>
               </select>
             </div>
           </div>
@@ -2524,6 +2536,48 @@ function detenerPollerEmitidos(){
   if(pollerEmitidosId){ clearInterval(pollerEmitidosId); pollerEmitidosId = null; }
 }
 
+// Busca entre los comprobantes YA EMITIDOS y ACEPTADOS por SUNAT de esta empresa
+// (Factura o Boleta, según lo que corresponda para NC/ND) — autocompleta al elegir uno.
+function buscarComprobanteParaNota(texto){
+  const lista = document.getElementById('listaComprobantesNota');
+  const q = (texto||'').trim().toLowerCase();
+  if(!q){ lista.style.display='none'; lista.innerHTML=''; return; }
+
+  const candidatos = emitidos.filter(e =>
+    e.empresa===empresaActual && e.grupo==='facturacion'
+    && (e.tipo==='factura' || e.tipo==='boleta')
+    && e.sunatEstado==='aceptado'
+    && (
+      (e.serie||'').toLowerCase().includes(q) ||
+      (e.cliente||'').toLowerCase().includes(q)
+    )
+  ).slice(0, 8);
+
+  if(!candidatos.length){
+    lista.style.display='block';
+    lista.innerHTML = `<div style="padding:10px 12px; font-size:12px; color:var(--text-dim);">Sin resultados entre tus comprobantes aceptados por SUNAT.</div>`;
+    return;
+  }
+
+  lista.style.display='block';
+  lista.innerHTML = candidatos.map((e,i)=>`
+    <div style="padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--line); font-size:13px;"
+      onmousedown="elegirComprobanteParaNota(${emitidos.indexOf(e)})">
+      <b>${e.serie}</b> — ${e.cliente} <span style="color:var(--text-dim);">(S/ ${(e.monto||0).toFixed(2)})</span>
+    </div>
+  `).join('');
+}
+function elegirComprobanteParaNota(idx){
+  const e = emitidos[idx];
+  document.getElementById('f_docref').value = e.serie;
+  document.getElementById('f_docref').dataset.tipoAfectado = TIPO_DOC_CATALOGO1[e.tipo]; // "01" Factura o "03" Boleta
+  document.getElementById('listaComprobantesNota').style.display = 'none';
+}
+document.addEventListener('click', function(ev){
+  const lista = document.getElementById('listaComprobantesNota');
+  if(lista && !ev.target.closest('#camposNCND')) lista.style.display='none';
+});
+
 function cambiarDoc(grupo, doc){
   const picker = grupo==='facturacion' ? '#tab-facturacion .doc-picker' : '#tab-guias .doc-picker';
   document.querySelectorAll(picker+' .doc-btn').forEach(b=>b.classList.remove('active'));
@@ -2539,6 +2593,12 @@ function cambiarDoc(grupo, doc){
     } else {
       document.getElementById('tituloDocFact').textContent = 'Nueva ' + docLabels[doc];
       document.getElementById('camposNCND').style.display = (doc==='nc'||doc==='nd') ? 'block':'none';
+      if(doc==='nc'||doc==='nd'){
+        document.getElementById('f_motivo_nc').style.display = (doc==='nc') ? 'block' : 'none';
+        document.getElementById('f_motivo_nd').style.display = (doc==='nd') ? 'block' : 'none';
+        document.getElementById('f_docref').value = '';
+        document.getElementById('f_docref').dataset.tipoAfectado = '';
+      }
       document.getElementById('camposLiquidacion').style.display = (doc==='liquidacion') ? 'block':'none';
       document.getElementById('lbl_f_cliente').textContent = (doc==='liquidacion') ? 'Vendedor (persona natural sin RUC)' : 'Cliente / Razón Social';
       document.getElementById('f_tipodoc').value = (doc==='boleta'||doc==='liquidacion') ? '1' : '6';
@@ -3248,11 +3308,16 @@ function buildFacturaJSON(emp, serie, docTipo){
   };
 
   if(esNota){
-    const motivoTexto = document.getElementById('f_motivo').value;
-    cabecera.codMotivo = MOTIVO_NOTA_A_CODIGO[motivoTexto.toLowerCase()] || "13";
-    cabecera.desMotivo = motivoTexto;
-    cabecera.tipDocAfectado = tipoDocSel === '1' ? "03" : "01"; // 01=Factura, 03=Boleta
-    cabecera.numDocAfectado = document.getElementById('f_docref').value || "";
+    const selMotivo = docActualFact === 'nd' ? document.getElementById('f_motivo_nd') : document.getElementById('f_motivo_nc');
+    cabecera.codMotivo = selMotivo.value; // ya es el código real (ej. "01"), no hace falta convertir texto
+    cabecera.desMotivo = selMotivo.options[selMotivo.selectedIndex].text.replace(/^\d+\s*-\s*/, '');
+    const docrefEl = document.getElementById('f_docref');
+    const serieRef = (docrefEl.value || '').trim().toUpperCase();
+    // Si se eligió de la lista de sugerencias, ya quedó guardado el tipo exacto (Factura/Boleta);
+    // si se escribió a mano, se infiere por el prefijo de la serie (F=Factura, B=Boleta) — esto NO
+    // debe salir del tipo de documento del CLIENTE de la nota nueva, son cosas distintas (bug viejo).
+    cabecera.tipDocAfectado = docrefEl.dataset.tipoAfectado || (serieRef.startsWith('B') ? '03' : '01');
+    cabecera.numDocAfectado = serieRef;
   }
 
   // Datos adicionales SUNAT (opcionales, solo si se marcaron/llenaron)
