@@ -6917,10 +6917,23 @@ function imprimirComprobante(idx, formato, modo){
 
   // Solo para Nota de Crédito/Débito: panel con el comprobante que se modifica, motivo y
   // sustento — ocupa el mismo espacio donde iría la detracción (que no aplica a NC/ND).
+  // Catálogo 09 (NC) y catálogo 10 (ND) — mismos textos que usa el select del formulario, para
+  // mostrar el código junto a su etiqueta legible en el PDF, no solo el número suelto.
+  const ETIQUETAS_MOTIVO_NC = {
+    '01':'Anulación de la operación', '02':'Anulación por error en el RUC',
+    '03':'Corrección por error en la descripción', '04':'Descuento global',
+    '05':'Descuento por ítem', '06':'Devolución total', '07':'Devolución por ítem',
+    '08':'Bonificación', '09':'Disminución en el valor', '10':'Otros conceptos',
+    '11':'Ajustes de operaciones de exportación', '12':'Ajustes afectos al IVAP',
+    '13':'Corrección del monto neto pendiente de pago y/o fechas de vencimiento',
+  };
+  const ETIQUETAS_MOTIVO_ND = {
+    '01':'Intereses por mora', '02':'Aumento en el valor', '03':'Penalidades / otros conceptos',
+  };
   const infoNotaG = (e.tipo === 'nc' || e.tipo === 'nd') && cabG.numDocAfectado ? {
     docAfectado: cabG.numDocAfectado,
     tipoDocAfectado: cabG.tipDocAfectado === '03' ? 'Boleta' : 'Factura',
-    motivo: cabG.codMotivo || '',
+    motivo: cabG.codMotivo ? `${cabG.codMotivo} - ${(e.tipo==='nd' ? ETIQUETAS_MOTIVO_ND : ETIQUETAS_MOTIVO_NC)[cabG.codMotivo] || ''}` : '',
     sustento: cabG.desMotivo || '',
   } : null;
 
