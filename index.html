@@ -6915,6 +6915,15 @@ function imprimirComprobante(idx, formato, modo){
   const detraccionG = cabG.adicionalCabecera && cabG.adicionalCabecera.ctaBancoNacionDetraccion ? cabG.adicionalCabecera : null;
   const guiaRelacionadaG = cabG.documentoRelacionado ? cabG.documentoRelacionado.numDocRelacionado : (e.guiaRelacionada || '');
 
+  // Solo para Nota de Crédito/Débito: panel con el comprobante que se modifica, motivo y
+  // sustento — ocupa el mismo espacio donde iría la detracción (que no aplica a NC/ND).
+  const infoNotaG = (e.tipo === 'nc' || e.tipo === 'nd') && cabG.numDocAfectado ? {
+    docAfectado: cabG.numDocAfectado,
+    tipoDocAfectado: cabG.tipDocAfectado === '03' ? 'Boleta' : 'Factura',
+    motivo: cabG.codMotivo || '',
+    sustento: cabG.desMotivo || '',
+  } : null;
+
   // Insignias de bancos — texto con el color de marca de cada banco (no se usa el logo oficial
   // en sí, por temas de derechos de marca, pero se identifican igual de rápido a simple vista).
   const COLORES_BANCO = {
@@ -7047,8 +7056,25 @@ function imprimirComprobante(idx, formato, modo){
   <div class="footer-totales">
     <div>
       ${montoLetras ? `<div class="son-letras"><b>SON:</b> ${montoLetras}</div>` : ''}
-      ${(detraccionG || esCreditoG) ? `
+      ${(detraccionG || esCreditoG || infoNotaG) ? `
       <div class="paneles-bajos">
+        ${infoNotaG ? `
+        <div class="panel-bajo" style="flex:1.5;">
+          <div class="panel-head">${e.tipo==='nc' ? 'Documento que se modifica (Nota de Crédito)' : 'Documento que se modifica (Nota de Débito)'}</div>
+          <div class="panel-body">
+            <table>
+              <thead><tr><th>Documento Ref.</th><th>Folio</th><th>Motivo</th><th>Sustento</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>${infoNotaG.tipoDocAfectado}</td>
+                  <td>${infoNotaG.docAfectado}</td>
+                  <td>${infoNotaG.motivo}</td>
+                  <td>${infoNotaG.sustento}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>` : ''}
         ${detraccionG ? `
         <div class="panel-bajo">
           <div class="panel-head">Información de Detracción</div>
