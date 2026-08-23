@@ -414,7 +414,7 @@
         <label>Dirección</label>
         <input type="text" id="f_direccion" placeholder="Dirección del cliente">
 
-        <div class="row2">
+        <div class="row2" id="bloqueFormaPagoGuia">
           <div>
             <label>Forma de pago</label>
             <select id="f_formapago" onchange="onFormaPagoChange()">
@@ -2572,6 +2572,16 @@ function elegirComprobanteParaNota(idx){
   document.getElementById('f_docref').value = e.serie;
   document.getElementById('f_docref').dataset.tipoAfectado = TIPO_DOC_CATALOGO1[e.tipo]; // "01" Factura o "03" Boleta
   document.getElementById('listaComprobantesNota').style.display = 'none';
+
+  // Autocompleta también los datos del cliente del comprobante elegido — la Nota
+  // de Crédito/Débito tiene que ir al MISMO cliente que el comprobante que modifica.
+  document.getElementById('f_cliente').value = e.cliente || '';
+  if(e.tipoDocCliente) document.getElementById('f_tipodoc').value = e.tipoDocCliente;
+  document.getElementById('f_doc').value = e.numDocCliente || '';
+  document.getElementById('f_direccion').value = e.direccionCliente || '';
+
+  // La letra de la serie (F/B) depende de este comprobante — refrescar lo que se ve en pantalla.
+  actualizarSeriesVisibles();
 }
 document.addEventListener('click', function(ev){
   const lista = document.getElementById('listaComprobantesNota');
@@ -2593,7 +2603,12 @@ function cambiarDoc(grupo, doc){
     } else {
       document.getElementById('tituloDocFact').textContent = 'Nueva ' + docLabels[doc];
       document.getElementById('camposNCND').style.display = (doc==='nc'||doc==='nd') ? 'block':'none';
+      // Forma de pago y Guía relacionada no aplican a Nota de Crédito/Débito — el XML de
+      // esas notas ni siquiera manda el bloque de forma de pago (confirmado con SUNAT real),
+      // así que mostrarlas ahí solo confunde sin servir de nada.
+      document.getElementById('bloqueFormaPagoGuia').style.display = (doc==='nc'||doc==='nd') ? 'none' : 'grid';
       if(doc==='nc'||doc==='nd'){
+        document.getElementById('camposCredito').style.display = 'none';
         document.getElementById('f_motivo_nc').style.display = (doc==='nc') ? 'block' : 'none';
         document.getElementById('f_motivo_nd').style.display = (doc==='nd') ? 'block' : 'none';
         document.getElementById('f_docref').value = '';
@@ -4165,7 +4180,22 @@ function buildLiquidacionJSON(emp, serie){
 // Factura/Boleta: cada Caja tiene su propia serie numerada (Caja 1→serie F001/B001, Caja 2→F002/B002...);
 // el Administrador de la empresa emite con la serie 5 (F005/B005). El resto de documentos usa la serie
 // única de la empresa (emp.series / emp.correlativos), como antes.
-function obtenerSerieYCorrelativo(emp, docTipo){
+function obtenerSerieYCorrelativo(emp, docTipo, letraSerieNota){
+  // Nota de Crédito/Débito: SUNAT exige que la serie empiece con la MISMA LETRA del
+  // comprobante que se modifica (F si es Factura, B si es Boleta) — confirmado oficial.
+  // Se mantiene el resto de la serie que ya configuraste (ej. "C01" de "FC01"), solo la
+  // primera letra cambia según corresponda, cada una con su propio correlativo aparte.
+  if(docTipo === 'nc' || docTipo === 'nd'){
+    const letra = letraSerieNota || 'F';
+    const restoSerie = (emp.series[docTipo] || (docTipo==='nc'?'FC01':'FD01')).slice(1); // quita la primera letra configurada
+    const codigoSerie = letra + restoSerie;
+    if(!emp.correlativosPorSerie[docTipo]) emp.correlativosPorSerie[docTipo] = {};
+    if(!emp.correlativosPorSerie[docTipo][letra]) emp.correlativosPorSerie[docTipo][letra] = 1;
+    const correlativo = emp.correlativosPorSerie[docTipo][letra]++;
+    const serie = `${codigoSerie}-${String(correlativo).padStart(8,'0')}`;
+    return { serie, correlativo };
+  }
+
   if(docTipo !== 'factura' && docTipo !== 'boleta'){
     const correlativo = emp.correlativos[docTipo]++;
     const serie = `${emp.series[docTipo]}-${String(correlativo).padStart(8,'0')}`;
@@ -4203,7 +4233,14 @@ function generarComprobante(){
 
   // Factura y Boleta usan serie propia por Caja (Caja 1 = serie 1, Caja 2 = serie 2...);
   // el resto de documentos (NC, ND, Guías, Retención, etc.) sigue con la serie única de la empresa.
-  const { serie, correlativo } = obtenerSerieYCorrelativo(emp, docActualFact);
+  // Para NC/ND, la letra de la serie (F o B) se toma del comprobante elegido en "Comprobante
+  // que modifica" — dataset.tipoAfectado ya trae "01" (Factura) o "03" (Boleta).
+  let letraSerieNota = 'F';
+  if(docActualFact === 'nc' || docActualFact === 'nd'){
+    const docrefEl = document.getElementById('f_docref');
+    letraSerieNota = docrefEl.dataset.tipoAfectado === '03' ? 'B' : 'F';
+  }
+  const { serie, correlativo } = obtenerSerieYCorrelativo(emp, docActualFact, letraSerieNota);
 
   let jsonSUNAT = null;
   let tipDocArchivo = null;
@@ -7264,6 +7301,16 @@ function actualizarSeriesVisibles(){
       const prefijo = docActualFact === 'factura' ? 'F' : 'B';
       const codigoSerie = prefijo + String(numSerie).padStart(3,'0');
       const correlativo = (emp.correlativosPorSerie[docActualFact] && emp.correlativosPorSerie[docActualFact][numSerie]) || 1;
+      elFact.textContent = `${codigoSerie}-${String(correlativo).padStart(8,'0')}`;
+    } else if(docActualFact === 'nc' || docActualFact === 'nd'){
+      // La letra (F o B) depende de qué comprobante se eligió arriba en "Comprobante que
+      // modifica" — si todavía no se eligió nada, se muestra con F por defecto (se corrige
+      // solo apenas se elija un comprobante, ver actualizarSerieVisibleNota()).
+      const docrefEl = document.getElementById('f_docref');
+      const letra = (docrefEl && docrefEl.dataset.tipoAfectado === '03') ? 'B' : 'F';
+      const restoSerie = (emp.series[docActualFact] || (docActualFact==='nc'?'FC01':'FD01')).slice(1);
+      const codigoSerie = letra + restoSerie;
+      const correlativo = (emp.correlativosPorSerie[docActualFact] && emp.correlativosPorSerie[docActualFact][letra]) || 1;
       elFact.textContent = `${codigoSerie}-${String(correlativo).padStart(8,'0')}`;
     } else if(emp.series[docActualFact] !== undefined){
       const correlativo = emp.correlativos[docActualFact] || 1;
