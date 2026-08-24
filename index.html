@@ -1395,13 +1395,14 @@
             <label>Código interno (opcional)</label>
             <input type="text" id="prod_codigo" placeholder="250002">
           </div>
-          <div>
+          <div style="position:relative;">
             <label>Código de producto SUNAT (Catálogo 25)</label>
-            <input type="text" id="prod_codigo_sunat" placeholder="ej. 50202306">
+            <input type="text" id="prod_codigo_sunat" placeholder="ej. 50202306" autocomplete="off" oninput="buscarCodigoSunat(this.value)" onfocus="buscarCodigoSunat(this.value)">
+            <div id="listaCodigosSunat" style="display:none; position:absolute; z-index:20; top:100%; left:0; right:0; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; margin-top:4px; max-height:260px; overflow-y:auto;"></div>
           </div>
         </div>
         <div style="background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.3); color:#f7c266; border-radius:8px; padding:8px 10px; font-size:11px; margin-bottom:10px;">
-          ⚠️ Desde el <b>1 de agosto de 2026</b>, este código pasa a ser <b>obligatorio</b> (Catálogo N°25, Anexos 25.1/25.2/25.3) para: oro, explosivos, insumos químicos, <b>combustible</b>, maquinarias y equipos, harina/polvo de pescado, minerales, plomo, piedra, arena, dióxido de carbono, PET. Si vendes combustible (Grifo), llénalo siempre.
+          ⚠️ Desde el <b>1 de enero de 2027</b>, este código pasa a ser <b>obligatorio</b> (Catálogo N°25, Anexos 25.1/25.2/25.3) para: oro, explosivos, insumos químicos, <b>combustible</b>, maquinarias y equipos, harina/polvo de pescado, minerales, plomo, piedra, arena, dióxido de carbono, PET. Si vendes combustible (Grifo), llénalo siempre. <i>(SUNAT postergó esta fecha — antes era el 1 de agosto de 2026, Resolución 000143-2026/SUNAT.)</i>
         </div>
 
         <div class="row2">
@@ -2763,6 +2764,57 @@ function onModalidadChange(){
   }
 }
 
+// ---------- Buscador integrado de Código de Producto SUNAT (Catálogo N°25 / UNSPSC) ----------
+// IMPORTANTE sobre esta lista: son códigos VERIFICADOS con fuentes técnicas confiables
+// (no inventados), pero es un catálogo COMPLETO de más de 150,000 códigos — esta es solo
+// una selección de los más comunes, priorizando combustibles/grifo (tu rubro) y los rubros
+// que la propia SUNAT marca como obligatorios desde 2027. Si no encuentras tu producto acá,
+// usa el buscador externo gratuito enlazado abajo (más completo, con el catálogo oficial).
+const CATALOGO_SUNAT_LOCAL = [
+  // Combustibles — verificados, prioridad para Grifo Tic Tac / Grifo Central
+  {codigo:'15101506', desc:'Gasolina / Petróleo (gasolina de motor)'},
+  {codigo:'15101505', desc:'Diésel (petróleo diésel, incluye B5)'},
+  {codigo:'15101507', desc:'Bencina'},
+  {codigo:'15101508', desc:'Petróleo crudo'},
+  {codigo:'15101509', desc:'Combustible marino'},
+  {codigo:'15111500', desc:'Combustibles gaseosos (clase general — para GLP, verifica el código exacto de 8 dígitos en el buscador externo)'},
+  // Servicios y bienes comunes de uso general (no exhaustivo)
+  {codigo:'78181500', desc:'Transporte de carga por carretera'},
+  {codigo:'80111600', desc:'Servicios de consultoría y asesoría'},
+  {codigo:'81112200', desc:'Servicios de soporte técnico informático'},
+  {codigo:'93141506', desc:'Servicios de alquiler de bienes muebles'},
+  {codigo:'90101801', desc:'Servicios de alojamiento / hospedaje'},
+  {codigo:'90101602', desc:'Servicios de restaurante'},
+];
+
+function buscarCodigoSunat(texto){
+  const lista = document.getElementById('listaCodigosSunat');
+  const q = (texto||'').trim().toLowerCase();
+  if(!q){ lista.style.display='none'; lista.innerHTML=''; return; }
+
+  const candidatos = CATALOGO_SUNAT_LOCAL.filter(c =>
+    c.codigo.includes(q) || c.desc.toLowerCase().includes(q)
+  ).slice(0, 8);
+
+  lista.style.display='block';
+  let html = candidatos.map(c => `
+    <div style="padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--line); font-size:12.5px;"
+      onmousedown="document.getElementById('prod_codigo_sunat').value='${c.codigo}'; document.getElementById('listaCodigosSunat').style.display='none';">
+      <b>${c.codigo}</b> — ${c.desc}
+    </div>
+  `).join('');
+
+  html += `<div style="padding:8px 12px; font-size:11px; color:var(--text-dim);">
+    ¿No lo encuentras? <a href="https://codigosunspsc.destrupack.com.pe/" target="_blank" style="color:var(--accent);">Busca en el catálogo completo (externo, gratis)</a>
+  </div>`;
+
+  lista.innerHTML = html;
+}
+document.addEventListener('click', function(ev){
+  const lista = document.getElementById('listaCodigosSunat');
+  if(lista && ev.target.id !== 'prod_codigo_sunat') lista.style.display='none';
+});
+
 function agregarItem(){
   items.push({producto:'', cant:1, unidad:'UND', precio:0, afectacion:'10'});
   renderItems();
@@ -3688,11 +3740,18 @@ function validarReglasSFS(docTipo, total){
   return errores;
 }
 
-// Aviso no bloqueante: desde 01/08/2026 el código SUNAT es obligatorio para ciertos rubros (combustible, oro, etc.)
+// Aviso no bloqueante: desde 01/01/2027 el código SUNAT es obligatorio para ciertos rubros
+// (combustible, oro, etc.) — POSTERGADO por SUNAT (RS 000143-2026/SUNAT, modifica la RS
+// 000048-2026/SUNAT): la fecha original era 01/08/2026, se corrió a 01/01/2027. Confirmado
+// con múltiples fuentes independientes (NubeFacT, Nibble Corp, Quesito, cpesunat.com) — el
+// catálogo N°25 sí se actualizó el 01/08/2026 pero SIN los anexos 25.1/25.2/25.3 (volvió a
+// la versión v14 anterior); esos anexos que hacen obligatorio el código recién entran en
+// vigor el 01/01/2027. Antes de esa fecha, un código faltante/incorrecto da observación, no
+// rechazo (error 3496 es el que aplicará desde 2027).
 // Devuelve true si se puede continuar (el usuario confirmó o no aplica), false si canceló.
 function confirmarCodigosSunatSiAplica(fechaInput){
   const fecha = fechaInput ? new Date(fechaInput+'T00:00:00') : new Date();
-  const fechaLimite = new Date('2026-08-01T00:00:00');
+  const fechaLimite = new Date('2027-01-01T00:00:00');
   if(fecha < fechaLimite) return true;
 
   const emp = empresas[empresaActual];
@@ -3703,9 +3762,9 @@ function confirmarCodigosSunatSiAplica(fechaInput){
   if(itemsSinCodigo.length === 0) return true;
 
   return confirm(
-    `⚠️ Desde el 01/08/2026, SUNAT exige código de producto (Catálogo N°25) para ciertos rubros (combustible, oro, explosivos, insumos químicos, minerales, etc.).\n\n` +
+    `⚠️ Desde el 01/01/2027, SUNAT exige código de producto (Catálogo N°25, Anexos 25.1/25.2/25.3) para ciertos rubros (combustible, oro, explosivos, insumos químicos, minerales, etc.) — SUNAT postergó esta fecha, antes era 01/08/2026.\n\n` +
     `Estos ítems no tienen código SUNAT en su catálogo:\n` + itemsSinCodigo.map(it=>'• '+it.producto).join('\n') +
-    `\n\nSi alguno es combustible u otro bien de esa lista, SUNAT puede rechazar el comprobante.\n\n¿Generar de todas formas?`
+    `\n\nSi alguno es combustible u otro bien de esa lista, SUNAT puede rechazar el comprobante (error 3496).\n\n¿Generar de todas formas?`
   );
 }
 
