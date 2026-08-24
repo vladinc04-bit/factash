@@ -8,14 +8,14 @@
 <title>FACTASH</title>
 <style>
   :root{
-    --bg:#f4f6f8;
+    --bg:#eef6f5;
     --panel:#ffffff;
-    --panel-2:#eef1f4;
-    --line:#dde3e8;
-    --text:#1f2937;
-    --text-dim:#6b7280;
-    --accent:#14b8a6;
-    --accent-2:#22c55e;
+    --panel-2:#e3f2f0;
+    --line:#c8ddd9;
+    --text:#12303a;
+    --text-dim:#5b7d85;
+    --accent:#0d9488;
+    --accent-2:#16a34a;
     --warn:#f59e0b;
     --danger:#ef4444;
     --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
@@ -28,7 +28,8 @@
   }
   header{
     display:flex; align-items:center; justify-content:space-between;
-    padding:14px 24px; background:var(--panel); border-bottom:1px solid var(--line);
+    padding:14px 24px; background:linear-gradient(90deg, var(--panel), var(--panel-2));
+    border-bottom:2px solid var(--accent);
     position:sticky; top:0; z-index:10;
   }
   .brand{display:flex; align-items:center; gap:10px;}
@@ -123,6 +124,7 @@
   .badge.gtrans{background:rgba(236,72,153,.15); color:#be185d;}
 
   .empty-state{text-align:center; padding:40px 10px; color:var(--text-dim); font-size:13px;}
+  .empty-state svg{display:block; margin:0 auto 12px; opacity:.55;}
 
   .placeholder-note{
     background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.3); color:#8a5a00;
@@ -1804,6 +1806,17 @@ let cajaActual = null; // {id, nombre} de la caja con la que se entró, si aplic
 let docActualFact = 'factura';
 let docActualGuia = 'remitente';
 let items = [];
+// Ícono decorativo (carrito + engranaje) para cuando el catálogo de productos está vacío.
+const ICONO_CARRITO_VACIO = `<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="32" cy="32" r="30" fill="var(--accent)" fill-opacity="0.12"/>
+  <path d="M14 16h4l4.2 20.2a3 3 0 0 0 2.94 2.4h14.7a3 3 0 0 0 2.93-2.35L46 22H20" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="26" cy="47" r="2.6" fill="var(--accent)"/>
+  <circle cx="39" cy="47" r="2.6" fill="var(--accent)"/>
+  <g transform="translate(38,10)">
+    <circle cx="8" cy="8" r="5.2" stroke="var(--accent-2)" stroke-width="2"/>
+    <path d="M8 1.6v2M8 12.4v2M14.4 8h-2M3.6 8h-2M12.5 3.5l-1.4 1.4M4.9 11.1l-1.4 1.4M12.5 12.5l-1.4-1.4M4.9 4.9L3.5 3.5" stroke="var(--accent-2)" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+</svg>`;
 let itemsGuia = [];
 let vehiculosGuia = [];
 let conductoresGuia = [];
@@ -5898,7 +5911,7 @@ function renderCatalogoCompleto(){
         <button class="rm-btn" style="color:var(--danger); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="eliminarProducto('${p.id}')">🗑️ Eliminar</button>
       </div>
     </div>
-  `).join('') || `<div class="empty-state">Sin productos registrados — agrega el primero con el formulario</div>`;
+  `).join('') || `<div class="empty-state">${ICONO_CARRITO_VACIO}Sin productos registrados — agrega el primero con el formulario</div>`;
 }
 
 function renderCatalogo(){
@@ -5911,7 +5924,7 @@ function renderCatalogo(){
       </div>
       <div class="cliente">${p.unidad}</div>
     </div>
-  `).join('') || `<div class="empty-state">Sin productos registrados</div>`;
+  `).join('') || `<div class="empty-state">${ICONO_CARRITO_VACIO}Sin productos registrados</div>`;
 }
 
 function renderDatosEmpresa(){
