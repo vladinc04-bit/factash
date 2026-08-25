@@ -626,8 +626,6 @@
       <button class="doc-btn" data-doc="transportista" onclick="cambiarDoc('guias','transportista')">Guía Transportista</button>
     </div>
 
-    <div class="placeholder-note">Índice de trabajo — datos de prueba.</div>
-
     <div class="grid">
       <div class="card">
         <h2 id="tituloDocGuia">Nueva Guía de Remisión Remitente</h2>
@@ -2689,9 +2687,10 @@ function cambiarDoc(grupo, doc){
       const esNoFiscal = DOCS_NO_FISCALES.includes(doc);
       const btnDatosAdic = document.querySelector('button[onclick="toggleDatosAdicionales()"]');
       if(btnDatosAdic) btnDatosAdic.parentElement.style.display = esNoFiscal ? 'none' : 'block';
+      document.getElementById('notaFact').style.display = esNoFiscal ? 'block' : 'none';
       document.getElementById('notaFact').textContent = esNoFiscal
         ? `⚠️ ${docLabels[doc]} — este documento NO ES un comprobante de pago válido para SUNAT, es solo para uso interno/comercial.`
-        : 'Índice de trabajo — datos de prueba. Nada se envía a SUNAT ni se guarda todavía.';
+        : '';
       onTipoDocChange();
 
       // Percepción por defecto configurada en la empresa — solo aplica a Factura/Boleta
