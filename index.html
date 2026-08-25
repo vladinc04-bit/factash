@@ -124,8 +124,8 @@
   .list-item .cliente{font-size:12.5px; color:var(--text-dim); margin-top:2px;}
   .list-item .monto{font-weight:700; font-size:13px;}
   .badge{font-size:10px; padding:2px 7px; border-radius:20px; font-weight:700; text-transform:uppercase;}
-  .badge.factura{background:rgba(59,130,246,.15); color:#8ab6fb;}
-  .badge.boleta{background:rgba(34,197,94,.15); color:#7fe0a1;}
+  .badge.factura{background:rgba(59,130,246,.15); color:#1d4ed8;}
+  .badge.boleta{background:rgba(34,197,94,.15); color:#15803d;}
   .badge.nc{background:rgba(245,158,11,.15); color:#8a5a00;}
   .badge.nd{background:rgba(239,68,68,.15); color:#b91c1c;}
   .badge.gremit{background:rgba(139,92,246,.15); color:#6d28d9;}
@@ -6432,7 +6432,7 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
       <td style="text-align:right;">${it.peso||''}</td>
       <td style="text-align:right;">${(parseFloat(it.cant)||0).toFixed(2)}</td>
     </tr>
-  `).join('') || `<tr><td colspan="8" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
+  `).join('') || `<tr><td colspan="8" style="text-align:center; color:#4b5563;">(ítems no disponibles para vista previa)</td></tr>`;
 
   const urlConsultaPublica = 'https://www.sunat.gob.pe/ol-it-wsconsvalicpe/ValidezItemFactura.htm';
   const hashMostrado = e.sunatHashCorto || (e.sunatQrUrl ? (e.sunatQrUrl.split('hashqr=')[1] || '') : '');
@@ -6454,7 +6454,7 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; box-sizing: border-box; }
   html, body { width: 100%; overflow-x: hidden; }
   .pagina { width: 98%; max-width: 98%; margin: 0 auto; }
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; color:#333; font-size:11px; margin:0; padding:0; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color:#000000; font-size:11px; margin:0; padding:0; }
   .box { border:1.5px solid var(--azul-borde); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:#fff; }
   .box.fondo { background:var(--azul-fondo); }
   .box.verde { border-color:var(--verde-borde); background:var(--verde-fondo); }
@@ -6464,7 +6464,7 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
   .logo-box img { max-width:100%; max-height:65px; object-fit:contain; }
   .empresa-info { flex:1; text-align:center; }
   .empresa-nombre { font-size:15px; font-weight:bold; color:#000; margin:0 0 4px; }
-  .empresa-detalles { font-size:9.5px; color:#333; text-transform:uppercase; }
+  .empresa-detalles { font-size:9.5px; color:#000000; text-transform:uppercase; }
   .documento-box { flex:0 0 200px; background:var(--azul); color:#fff; border-radius:12px; padding:11px; text-align:center; }
   .documento-ruc { font-size:12px; font-weight:bold; }
   .documento-titulo { font-size:10.5px; margin:5px 0; text-transform:uppercase; line-height:1.3; }
@@ -6481,17 +6481,17 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
   .footer-grid { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:10px; margin-top:12px; }
   .qr-section { display:flex; align-items:center; gap:10px; }
   #qrcode { flex:0 0 130px; }
-  .resumen-hash { font-size:8.5px; color:#555; word-break:break-all; line-height:1.3; }
+  .resumen-hash { font-size:8.5px; color:#1f2937; word-break:break-all; line-height:1.3; }
   .totales-box { display:flex; flex-direction:column; justify-content:center; align-items:center; }
   .total-item { text-align:center; margin:4px 0; }
-  .total-label { font-size:9.5px; color:#555; font-weight:bold; }
+  .total-label { font-size:9.5px; color:#1f2937; font-weight:bold; }
   .total-value { font-size:16px; font-weight:bold; color:var(--azul); }
   .firma-box { display:flex; flex-direction:column; justify-content:flex-end; height:88px; border:1.5px dashed var(--azul-borde); border-radius:12px; padding:10px; text-align:center; }
   .firma-linea { border-top:1px solid #333; margin-top:8px; padding-top:5px; font-size:9.5px; }
   .aviso { margin-top:10px; padding:6px 10px; font-size:9.5px; border-radius:8px; }
   .aviso.pendiente { background:#fff7e6; border:1px solid #e0a72c; color:#8a5a00; }
   .aviso.ok { background:#eafaf0; border:1px solid #2e9e5b; color:#1a7a3c; }
-  .footer-legal { margin-top:12px; text-align:center; font-size:9px; color:#777; border-top:1px solid #eee; padding-top:6px; }
+  .footer-legal { margin-top:12px; text-align:center; font-size:9px; color:#374151; border-top:1px solid #eee; padding-top:6px; }
 </style></head>
 <body>
 <div class="pagina">
@@ -6593,7 +6593,7 @@ function buildGuiaPrintHTML(e, emp, filasItems, contenidoQR, qrDisponible){
     </div>
   </div>
 
-  <div style="font-size:9px; color:#555; margin-top:6px;">
+  <div style="font-size:9px; color:#1f2937; margin-top:6px;">
     Puede consultar y descargar el documento original ingresando el RUC del emisor (${emp.ruc}), el tipo, serie y número (${e.serie}) en:
     <a href="${urlConsultaPublica}" target="_blank" style="color:#1a54c4;">${urlConsultaPublica}</a>
     ${e.sunatQrUrl ? `<br>Enlace directo de verificación: <a href="${e.sunatQrUrl}" target="_blank" style="color:#1a54c4; word-break:break-all;">${e.sunatQrUrl}</a>` : ''}
@@ -6643,7 +6643,7 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
       <td style="text-align:right;">${cant}</td>
       <td style="text-align:right;">${pt ? pt.toFixed(2) : ''}</td>
     </tr>`;
-  }).join('') || `<tr><td colspan="7" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
+  }).join('') || `<tr><td colspan="7" style="text-align:center; color:#4b5563;">(ítems no disponibles para vista previa)</td></tr>`;
 
   const urlConsultaPublica = 'https://www.sunat.gob.pe/ol-it-wsconsvalicpe/ValidezItemFactura.htm';
 
@@ -6653,14 +6653,14 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
 <style>
   @page { size: A4; margin: 12mm; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color:#222; font-size:9.5px; margin:0; padding:0; }
+  body { font-family: Arial, Helvetica, sans-serif; color:#000000; font-size:9.5px; margin:0; padding:0; }
   .pagina { width:100%; }
   .header { display:flex; justify-content:space-between; align-items:flex-end; gap:14px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #333; }
   .logo-box { flex:0 0 130px; height:70px; display:flex; align-items:center; justify-content:center; }
   .logo-box img { max-width:100%; max-height:100%; object-fit:contain; }
   .empresa-info { flex:1; padding-top:2px; }
   .empresa-nombre { font-size:13px; font-weight:bold; text-transform:uppercase; margin:0 0 2px; }
-  .empresa-detalles { font-size:8px; color:#333; line-height:1.3; }
+  .empresa-detalles { font-size:8px; color:#000000; line-height:1.3; }
   .documento-box { flex:0 0 210px; border:1.5px solid #333; border-radius:4px; padding:10px 12px; text-align:center; }
   .documento-ruc { font-size:11px; font-weight:bold; }
   .documento-titulo { font-size:9.5px; font-weight:bold; margin:5px 0; text-transform:uppercase; line-height:1.35; }
@@ -6675,7 +6675,7 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
   .footer-grid { display:flex; gap:14px; margin-top:8px; align-items:stretch; }
   .qr-box { flex:0 0 300px; border:1.5px solid #333; border-radius:6px; padding:10px; display:flex; gap:10px; align-items:center; }
   #qrcode { flex:0 0 130px; }
-  .qr-texto { font-size:9.5px; color:#333; }
+  .qr-texto { font-size:9.5px; color:#000000; }
   .recibi-box { flex:1; border:1px solid #ccc; border-radius:6px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; }
   .recibi-titulo { font-weight:bold; font-size:11px; margin-bottom:0; }
   .linea-firma-vacia { height:44px; border-bottom:1px solid #333; margin:10px 0 14px; }
@@ -6683,7 +6683,7 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
   .campo-firma-label { font-size:10px; white-space:nowrap; flex-shrink:0; }
   .campo-firma-linea { flex:1; border-bottom:1px solid #333; height:12px; }
   .firma-linea { font-size:10px; }
-  .footer-legal { margin-top:6px; text-align:left; font-size:7.5px; color:#666; }
+  .footer-legal { margin-top:6px; text-align:left; font-size:7.5px; color:#1f2937; }
   .footer-legal a { color:#1a54c4; }
   .aviso { margin-top:6px; padding:5px 8px; font-size:8.5px; border-radius:6px; }
   .aviso.pendiente { background:#fff7e6; border:1px solid #e0a72c; color:#8a5a00; }
@@ -6764,7 +6764,7 @@ function buildGuiaPrintHTMLFormatoB(e, emp, filasItems, contenidoQR, qrDisponibl
       <div id="qrcode"></div>
       <div class="qr-texto">
         <strong>🔑 Resumen</strong><br>
-        ${e.sunatQrUrl ? `<span style="font-size:8px; word-break:break-all; color:#666; line-height:1.3;">${hashMostrado}</span><br>` : ''}
+        ${e.sunatQrUrl ? `<span style="font-size:8px; word-break:break-all; color:#1f2937; line-height:1.3;">${hashMostrado}</span><br>` : ''}
         Representación impresa de la GUÍA DE REMISIÓN ELECTRÓNICA.
       </div>
     </div>
@@ -6860,15 +6860,15 @@ function imprimirComprobante(idx, formato, modo){
     // ---------- TICKET 80mm (simplificado) ----------
     const filasTicket = filasItems.map(it => `
       <tr><td>${it.desc}</td><td style="text-align:right;">${it.cant}</td><td style="text-align:right;">${esGuia?textoUnidadImpresion(it.unidad):it.precio.toFixed(2)}</td></tr>
-    `).join('') || `<tr><td colspan="3" style="text-align:center; color:#999;">(ítems no disponibles)</td></tr>`;
+    `).join('') || `<tr><td colspan="3" style="text-align:center; color:#4b5563;">(ítems no disponibles)</td></tr>`;
 
     const html = `
 <!DOCTYPE html><html><head><meta charset="UTF-8"><title>${e.serie}</title>
 <style>
   @page { size: 80mm auto; margin: 4mm; }
-  body { font-family: Arial, sans-serif; color:#111; width:72mm; font-size:11px; }
+  body { font-family: Arial, sans-serif; color:#000000; width:72mm; font-size:11px; }
   h1 { font-size:13px; margin:0 0 4px; text-align:center; }
-  .sub { color:#555; font-size:10px; margin-bottom:6px; text-align:center; }
+  .sub { color:#1f2937; font-size:10px; margin-bottom:6px; text-align:center; }
   table { width:100%; border-collapse:collapse; margin-top:8px; }
   th, td { padding:3px 2px; text-align:left; font-size:10px; }
   th { border-bottom:1px solid #999; }
@@ -6934,7 +6934,7 @@ function imprimirComprobante(idx, formato, modo){
       <td style="text-align:right;">0.00</td>
       <td style="text-align:right;">${esGuia ? '-' : valorVentaAprox.toFixed(2)}</td>
     </tr>`;
-  }).join('') || `<tr><td colspan="8" style="text-align:center; color:#999;">(ítems no disponibles para vista previa)</td></tr>`;
+  }).join('') || `<tr><td colspan="8" style="text-align:center; color:#4b5563;">(ítems no disponibles para vista previa)</td></tr>`;
 
   // Datos de crédito — se usan para el panel "Cronograma de Pagos (Crédito)" que aparece
   // debajo de los totales (no anidado en la tabla de ítems).
@@ -7046,25 +7046,25 @@ function imprimirComprobante(idx, formato, modo){
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
 <style>
   @page { size: A4; margin: 10mm 12mm; }
-  body { font-family: Arial, sans-serif; color:#222; font-size:10.5px; }
+  body { font-family: Arial, sans-serif; color:#000000; font-size:10.5px; }
   .header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid #ddd; }
   .empresa { display:flex; gap:12px; align-items:flex-start; }
   .empresa .logo-wrap { width:58px; height:58px; border-radius:50%; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:#f2f2f2; }
   .empresa .logo-wrap img { width:100%; height:100%; object-fit:contain; }
   .empresa h1 { font-size:14px; margin:0 0 4px; color:${COLOR_ACENTO_PDF}; letter-spacing:0.3px; }
-  .empresa .datos { font-size:9.5px; color:#333; line-height:1.55; }
+  .empresa .datos { font-size:9.5px; color:#000000; line-height:1.55; }
   .empresa .datos b { color:${COLOR_ACENTO_PDF}; }
   .caja-comprobante { border:1.5px solid ${COLOR_ACENTO_PDF}; border-radius:4px; padding:8px 16px; text-align:center; min-width:220px; }
-  .caja-comprobante .ruc { font-weight:bold; font-size:11px; color:#111; }
+  .caja-comprobante .ruc { font-weight:bold; font-size:11px; color:#000000; }
   .caja-comprobante .tipo { display:inline-block; background:${COLOR_ACENTO_CLARO_PDF}; color:${COLOR_ACENTO_PDF}; font-weight:bold; font-size:11.5px; padding:3px 10px; border-radius:3px; margin:5px 0; }
-  .caja-comprobante .serie { font-size:15px; font-weight:bold; letter-spacing:0.5px; color:#111; margin-top:3px; }
-  .fecha-emision { text-align:right; font-size:9.5px; color:#555; margin-bottom:6px; }
+  .caja-comprobante .serie { font-size:15px; font-weight:bold; letter-spacing:0.5px; color:#000000; margin-top:3px; }
+  .fecha-emision { text-align:right; font-size:9.5px; color:#1f2937; margin-bottom:6px; }
   .datos-cliente { width:100%; border:1px solid #ccc; border-radius:4px; border-collapse:collapse; margin-bottom:8px; font-size:9.5px; }
   .datos-cliente td { padding:4px 8px; border-bottom:1px solid #eee; }
   .datos-cliente tr:last-child td { border-bottom:none; }
-  .datos-cliente td.lbl { color:#555; font-weight:bold; width:90px; white-space:nowrap; }
-  .datos-cliente td.val { color:#222; }
-  .obs-label { font-size:9.5px; font-weight:bold; color:#555; text-transform:uppercase; margin:6px 0 3px 2px; }
+  .datos-cliente td.lbl { color:#1f2937; font-weight:bold; width:90px; white-space:nowrap; }
+  .datos-cliente td.val { color:#000000; }
+  .obs-label { font-size:9.5px; font-weight:bold; color:#1f2937; text-transform:uppercase; margin:6px 0 3px 2px; }
   table.items { width:100%; border-collapse:collapse; margin-bottom:8px; }
   table.items th { background:${COLOR_ACENTO_PDF}; color:#fff; padding:5px; font-size:9px; text-align:left; text-transform:uppercase; }
   table.items td { padding:4px 5px; font-size:9.5px; border-bottom:1px solid #eee; vertical-align:top; }
@@ -7085,13 +7085,13 @@ function imprimirComprobante(idx, formato, modo){
   .tabla-bancos { border-collapse:collapse; font-size:8px; width:auto; }
   .tabla-bancos td { border:1px solid #ccc; padding:2px 5px; line-height:1.3; }
   .banco-badge { display:inline-block; color:#fff; font-size:7px; font-weight:bold; padding:1.5px 5px; border-radius:2px; text-transform:uppercase; white-space:nowrap; }
-  .footer-legal { margin-top:12px; text-align:center; font-size:8.5px; color:#777; border-top:1px solid #eee; padding-top:6px; }
+  .footer-legal { margin-top:12px; text-align:center; font-size:8.5px; color:#374151; border-top:1px solid #eee; padding-top:6px; }
 </style></head>
 <body>
 
   <div class="header">
     <div class="empresa">
-      <div class="logo-wrap">${emp.logo ? `<img src="${emp.logo}">` : `<span style="font-size:20px; color:#bbb;">🏢</span>`}</div>
+      <div class="logo-wrap">${emp.logo ? `<img src="${emp.logo}">` : `<span style="font-size:20px; color:#6b7280;">🏢</span>`}</div>
       <div>
         <h1>${emp.nombreComercial || emp.nombre}</h1>
         <div class="datos">
@@ -7207,7 +7207,7 @@ function imprimirComprobante(idx, formato, modo){
   <div class="qr-fila">
     <div style="flex-shrink:0;">
       <div id="qrcode"></div>
-      ${hashMostradoFactura ? `<div style="font-size:6.5px; color:#999; text-align:center; width:75px; word-break:break-all; margin-top:2px;">${hashMostradoFactura}</div>` : ''}
+      ${hashMostradoFactura ? `<div style="font-size:6.5px; color:#4b5563; text-align:center; width:75px; word-break:break-all; margin-top:2px;">${hashMostradoFactura}</div>` : ''}
     </div>
     ${(emp.bancos||[]).filter(b=>b.activo).length || detraccionG ? `
     <table class="tabla-bancos">
