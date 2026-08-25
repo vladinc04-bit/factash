@@ -4143,7 +4143,23 @@ async function consultarRucODni(idDoc, idTipoDoc, idNombre, idDireccion, idMsg, 
   }
 
   const msgEl = document.getElementById(idMsg);
-  if(msgEl){ msgEl.style.display='block'; msgEl.style.color='var(--text-dim)'; msgEl.textContent='Buscando...'; }
+
+  // Primero busca entre tus propios comprobantes ya emitidos (mismo cliente que ya facturaste
+  // antes) — si lo encuentra, usa esos datos directo, sin consultar afuera para nada.
+  const yaConocido = emitidos.find(e => e.empresa===empresaActual && e.numDocCliente === numero);
+  if(yaConocido){
+    document.getElementById(idNombre).value = yaConocido.cliente || '';
+    if(idDireccion && document.getElementById(idDireccion)) document.getElementById(idDireccion).value = yaConocido.direccionCliente || '';
+    if(idUbigeo && document.getElementById(idUbigeo) && yaConocido.ubigeoCliente) document.getElementById(idUbigeo).value = yaConocido.ubigeoCliente;
+    if(msgEl){
+      msgEl.style.display='block'; msgEl.style.color='var(--accent-2)';
+      msgEl.textContent = '✓ Cliente ya registrado en tus comprobantes';
+      setTimeout(()=>{ msgEl.style.display='none'; }, 2000);
+    }
+    return;
+  }
+
+  if(msgEl){ msgEl.style.display='block'; msgEl.style.color='var(--text-dim)'; msgEl.textContent='No está en tus comprobantes — buscando afuera...'; }
 
   try{
     const resp = await fetch(URL_CONSULTA_DOC + numero);
