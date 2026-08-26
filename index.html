@@ -612,7 +612,7 @@
         <div id="modalEditarProducto" class="modal-overlay" style="display:none;" onclick="if(event.target===this) cerrarEditorProducto();">
           <div class="modal-box" style="max-width:600px;">
             <div class="modal-head">Descripción del producto/servicio</div>
-            <textarea id="textareaEditarProducto" rows="4" style="resize:vertical; min-height:90px; font-size:14px;" oninput="sincronizarEditorProducto(this.value)"></textarea>
+            <textarea id="textareaEditarProducto" rows="4" style="resize:vertical; min-height:90px; font-size:14px; text-transform:uppercase;" oninput="sincronizarEditorProducto(this.value)" onblur="this.value=this.value.toUpperCase(); sincronizarEditorProducto(this.value)"></textarea>
             <div style="font-size:11px; color:var(--text-dim); margin-top:8px;">Haz clic afuera de este cuadro para guardar y cerrar.</div>
           </div>
         </div>
@@ -2903,8 +2903,8 @@ function renderItems(){
     tr.className='fila-producto';
     tr.innerHTML = `
       <td>
-        <input type="text" list="datalist_prod_${i}" value="${it.producto}" placeholder="Escribe o elige producto"
-          oninput="items[${i}].producto=this.value; actualizarEstadoBotonGenerar();" onchange="setItemProductoTexto(${i}, this.value)"
+        <input type="text" list="datalist_prod_${i}" value="${it.producto}" placeholder="Escribe o elige producto" style="text-transform:uppercase;"
+          oninput="items[${i}].producto=this.value; actualizarEstadoBotonGenerar();" onblur="this.value=this.value.toUpperCase(); items[${i}].producto=this.value;" onchange="setItemProductoTexto(${i}, this.value.toUpperCase())"
           ondblclick="abrirEditorProducto(${i})">
         <datalist id="datalist_prod_${i}">
           ${emp.productos.map(p=>`<option value="${p.nombre}"></option>`).join('')}
