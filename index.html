@@ -3867,6 +3867,33 @@ const ENVIO_DIRECTO_API_URL = 'https://factura-directo.vmshgroup.com';
 // empresa). Si no está configurado, generarComprobante() sigue usando el bridge
 // del SFS exactamente como antes — este camino nuevo NO reemplaza nada por
 // defecto, hay que activarlo empresa por empresa a propósito.
+// Descarga el XML firmado real o el CDR real de SUNAT, guardados en el servidor
+// al momento del envío original (ver factura-directo-api.js, /api/descargar-archivo).
+// Solo existe para comprobantes emitidos DESPUÉS de activar este guardado — si es
+// más viejo, el servidor responde 404 y se avisa con un alert.
+async function descargarXMLoCDR(empresaId, tipoDoc, serieCombinada, tipo){
+  const [serie, correlativo] = serieCombinada.split('-');
+  const url = `${ENVIO_DIRECTO_API_URL}/api/descargar-archivo?empresaId=${encodeURIComponent(empresaId)}&tipoDoc=${encodeURIComponent(tipoDoc)}&serie=${encodeURIComponent(serie)}&correlativo=${encodeURIComponent(correlativo)}&tipo=${tipo}`;
+  try{
+    const resp = await fetch(url);
+    if(!resp.ok){
+      const data = await resp.json().catch(()=>null);
+      alert(data?.error || `No se pudo descargar el ${tipo.toUpperCase()}.`);
+      return;
+    }
+    const blob = await resp.blob();
+    const nombreArchivo = tipo === 'xml' ? `${serieCombinada}.xml` : `R-${serieCombinada}.zip`;
+    const linkTemp = document.createElement('a');
+    linkTemp.href = URL.createObjectURL(blob);
+    linkTemp.download = nombreArchivo;
+    linkTemp.click();
+    URL.revokeObjectURL(linkTemp.href);
+  } catch(e){
+    alert('No se pudo conectar con el servicio de descarga: ' + e.message);
+  }
+}
+
+
 async function enviarPorPipelineDirectoSiCorresponde(emp, tipoDocArchivo, serie, correlativo, cabecera, detalle){
   if(!emp.envioDirectoEmpresaId) return { automatico: false };
 
@@ -6095,8 +6122,10 @@ function renderEmitidos(){
       <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'a4')">📄 PDF A4</button>
         <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="imprimirComprobante(${idx}, 'ticket')">🧾 Ticket</button>
-        ${['factura','boleta','nc','nd','liquidacion'].includes(e.tipo) && e.jsonSUNAT ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="descargarComprobanteTXTZip(emitidos[${idx}].jsonSUNAT, emp.ruc, '${{factura:'01',boleta:'03',nc:'07',nd:'08',liquidacion:'04'}[e.tipo]}', emitidos[${idx}].serie)">🗂️ Descargar archivos TXT (.CAB/.DET/...)</button>` : ''}
-        ${['retencion','percepcion'].includes(e.tipo) && e.jsonSUNAT ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="descargarRetPerTXT(emitidos[${idx}].jsonSUNAT, emp.ruc, '${e.tipo==='retencion'?'20':'40'}', emitidos[${idx}].serie, ${e.tipo==='retencion'})">🗂️ Descargar archivos TXT (${e.tipo==='retencion'?'.RET/.DRE':'.PER/.DPE'})</button>` : ''}
+        ${['factura','boleta','nc','nd','liquidacion'].includes(e.tipo) && e.jsonSUNAT ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="descargarComprobanteTXTZip(emitidos[${idx}].jsonSUNAT, '${emp.ruc}', '${{factura:'01',boleta:'03',nc:'07',nd:'08',liquidacion:'04'}[e.tipo]}', emitidos[${idx}].serie)">🗂️ Descargar archivos TXT (.CAB/.DET/...)</button>` : ''}
+        ${['factura','boleta','nc','nd','liquidacion'].includes(e.tipo) && emp.envioDirectoEmpresaId ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="descargarXMLoCDR('${emp.envioDirectoEmpresaId}', '${{factura:'01',boleta:'03',nc:'07',nd:'08',liquidacion:'04'}[e.tipo]}', '${e.serie}', 'xml')">📄 Descargar XML</button>
+        <button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="descargarXMLoCDR('${emp.envioDirectoEmpresaId}', '${{factura:'01',boleta:'03',nc:'07',nd:'08',liquidacion:'04'}[e.tipo]}', '${e.serie}', 'cdr')">📥 Descargar CDR</button>` : ''}
+        ${['retencion','percepcion'].includes(e.tipo) && e.jsonSUNAT ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="descargarRetPerTXT(emitidos[${idx}].jsonSUNAT, '${emp.ruc}', '${e.tipo==='retencion'?'20':'40'}', emitidos[${idx}].serie, ${e.tipo==='retencion'})">🗂️ Descargar archivos TXT (${e.tipo==='retencion'?'.RET/.DRE':'.PER/.DPE'})</button>` : ''}
         ${!emp.bridgeEmpresaId ? `<button class="rm-btn" style="color:var(--text-dim); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="document.getElementById('cdrInput_${idx}').click()">📥 Cargar CDR SUNAT</button>
         <input type="file" id="cdrInput_${idx}" accept=".xml" style="display:none;" onchange="cargarCDR(${idx}, this.files[0])">` : ''}
         ${!e.anulado && (e.sunatEstado==='rechazado'||e.sunatEstado==='pendiente'||e.sunatEstado==='en_proceso') ? `<button class="rm-btn" style="color:var(--accent-2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font-size:11px;" onclick="reintentarEnvio(${idx})">🔁 Reintentar (mismo N°)</button>
