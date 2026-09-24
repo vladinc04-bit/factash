@@ -3355,34 +3355,47 @@ async function descargarComprobanteTXTZip(jsonComprobante, ruc, tipoArchivo, ser
   }
 }
 
-// Catálogo N°54 SUNAT — Códigos y porcentajes de bienes/servicios sujetos a detracción.
+// Catálogo de bienes/servicios sujetos a detracción — Anexo IV de la R.S.
+// 183-2004/SUNAT y normas modificatorias (códigos y % vigentes). Se quitaron
+// '002' (Arroz, código ya no existe en el catálogo vigente) y '027' (Transporte
+// de bienes por vía terrestre: NO usa este catálogo de % fijo — se rige por la
+// R.S. 073-2006/SUNAT con "valor referencial" según ruta/distancia, un sistema
+// aparte). Se corrigió '028 Transporte de personas 4%' → código real 026 al 10%
+// (Anexo III, numeral 8). Se agregaron los códigos oficiales que faltaban.
 const DETRACCION_CATALOGO = {
   '001':{desc:'Azúcar y melaza de caña', pct:10},
-  '002':{desc:'Arroz', pct:4},
   '003':{desc:'Alcohol etílico', pct:10},
   '004':{desc:'Recursos hidrobiológicos', pct:4},
   '005':{desc:'Maíz amarillo duro', pct:4},
+  '007':{desc:'Caña de azúcar', pct:10},
   '008':{desc:'Madera', pct:4},
   '009':{desc:'Arena y piedra', pct:10},
   '010':{desc:'Residuos, subproductos, desechos, recortes y desperdicios', pct:15},
   '011':{desc:'Bienes gravados con el IGV, por renuncia a la exoneración', pct:10},
   '012':{desc:'Intermediación laboral y tercerización', pct:12},
+  '013':{desc:'Animales vivos', pct:4},
   '014':{desc:'Carnes y despojos comestibles', pct:4},
+  '015':{desc:'Abonos, cueros y pieles de origen animal', pct:4},
+  '016':{desc:'Aceite de pescado', pct:10},
   '017':{desc:'Harina, polvo y pellets de pescado', pct:4},
-  '019':{desc:'Arrendamiento de bienes muebles', pct:10},
+  '019':{desc:'Arrendamiento de bienes', pct:10},
   '020':{desc:'Mantenimiento y reparación de bienes muebles', pct:12},
   '021':{desc:'Movimiento de carga', pct:10},
   '022':{desc:'Otros servicios empresariales', pct:12},
+  '023':{desc:'Leche', pct:4},
   '024':{desc:'Comisión mercantil', pct:10},
   '025':{desc:'Fabricación de bienes por encargo', pct:10},
-  '027':{desc:'Transporte de bienes', pct:4},
-  '028':{desc:'Transporte de personas', pct:4},
+  '026':{desc:'Servicio de transporte de personas', pct:10},
   '030':{desc:'Contrato de construcción', pct:4},
   '031':{desc:'Oro gravado con el IGV', pct:10},
+  '032':{desc:'Páprika y otros frutos de los géneros capsicum o pimienta', pct:10},
   '034':{desc:'Minerales metálicos no auríferos', pct:10},
   '035':{desc:'Bienes exonerados del IGV', pct:1.5},
+  '036':{desc:'Oro y demás minerales metálicos exonerados del IGV', pct:1.5},
   '037':{desc:'Demás servicios gravados con el IGV', pct:12},
-  '040':{desc:'Primera venta de inmuebles gravados con IGV', pct:4},
+  '039':{desc:'Minerales no metálicos', pct:10},
+  '040':{desc:'Bien inmueble gravado con el IGV', pct:4},
+  '041':{desc:'Plomo', pct:15},
   '099':{desc:'Ley N° 30737', pct:1.5}
 };
 function poblarSelectDetraccion(){
