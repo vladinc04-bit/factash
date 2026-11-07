@@ -3047,9 +3047,18 @@ function renderCuotas(){
   const n = parseInt(document.getElementById('f_ncuotas').value) || 1;
   const total = parseFloat(document.getElementById('f_montofinanciado').value) || 0;
   const montoCuota = n>0 ? (total/n).toFixed(2) : '0.00';
+  // Antes de reconstruir la tabla, rescatamos las fechas ya escritas por el usuario
+  // (si no hacemos esto, cada vez que se toca un ítem de la factura se vuelve a llamar
+  // renderCuotas() y se BORRABA la fecha de vencimiento ya puesta, dejándola vacía al
+  // generar el XML -> SUNAT rechazaba por PaymentDueDate vacío).
+  const fechasPrevias = [];
+  for(let i=1;i<=n;i++){
+    const elPrevio = document.getElementById(`cuota_fecha_${i}`);
+    fechasPrevias[i] = elPrevio ? elPrevio.value : '';
+  }
   let html = '<table><thead><tr><th>Cuota</th><th>Fecha vcmto.</th><th>Monto</th></tr></thead><tbody>';
   for(let i=1;i<=n;i++){
-    html += `<tr><td>${i}</td><td><input type="date" id="cuota_fecha_${i}"></td><td>S/ ${montoCuota}</td></tr>`;
+    html += `<tr><td>${i}</td><td><input type="date" id="cuota_fecha_${i}" value="${fechasPrevias[i] || ''}"></td><td>S/ ${montoCuota}</td></tr>`;
   }
   html += '</tbody></table>';
   document.getElementById('cuotasBox').innerHTML = html;
